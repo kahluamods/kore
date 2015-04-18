@@ -1,0 +1,1759 @@
+KahLua Kore - User Interface (KKoreUI)
+======================================
+
+KKoreUI is a library of useful user interface management functions used
+by all KahLua modules. While it was originally designed to be tightly
+coupled with the rest of KahLua Kore (KKore), it provides functionality
+that is useful and traditionally fairly difficult to work with using the
+standard Blizzard code. Therefore, I have made it possible for this
+portion of KKore to be packaged as a stand-alone library so that other
+addon authors can more easily create their won user interfaces. The
+parts that are most likely to interest other users is the tabbed dialog
+code, the dropdown menu code and the popup menu code. That is the vast
+majority of the KKoreUI code anyway, the rest of it is mostly just a
+thin wrapper on top of normal Blizzard frame types.
+
+KKoreUI functions are divided into three main groups:
+1.  Individual widgets (buttons, edit boxes etc).
+2.  Container widgets (dialogs and tabbed dialogs).
+3.  Utilities (string measurement etc).
+
+1.  Using KKoreUI in your code.
+===============================
+KKoreUI's heritage shows in its directory placement requirement. To use
+this (or other KKore libraries such as KKoreHash) simply copy the KKore
+folder into your addon directory and add the following line to your
+addon's TOC file, right after all of the ## directives:
+     KKore\KKore.xml
+Then edit that file (KKore\KKore.xml) and ensure that KKoreUI has been
+uncommented. If you are using any other KKore libraries in your addon,
+they should be uncommented too.
+
+Once this has been done, somewhere at the top of your module code where
+it initializes itself, you need to get a "handle" to KKoreUI. KKoreUI
+has an embedded version of LibStub, so if you were using that for any
+other reason, such as loading Ace3 libraries, you can remove the
+LibStub.lua file from your addon and its TOC file. This is why you want
+KKore to be loaded as early as possible in your TOC. To get a handle
+for KKoreUI, simply add the following lines to your addon:
+
+  local KUI = LibStub:GetLibrary ("KKoreUI")
+  assert (KUI, "YourModuleName requires KKoreUI, which was not loaded")
+
+That's it. Your addon is now ready to use KKoreUI.
+
+2.  Basic Usage
+===============
+
+Almost all KKoreUI functions take two and only two arguments: a configuration
+table and the parent frame to which the widget is to be attached, which if
+not specified defaults to UIParent. For example, to create a button, you
+could use:
+
+  local button = KUI:CreateButton ({text = "Push me!"})
+
+All options to KKoreUI widgets and functions are passed through the first
+argument, which is a Lua table with a number of named elements that
+control what KKoreUI does. There are some elements common to all or most
+widgets, and some widgets have extra elements to control their behaviour.
+The common elements all widgets share are:
+
+cfg.name [string]
+  The name of the widget or container. Certain widget types must have a
+  name, others its optional. Where a name is mandatory it is discussed in
+  the widget type.
+
+cfg.x, cfg.y [number or string]
+  Where to position this object relative to its parent. Internally KKoreUI
+  performs the following actions:
+
+    frame:SetPoint ("LEFT", parent, "LEFT", x, 0)
+    frame:SetPoint ("TOP, parent, "TOP, 0, y)
+
+  x can also be the string "CENTER" in which case the widget will be
+  centered horizontally withing the parent, and y can be the string
+  "MIDDLE" to be centered vertically. If either x or y are not specified
+  then that particular point ("LEFT" for x, "TOP" for y) are not set by
+  KKoreUI and you will need to place the returned frame yourself.
+
+cfg.width, cfg.height [number]
+  Override the default widget width and height. Each widget type has a
+  default, and this allows you to set your own values.
+
+cfg.enabled [boolean]
+  Most widgets support this element, and if set, sets the default state
+  of the element. If not specified it defaults to true. If you want the
+  widget to start out life disabled, set this to false.
+
+cfg.label [table]
+  Many widgets allow you to set a lable for the widget. If the widget type
+  uses labels, this is how you set its value and properties. This element
+  is a table which can contain the following elements:
+  text
+    The actual text of the label. Must be specified if the label element
+    appears in the config table.
+  font
+    The name of the font to use for the label. Depending on the widget type
+    this has different default values if not specified.
+  color
+    The color for the lable. This is a table with 4 named values: r, g, b and
+    a for the red, green, blue and alpha channels respectively. if a is
+    omitted it defaults to 1. The values for r, g and b must be between
+    0 and 1.
+  pos
+    Where to position the label with regards to the UI element itself.
+    Not all widgets support all values but most do. The possible values
+    are "TOP" to place the label above the widget, "BOTTOM" to display
+    it below, "LEFT" to display it to the left, and "RIGHT" to display
+    it to the right.
+  justifyh, justifyv
+    How the text is justified in the label frame horizontally and
+    vertically. justifyh defaults to "LEFT" for most widgets, and
+    justifyv defaults to "MIDDLE".
+
+cfg.parent [table]
+  If you need the widget to have a specific parent, set it here. Otherwise
+  the parent passed as the argument to the widget creation function is
+  used. If the parent frame passed to the creation function is a KKoreUI
+  container widget and it has a member called "content", then this is set
+  as the actual parent.
+
+cfg.level [number]
+  Set the frame level to the value indicated. Not often used but its here
+  if you need it. The level must be no greater than 128 above the parent's
+  frame level.
+
+cfg.template [string]
+  Set this to the name of a template to use for the widget instead of
+  whichever template is the default.
+
+cfg.canmove [boolean]
+  Some widget types, and especially the container types, allow you to
+  mark the container as movable. Set this to true if you want the user
+  to be able to move the thing, false if not. If set to true, will cause
+  the OnStartMoving and OnStopMoving events to fire when moving starts
+  and stops.
+
+cfg.canresize [boolean or string]
+  Some widget types and containers support resizing. If you want to allow
+  resizing, set this to boolean true if you want resizing in both the
+  vertical and horizontal planes. If you only want to allow vertical
+  resizing, set this to "HEIGHT", and if you only want to allow horizontal
+  resizing set this to "WIDTH". The string "BOTH" has the same meaning as
+  boolean true (resizing in both planes).
+
+cfg.minheight, cfg.maxheight [number]
+  If cfg.canresize enables window resizing, then these two values give
+  the minimum and maximum height that the widget or container can be
+  resized to.
+
+cfg.minwidth, cfg.maxwidth [number]
+  If cfg.canresize enables window resizing, then these two values give
+  the minimum and maximum width that the widget or container can be
+  resized to.
+
+cfg.tooltip [table]
+  Some widgets support setting a tooltip that will be displayed when the
+  mouse enters them. For those widgets, you set the tooltip text and title
+  using this table. It can have the following three members:
+  title
+    The title for the tooltip, displayed at the top of the tooltip using
+    HIGHLIGHT_FONT_COLOR. By special dispensation, if this is the string
+    "$$" then it will be replaced by the title text of the enclosing
+    widget.
+  text
+    The substantive text for the tooltip, displayed using NORMAL_FONT_COLOR.
+    This can have embedded newlines.
+  func
+    Custom placement function. If this is set then the tooltip is anchored
+    to the widget by default, with its TOPLEFT set to just to the right
+    of the widget's TOPLEFT. You can change this placement and the frame
+    it is anchored to in the function. It is passed a single argument, the
+    widget frame pointer.
+
+3.  Utility Functions
+=====================
+These functions do not take the usual configuration table and parent
+as their arguments. They are simply useful functions used throughout
+the KKoreUI internals and useful outside too.
+
+width, height = KUI.MeasureStrWidth (str, font)
+  Measures and returns the absolute width and height of the specified
+  string when using the specified font. If no font is specified then
+  this defaults to the last font used in a call to this or GetFontColor
+  below.
+
+r, g, b, a = KUI.GetFontColor (font)
+rgbtable = KUI.GetFontColor (font, true)
+  Returns the default colors for the given font, either as a set of
+  4 values, or as a table containing the members r, g, b and a with
+  those colors, if the second argument to the function was true. If
+  no font is specified, defaults to the last font pased to this function
+  or to MeasureStrWidth above.
+
+w, h, t, b, l, r = KUI.GetFramePos (frame)
+postable = KUI.GetFramePos (frame, true)
+  Returns the width, height, top, bottom, left and right position of the
+  given frame, or a table with these values names w, h, t, b, l and r
+  if the second argument is true,
+
+frame = KUI.MakeFrame (type, name, parent, template)
+  A drop-in replacement for CreateFrame() that simply securely hooks
+  the SetFrameLevel() function and ensures that all children of a
+  frame have their levels adjusted if you change the frame level.
+
+4.  Return Values
+=================
+The return value from most of the widget creation functions is a frame
+of the specified type, or a generic frame if it is a container. Thus all
+of the functions available to frames of the given type are available to
+call. There are also a few functions or values stored in this return
+value which you can use. The two most important of these are :Catch()
+and :Throw(), which are the mechanism used to receive and dispatch events
+respectively.
+
+ret:Catch (event, handler)
+  Catches the named event and calls the given handler. If no handler
+  is specified, returns the current handler for the event, if any.
+  The handler can either be a function or a string which names a
+  function. If you use a string the function must either be a member
+  of the return value (ret), or a global function. Event handlers can return
+  values to the caller. The first return value is a boolean which
+  indicates that the handler failed in some way. Return true for an
+  error, or nil or false if there was no error. Return any other values
+  after this first value.
+  Please refer to each widget type to see what events it throws
+  which you may want to catch. There are some standard events which are
+  thrown if you call certain functions. These events are described here.
+  All events take as their first argument the name of the event, followed
+  by any additional arguments specific to the event.
+
+  OnWidthSet (this, event, width)
+    Thrown when you call :SetWidth() on a widget and its width changes.
+  OnHeightSet (this, event, height)
+    Thrown when you call :SetHeight() on a widget and its height changes.
+  OnEnable (this, event, onoff)
+    Thrown when you enable or disable the widget, either by calling
+    :Enable() or :Disable() directly, or by calling :SetEnabled (),
+    which is discussed below. onoff is set to true if the widget is
+    being enabled or false if it is being disabled.
+  OnShow (this, event)
+    Thrown when the widget is shown by calling :Show (). This is not
+    quite the same thing as hooking the OnShow script.
+  OnHide (this, event)
+    Thrown when the widget is hidden by calling :Hide (). This is not
+    quite the same thing as hooking the OnHide script.
+  OnValueChanged (this, event, newval, user)
+    For many widget types that store a value, this is thrown whenever
+    the value of the widget changes. Exactly how and when this is called
+    depends on the widget type and is discussed below. user is set to true
+    if this was the result of actual user interaction, false if it was
+    the result of a programatic change. This event may fire multiple times
+    for the same "action". For example, it may fire once with user set to
+    false (as it sets the value) and then again with user set to true if
+    the change was the result of the user clicking or changing the element.
+
+ret:Throw (event, ...)
+  Used to throw an event for the widget. You can use this as a way of
+  controlling your widgets with custom events. Takes any number of
+  arguments all of which are pased unprocessed to any handlers.
+
+ret:SetEnabled (onoff)
+  If the widget is to be enabled, pass the value of true, or pass the
+  value false to disable the widget. Throws "OnEnable" for the widget.
+
+ret:SetShown (onoff)
+  Pass true to show the widget, false to hide it. Throws "OnShow" or
+  "OnHide".
+
+5.  Widgets
+===========
+This section discusses the basic KKoreUI widgets that are usually placed
+within containers or your own frames. These are the basic "building
+blocks" of a user interface. All of these widgets take the same two
+parameters: the config table and the parent, which defaults to UIParent
+if not specified. If the parent specified is a KKoreUI container object
+and that container has a "content" member, then the actual low level
+frame parent is set to that content frame, not to the outer containing
+frame of the container widget. If the widget throws any extra events
+they are displayed as throw:EVENTNAME (args).
+
+In discussing each widget type below, the convention is to use
+cfg.ELEMENTNAME to describe elements of the config table passed as the
+first argument, and ret.VALUE to ret:FUNCTION to describe values or
+functions found in the returned frame.
+
+5.1 KUI:CreateStringLabel
+-------------------------
+Creates a simple frame with a text string inside it. Since this entire
+widget type is a label, the various label members discussed in section 2
+above are all part of the base configuration table, not in a label
+element. This widget supports tooltips.
+
+cfg.autosize [boolean]
+  Enabled by default. If set to false the string label remains the
+  exact height and width specified in cfg. Otherwise, it adjusts the
+  frame size and string width to accomodate the string.
+
+cfg.border [boolean]
+  If set to true, surrounds the label with a thin (tooltip style) border.
+
+ret:SetText (string)
+  Sets the label's string to the one specified.
+ 
+ret:SetTextColor (r, g, b, a)
+  Sets the color of the label to the colors specified, all in the range
+  0 to 1.
+
+ret.label [FontString]
+  Low level pointer to the actual label created by the call to
+  CreateFontString ().
+
+Example:
+  local cfg = {
+    x = "CENTER", y = 0, width = 200, autosize = false, border = true,
+    text = "My string label", font = "GameFontHighlight",
+    color = { r = 1, g = 1, b = 0 }, justifyh = "CENTER",
+  }
+  local mystr = KUI:CreateStringLabel (cfg, myframe)
+
+5.2 KUI:CreateEditBox
+---------------------
+Creates an input box into which the user can type text or numbers.
+The default width and height are 200 and 24, respectively. Please note
+that the width and height do not take the label into account. These
+values control only the width and height of the edit box itself. This
+widget supports tooltips.
+
+cfg.len [number]
+  Sets the maximum number of characters the user can type in the edit box.
+  This defaults to 128.
+
+cfg.numeric [boolean]
+  Set to true if the input to this field should be only numbers. Defaults
+  to false.
+
+cfg.font [string]
+  Sets the name of the font for the text inside the edit box. Defaults
+  to "ChatFontNormal".
+
+cfg.color [RGB table]
+  Sets the color of the text inside the edit box.
+
+cfg.label [table]
+  Standard label as described in section 2 above. The label position
+  defaults to "LEFT".
+
+cfg.initialvalue [string]
+  Sets the initial value of the edit box.
+
+ret.label [FontString]
+  Low level access to the label, if any. This is the return value from
+  CreateFontString ().
+
+ret.lrgb [RGB table]
+  The label colors.
+
+ret.trgb [RGB table]
+  The actual text colors.
+
+throw:OnEnterPressed (value)
+  Thrown when Enter is pressed. value is the value of the edit box at the
+  time that enter was pressed. This sets the "saved value" of the edit box,
+  If a user presses Escape while changing set, the edit box contents are
+  set back to the last "saved value". If the handler for this event returns
+  true, which signals an error, then the input focus remains in the edit box.
+  Otherwise, focus is cleared.
+
+throw:OnEscapePressed ()
+  Thrown if the user presses Escape while entering text. When the edit box
+  value is restored to its last "saved value", this will also throw an
+  OnValueChanged () event.
+
+throw:OnValueChanged (value, user)
+  Thrown whenever the value of the edit box changes. This will be thrown
+  when the value of the edit box is set with :SetText() or when the last
+  saved value is restored if a user presses Escape. It will also be thrown
+  when the user presses enter after entering or removing text. user is set
+  to true if this is the result of a user change, false if programatic.
+
+Example:
+  local cfg = {
+    x = 0, y = -24, numeric = true, width = 32, len = 4,
+    label = { text = "Enter a number" },
+  }
+  local myeb = KUI:CreateEditBox (cfg, myframe)
+
+5.3 KUI:CreateCheckBox
+----------------------
+Creates a checkbox that can have a boolean on/off state. When on, it has
+a check mark in a little box. When off, the check mark is hidden.
+Check box labels can only appear to the "LEFT" or "RIGHT" of the box.
+If you need labels to appear above or below a check box for some reason
+(it looks terrible visually) then set your own label manualy with
+KUI:CreateStringLabel (). The default width and height are both 24.
+Adjust the width for a label if you will be using one. This widget supports
+tooltips.
+
+cfg.autosize [boolean]
+  Usually labels do not form part of the width or height of the widget.
+  However, labels are so intrinsic to this widget type that they do.
+  Set this to true if the containing frame is to be sized when the
+  label of the box changes or is set, false if the size is to remain
+  exactly as specified. Defaults to false.
+
+cfg.checked [boolean]
+  Set to true if the box should start out in the checked state, false if not.
+
+ret:SetText (text)
+  Sets the checkbox label to the specified text, and resizes the whole
+  frame if cfg.autosize was true.
+
+ret:GetChecked ()
+  Returns true or false if the button is or is not checked.
+
+ret:SetChecked (onoff)
+  Sets the checked state to on (if onoff is true) or off (if it is false).
+
+ret:ToggleChecked ()
+  Toggles the current checked state.
+
+ret.text [FontString]
+  Low level pointer to the label, if any.
+
+ret.rgb [RGB table]
+  The color of the lable, if any.
+
+throw:OnClick (checked)
+  Throws when the button is clicked. checked is set to the current state
+  of the button after the click was processed (in other words after the
+  state was changed and the new current value set).
+
+throw:OnValueChanged (onoff, user)
+  Thrown whenever the state of the button changes. onoff is set to false
+  if the button is unchecked, true if it is checked. user is true if this
+  was the result of a user action, false otherwise. May fire multiple
+  times
+
+Example:
+  local cfg = {
+    x = 0, y = 0, checked = true, label = { text = "Option 1" },
+  }
+  local mycb = KUI:CreateCheckBox (cfg, myframe)
+  mycb:Catch ("OnValueChanged", function (this, event, onoff)
+    print ("Option 1 set to " .. tostring(onoff))
+  end)
+
+5.4 KUI:CreateRadioButton
+-------------------------
+Radio buttons are a group of buttons which have a mutually exclusive
+choice (i.e. only one button in a radio group can be selected or
+checked at a time). For this reason, a mandatory element in the config
+table is the "group" element that groups all radio buttons in a
+group together. In order for radio buttons to work, all of the radio
+buttons must share a common parent. That parent can contain any number
+of radio button groups, but still, each group can only ever have one
+of its buttons pressed at a time. The default width and height are
+both 16.  Adjust the width for a label if you will be using one.
+This widget supports tooltips.
+
+cfg.autosize [boolean]
+  Usually labels do not form part of the width or height of the widget.
+  However, labels are so intrinsic to this widget type that they do.
+  Set this to true if the containing frame is to be sized when the
+  label of the box changes or is set, false if the size is to remain
+  exactly as specified. Defaults to false.
+
+cfg.group [string]
+  The name of the radio button group to which this radio button belongs.
+
+cfg.groupparent [table]
+  Set this to an explicit parent that contains the radio button group.
+  If not set this defaults to the parent specified in the call. If
+  that parent is some type of container and does not itself contain
+  all of the radio buttons in the group, use this to set a top level
+  parent that will contain all of the radio buttons. If you set this
+  you may also need to set the getbutton element below.
+
+cfg.checked [boolean]
+  Set to true if this radio button should be selected by default,
+  false otherwise.
+
+cfg.value [anything]
+  Set the value for this particular radio button. Each button in the
+  group must have a unique value (not enforced).
+
+cfg.func [function]
+  A convenience function that is called whenever the value of a radio
+  group changes. In order for this to have any meaning, all of the
+  buttons in a group should use the same function. This is essentially
+  just a convenient way of attaching an OnValueChanged event to each
+  radio button in a group. This function takes as its values a pointer
+  to the button that was pressed, whether the button is on or off, and
+  the button value:
+    local radiofunc (this, onoff, value)
+       ...
+    end
+
+cfg.getbutton [function]
+  Function that takes the radio button frame as its only argument.
+  This function must return a pointer to the parent that contains the
+  radio group. This really is very rarely used, and the best way to
+  understand why it is necessary is to look at the internals of
+  KKoreUI. Not for the weak of heart.
+
+ret:SetChecked ()
+  Sets this specific radio button to the one and only one in the group
+  that is checked. This will cause OnValueChanged events to be fired
+  both for the button being checked and for the button that is
+  currently checked becoming unchecked. There is NO guarantee of the
+  order in which these two events fire.
+
+ret:SetValue (value, nothrow)
+  Sets the value for the entire radio group to the value specified.
+  Essentially this just searches through all of the radio buttons in
+  the group until it finds one with a matching value, and if that was
+  not already set, set it to the current checked button. This will
+  also cause OnValueChanged events to fire for both the new button and
+  the previously selected one. Note that each button in the radio
+  group gets this function. Regardless of which button's function you
+  call it will set the value for the entire group. If nothrow is true,
+  do not throw an OnValueChanged event.
+
+ret:GetValue ()
+  Searches the radio group for the currently selected button and
+  return its value.
+
+throw:OnValueChanged (onoff, user, value)
+  Thrown when a buttons state changes. onoff is true if this is the
+  currently selected button, false otherwise. value is the value of
+  the button. user is whether this was a user initiated change or a
+  programatic one.
+
+Example:
+  local cfg = {
+    x = 0, y = 0, group = "mygroup", value = 1, checked = true,
+    label = { text = "Exclusive option 1" },
+  }
+  local myrb1 = KUI:CreateRadioButton (cfg, myparent)
+  cfg.y = -16
+  cfg.value = 2
+  cfg.label.text = "Exclusive option 2"
+  cfg.checked = false
+  local myrb2 = KUI:CreateRadioButton (cfg, myparent)
+  cfg.y = -32
+  cfg.value = 3
+  cfg.label.text = "Exclusive option 3"
+  local myrb3 = KUI:CreateRadioButton (cfg, myparent)
+  print ("Current option: " .. tostring(myrb3:GetValue ()))
+
+5.5 KUI:CreateSlider
+--------------------
+This widget type allows you to create either a vertical or horizontal
+slider that lets you drag a thumbnail to increase and decrease the slider
+value in defined increments between a given minimum and maximum value.
+A horizontal slider has a default width of 200 and height of 16, and
+a vetical slider has a default width of 16 and height of 200. This widget
+supports tooltips.
+
+cfg.orientation [string]
+  Either "HORIZONTAL" or "VERTICAL". Defaults to "HORIZONTAL".
+
+cfg.minval [number]
+  Sets the minimum value for the slider. Defaults to 0.
+
+cfg.maxval [number]
+  Sets the maximum value for the slider. Defaults to 100.
+
+cfg.step [number]
+  Sets the increment that the slider can change by. Defaults to 1.
+
+cfg.initialvalue [number]
+  Sets the initial value. Defaults to minval if not specified.
+
+cfg.minmaxfont [string]
+  Name of the font to use to display the minimum and maximum values.
+  Defaults to "GameFontHighlightSmall".
+
+cfg.minmaxcolor [RGB table]
+  Sets the color for the minimum and maximum values. Defaults to whatever
+  the color is for the font.
+
+cfg.editfont [string]
+  Sets the font for the edit box that appears in the middle of the slider
+  where the user can manually type in a value. Defaults to
+  "GameFontHighlightSmall".
+
+cfg.editcolor [RGB table]
+  Sets the color of the edit box text. Defaults to whatever the default
+  color for the font is.
+
+cfg.label [table]
+  Only valid for HORIZONTAL sliders. Sets the title of the slider that
+  is always displayed above the slider (the pos element is ignored).
+
+throw:OnValueChanged (value, user)
+  Thrown when the value changes by whatever mechanism.
+
+ret.editbox [table]
+  Pointer to the raw edit box.
+
+ret.mintxt [FontString]
+  Pointer to the raw font string for the minimum value.
+
+ret.maxtxt [FontString]
+  Pointer to the raw font string for the maximum value.
+
+ret.mrgb [RGB table]
+  Colors for the minumuma nd maximum strings.
+
+ret.ergb [RGB table]
+  Colors for the edit box.
+
+ret.label [FontString]
+  Pointer to the raw label font string.
+
+ret.lrgb [RGB table]
+  Colors for the label.
+
+Example:
+  local cfg = {
+    x = 0, y = -60, initialvalue = 42,
+    label = { text = "My Slider", justifyh = "CENTER" },
+  }
+  local myslider = KUI:CreateSlider (cfg, parent)
+
+5.6 KUI:CreateButton
+--------------------
+Creates a simple pushbutton based on the UIPanelButtonTemplate template.
+This widget supports tooltips.
+
+cfg.template [string]
+  Name of an alternate button template to use if you do not want to use
+  the default UIPanelButtonTemplate template. If you dont want to use
+  any template set this to the empty string ("").
+
+cfg.hook [boolean]
+  When set to true, hook the OnClick function rather than setting it.
+  You would want to do with if you want to preserve the OnClick handler
+  from a template. If this is nil or false, set an onclick handler that
+  will :Throw() an OnClick event. If set to true, :Throw () the onclick
+  event only after the template's OnClick handler has run.
+
+cfg.text [string]
+  Text to display on the button (if any).
+
+throw:OnClick (button, down)
+  Thrown when the button is clicked. BUTTON is the name of the button that
+  was pressed, and DOWN is true if the button is being pressed, false or nil
+  if it is being released.
+
+5.7 KUI:CreateDropDown
+----------------------
+Custom replacement for the notoriously confusing and badly implemented
+Blizzard dropdown menu code. Visually a KUI dropdown looks almost
+identical to the Blizzard one, but the internals are extremely different.
+This widget type must be given a name. Drop down menus can be either
+a simple single level drop down, or any of the items on the menu can
+be a submenu, with no restriction other than a practical one of how
+deep you can stack submenus. Submenus will automatically close the
+dropped down portion when the mouse leaves it for any length of time
+(which is configurable). This widget has two distinct portions. The
+first is the "static" portion that has the push button for displaying
+the drop down menu, and the string which has the current value or title,
+and the second portion is the actual menu that drops down below it
+when you press the drop down button. In this discussion, the first is
+refered to as the static portion and the second as the menu portion.
+This widget supports tooltips for the static portion, as well as
+individual tooltips for each item.
+
+Note that if a given menu has too many items to fit in the specified
+or calculated minimum / maximum height and width of the menu, the code
+will provide a small scrollbar on the left side of menu, which can be
+clicked or scrolled using the mouse wheel.
+
+cfg.name [string]
+  Name of the dropdown. Must be provided for all dropdowns, including
+  submenus.
+
+cfg.items [table]
+  Menu items for the dropdown. See below for details. Must be provided.
+  If you need to create an empty dropdown that you will populate later,
+  set this to KUI.emptydropdown.
+
+cfg.dwidth [number]
+  The width of the static user-interface portion of the dropdown.
+  Must be provided.
+
+cfg.label [table]
+  Label for the dropdown menu.
+
+cfg.justifyh [string]
+  Justification for the static text portion. Defaults to "LEFT".
+
+cfg.border [string]
+  Sets the border style. Values are "THICK" (the default) for dialog
+  style borders, or "THIN" for tooltip style borders. This is the
+  border used for the menu portion.
+
+cfg.mode [string]
+  Sets the "mode" for the dropdown. Can have one of three possible
+  values: "SINGLE" (the default if no mode is specified) for a dropdown
+  menu that allows you to select a single value from a list of
+  choices, "MULTI" which allows you to check multiple options, or
+  "COMPACT", which is the same as "SINGLE" but has no check marks
+  in order to save space. These values set the default for each item's
+  "keep" and "notcheckable" options See below for details.
+
+cfg.arg [anything]
+  Argument that is set for each item as its "tlarg" element.
+
+cfg.func [function (tbf, created)]
+  Function that is called with the item being clicked or created,
+  and a boolean indicating if the function is being called because
+  the item was just created. The tbf parameter is the full item
+  frame, with all of its values, as specified below.
+
+cfg.itemheight [number]
+  Optional. If set, sets the default height for each item so that you
+  do not need to specify it for each and every item. An individual
+  item may still override this default by specifying a height.
+
+cfg.timeout [number]
+  Sets how long the mouse cursor must be out of the bounds of the
+  static or menu portions before the dropdown is automatically closed.
+  Defaults to 3 seconds.
+
+cfg.minheight, cfg.maxheight [number]
+  If the menu portion is to be resizable, sets the minimum and maximum
+  height of the menu, respectively. See section 2 for details.
+
+cfg.minwidth, cfg.maxwidth [number]
+  If the menu portion is to be resizable, sets the minimum and maximum
+  width of the menu. See section 2 for details.
+
+cfg.canresize [boolean or string]
+  Allow or disallow resizing. See section 2 above for details.
+
+cfg.title [table]
+  Same type of table as a label. This is only used for MULTI mode
+  dropdowns where a clear choice about what to display in the static
+  text box cannot be made. With SINGLE or COMPACT mode dropdowns,
+  the static text is set to the currently selected item, but since
+  multiple items can be selected for a MULTI mode dropdown, this has
+  less meaning. Thus, this title. This sets the permanent value of the
+  static text box to this value. If this is not specified and the
+  first item in the item list is a title item that is used instead.
+  If the first item is not a title, a multi mode drop down will have no
+  value set by this code and you should set it yourself.
+
+cfg.width [number]
+  Set the width of this dropdown menu. If this is not set, then the
+  default width of the dropdown is set to be just wide enough to contain
+  the widest text or frame item.
+
+cfg.height [number]
+  Sets the height of this dropown menu. If this is not set, then the
+  height of the dropdown is set to be high enough to cover all of
+  the items, or 300, whichever is less. If the height required to show
+  all of the items is greater than this value, then the dropdown will
+  be scrollable.
+
+ret:SetJustification (how)
+  How to justify the text in the static portion of the dropdown.
+  Defaults to "LEFT".
+
+ret:UpdateItems (newitemtable)
+  Updates the menu portion to have the new items specified. This must be
+  the full list of items, there is no mechanism to randomly insert or
+  delete or modify items.
+
+ret:GetValue ()
+  Returns the value of the currently selected item or nil if no item
+  is selected.
+
+ret:SetValue (value, nothrow)
+  Sets the currently selected item to the first item that matches the
+  specified value. Ideally, each item in a dropdown will have a
+  unique value. If not, there is no guarantee which item with the same
+  value will actually become checked. If nothrow is true, do not thow an
+  OnValueChanged event.
+
+ret:Close ()
+  Closes the dropdown menu and any submenus
+
+ret:StopTimeoutCounter()
+ret:StartTimeoutCounter ()
+  Two functions to be called whenever the mouse enters or leaves the bounds
+  of any portion of the dropdown.
+
+ret.text [FontString]
+  Pointer to the raw font string that holds the displayed text
+  string of the current value or title.
+
+ret.button [table]
+  Pointer to the raw button that when pressed, will cause the
+  menu to drop down.
+
+ret.label [FontString]
+  Pointer to the low level font string for the label, if any.
+
+ret.labelcolor [RGB table]
+  Color values for the label.
+
+ret.toplevel [table]
+  Pointer to itself, as this is the top level of the dropdown.
+
+ret.dropdown [table]
+  The pointer to the top level drop down menu. This and all subsequent
+  submenus all have the same values inside. The values of this table are:
+  .toplevel [table]
+    Pointer to the very top level. Same as the return value from
+    KUI:CreateDropDown().
+
+  .sframe [table]
+    Pointer to the scrolling frame that contains the items.
+
+  .cframe [table]
+    Pointer to the child frame which is set as the child of .sframe.
+    This is the actual low level parent of all of the items.
+
+  .scrollbar [table]
+    Pointer to the scrollbar object that is positioned to the left of all
+    of the items if it needs to scroll.
+
+  .iframes [table]
+    Table of each individual item frame.
+
+  .current [table]
+    Pointer to the currently selected item.
+
+ret.trgb
+  The color for the static text title if the mode is MULTI.
+
+throw:OnClick ()
+  Thrown when the dropdown button is clicked and the dropdown either hidden
+  or shown.
+
+throw:OnItemChecked (item, checked)
+  Thrown when an item is checked on unchecked.
+
+throw:OnValueChanged (value, user)
+  Thrown when a new item is selected in a SINGLE or COMPACT drop down
+  and the drop down value changes.
+
+5.7.1 Menu Item Table
+---------------------
+
+For a dropdown, you define the choices by passing an item table through the
+main config structure. This is a table of tables, each element of
+which desribes a single item on the menu. This section describes the
+various values that can be set for each item.
+
+Each item must be either a text item or a custom frame, not both.
+Thus you need provide only menu.frame or menu.text. It is an error
+to provide both, or neither.
+
+menu.name [string]
+  Individual item name, possibly used by the handler function.
+
+menu.func [function (item, created)]
+  Function that is passed the item frame and whether or not the item has
+  just been created. This is called when the item is clicked and when
+  it is created. Optional.
+
+menu.arg [anything]
+  Presumably useful to the function above.
+
+menu.value [anything]
+  Unique value for the menu item.
+
+menu.tooltip [table]
+  Tooltip for this item. See section 2 above for details.
+
+menu.color [RGB table or function]
+  Color for the menu item text. Can be a table or a function that
+  returns a table.
+
+menu.title [boolean or function]
+  Whether or not this item is a title. Title items cannot be clicked on
+  or checked. Can be a boolean or a function returning a boolean. Title
+  items are displayed in a different font ("GameFontNormalSmallLeft" by
+  default). They are always both nocheckable and nonclickable.
+
+menu.enabled [boolean or function]
+  Whether or not this item is enabled. Can be a boolean or a function
+  that returns a boolean.
+
+menu.checked [boolean or function]
+  Whether or not this item should be checked. Can be a boolean or a
+  function that returns a boolean.
+
+menu.keep [boolean or function]
+  This can be a boolean or a function returning a boolean. If set to
+  true, keep the dropdown menu open even after the item is clicked.
+  If set to false, close the dropdown when the item is clicked. The
+  default value for this depends on the dropdown type. For SINGLE and
+  COMPACT mode dropdowns, this defaults to false. For MULTI mode
+  dropdowns it defaults to true. However, regardless of mode, if you
+  explicitly set this for an item, it will be obeyed.
+
+menu.text [string or function]
+  Either a string or a function that returns a string. This element is
+  mutually exclusive with menu.frame (see below). If this is specified
+  then this is a normal menu item or the text for a submenu. Unless
+  other options below prevent it, a normal menu item is both clickable
+  and checkable. This is the most common type of menu item. By
+  special dispensation, if the string (or return value from the
+  function) is a single hyphen ("-"), then this becomes a menu
+  "spacer" item that is neither clickable not checkable, and draws a
+  thin horizontal line between two sections of a menu. The default
+  font for text items is "GameFontHighlightSmallLeft"
+
+menu.notclickable [boolean or function]
+  A boolean or a function returning a boolean. If set to true, then this
+  item is not clickable (and by extension, not checkable). This is
+  rarely used with text menu items but is more commonly used with
+  custom frame menu items that are simply placing textures or other
+  content in the menu.
+
+menu.notcheckable [boolean or function]
+  A boolean or a function returning a boolean. Setting this to true means
+  the item can not be checked. More accurately, it means it will not have
+  a checkmark ascociated with it. COMPACT mode menus force this to true.
+  SINGLE and MULTI mode menus set it to false by default.
+
+menu.icon [string or function]
+  The name of an icon or a function return such a name. This is forced
+  to be a 16x16 sized icon. This icon will appear between the checkmark
+  (if any) and the left edge of the frame or text.
+
+menu.iconcoord [table]
+  If menu.icon is set above, this can be a set of texture co-ordinates
+  for the icon. This uses the 4-call version of SetTexCoord (). The table
+  can have members called left (defaults to 0), right (defaults to 1),
+  top (defaults to 0) and bottom (defaults to 1).
+
+menu.font [string or function]
+  Font to use for a title or text item. 
+
+menu.height [number]
+  Set this item to be this number of pixels high. If not set, inherits the
+  containing menu's itemheight value. If the menu does not have itemheight
+  set then this value must be provided.
+
+menu.width [number]
+  Set this item to be this number of pixels wide. If not specified this
+  defaults to the width of the text string or frame.
+
+menu.frame [table or function]
+  There may be times when you need a custom frame for a menu item to
+  represent something in the menu other than a simple checkbox choice.
+  For these situations, you can provide your own frame that is
+  placed in the menu by the KKoreUI code. This is rarely used for
+  dropdown menus, but more commonly used for popup menus. This element
+  must either be a frame or a function that returns a frame. It is the
+  responsibility of these custom frames to call the StartTimeoutCounter
+  and StopTimeoutCounter when the mouse leaves or enters the frame. In
+  order to make it easier to insert custom frames, if you set this
+  element to be boolean true, then this will call an internal KKoreUI
+  function that allows you to place one of a number of widgets on the
+  menu. If you use this facility, then you must set the menu.widget
+  element below to one of the supported widget names, and provide any
+  extra elements that widget may require as part of this menu item
+  table. If you set this to any other value then you need to manage the
+  frame yourself.
+
+menu.widget [string]
+  If you are using a custom frame and you are using the internal KKoreUI
+  custom frame creation function (by setting menu.frame to true), then this
+  element tells KKoreUI which widget type to create for the custom frame.
+  For each of these widget types, you may need to set extra elements in
+  the menu item table to provide configuration options for the widget.
+  Where this is the case is is described along with the widget type.
+  Note that using this feature requires the full KKoreUI library. If
+  you have stripped out just the dropdown portion, you may not be able to
+  use this feature. However, this document assumes you are using the
+  full KKoreUI, so please note that these widget types use the widgets
+  described above, so the purpose of the extra values is not discussed here.
+  Refer to the individual widget types above for details. The KKoreUI
+  widget type is displayed in parentheses.
+
+  "radio" (KUI:CreateRadioButton)
+    This widget type creates a radio button. Extra item elements you need
+    to provide are:
+    menu.group - the radio button group name
+
+  "slider" (KUI:CreateSlider)
+    Create a slider widget. The additional elements are:
+    menu.orientation - slider orientation (defaults to "VERTICAL")
+    menu.editfont - edit box font
+    menu.editcolor - edit box text color
+    menu.minmaxfont - minimum and maximum value font
+    menu.minmaxcolor - minimum and maximum value color
+    menu.minval - minimum slider value
+    menu.maxval - maximum slider value
+    menu.step - slider step increment
+    menu.initialvalue - initial slider value
+    menu.label - the text for the label. Note that this is not the full
+                 label table as described in the widget reference above.
+                 Rather, this is just the label.text portion of that
+                 table. The other lable values, such as label.font and
+                 label.color are already provided by menu.font and
+                 menu.color as described above.
+
+  "editbox" (KUI:CreateEditBox)
+    Create an edit box widget. Almost never used for dropdown menus but
+    this is not uncommon with popup menus, which use this same item
+    description table. The extra values you can define for this widget are:
+    menu.len - length of the string in the edit box
+    menu.numeric - true if this edit bo should accept numbers only
+    menu.initialvalue - initial text box contents.
+
+  "button" (KUI:CreateButton)
+    Creates a simple push-button. The extra elements for this type are:
+    menu.label - the label text for the button.
+    menu.template - alternate button template to use
+
+menu.submenu [table]
+  If set this ite becomes a submenu that will open when the mouse enters it.
+  This table can have all of the values of the top level dropdown
+  config structure described in section 5.7 above. However, not all of
+  those options are obeyed. Some are forced to inherit the values set
+  by the top level menu. Those elements that are obeyed are:
+  cfg.name, cfg.items, cfg.arg, cfg.func, cfg.itemheight,
+  cfg.minwidth, cfg.minheight, cfg.maxwidth, cfg.maxheight,
+  cfg.canresize, cfg.width and cfg.height.
+
+As you can see several menu item elements can in fact be functions which
+return the value that is used as the element. In each case the function
+receives a single argument, which is the containing frame for the menu
+item (the entity which ends up in the iframes table). This has most of
+the values you can specify as elements to the menu item stored in it.
+However, you must be aware that these functions are called in the order
+they are documented above. So for example, menu.color is processed before
+menu.title, so a function handler for menu.color can not check to see if
+the item is a title or not. The only additional or changed entries in
+the item frame are:
+
+ret.tlarg - set to the top level .arg value
+ret.tlname - set to the top level menu name
+ret.clickable - true or false. This is the inverse of menu.notclickable.
+ret.checkable - true or false. Inverse of menu.notcheckable.
+ret.checked - true if the item is checked.
+
+This may seem like it is very complex. However, in practice, most of these
+options are not used, they are provided for very fine tuning of your
+user interface. Please see the code in the file Examples/dropdown.lua
+for examples of how to use this code. The examples would be too large
+for this file here.
+
+5.8  KUI:CreatePopupMenu
+------------------------
+This is identical to KUI:CreateDropDown above in every way except that
+cfg.dwidth is not used, as there is no static portion, and cfg.border
+defaults to "THIN". cfg.mode has no meaning either and is ignored.
+There are a few extra configuration elements for a popup menu:
+
+cfg.canmove [boolean]
+  True if the top level menu panel can be moved, false if its position
+  remains static.
+
+cfg.header [integer]
+cfg.footer [integer]
+  Optional integer values that indicate the number of pixels to reserve at
+  the top and bottom of the popup window, respectively. The popup window can
+  never be resized to not include these two regions, so the common case is to
+  keep them small.
+
+ret.header [frame]
+ret.footer[frame]
+  The frames encompasing the header and footer. These will always be anchored
+  to the top and bottom of the popup frame respectively. The scrollable
+  portion of the popup will lie between them.
+
+A popup menu is like a dropdown menu without the static portion and the
+dropdown menu button. In every regard, it is like the actual dropdown
+portion of a dropdown. However, the usage of the two is quite different.
+Popup menus are usually invoked by things like a minimap button or
+an LDB launcher or a command line. Dropdown menus however are usually
+bound to some sort of dialog box for setting configuration options.
+Also the use of widget frames for menu items is far more common for
+popup menus than for dropdown menus. Strictly speaking a popup menu
+is not a widgeet but a container. However, since they are so similar
+to a dropdown menu (they use the exact same code) they are lumped with
+widgets here.
+
+5.9 KUI:CreateHSplit
+--------------------
+Creates a horizontal splitter, usually used to separate parts of a tab in
+a tabbed dialogm as discussed below. This splitter is not movable as splitters
+in Windows applications are. However, if the frame that is being split is
+resizable, one half of the split will resize with it. The other half is
+always a fixed size.
+
+cfg.placeframe [function]
+  Used to manually place the splitter frame. This function is passed the
+  created splitter frame as its only parameter. Very rarely used.
+
+cfg.height [number]
+  The height of the static portion of the split, in pixels. This splits
+  the parent frame into two regions, one which is this number of pixels,
+  and the other which is the remainder of the frame.
+
+cfg.topanchor [boolean]
+  By default, the height specifies the number of pixels to reserve at the
+  bottom portion of the split. In other words, the split is anchored to
+  the bottom of the parent frame. Set this to instead have it anchored to
+  the top of the frame.
+
+cfg.leftsplit [boolean]
+  If the left edge of the split is a vertical split, set this to true, so
+  that the left texture can be set to a "tee" which joins nicely with the
+  vertical split.
+
+cfg.leftshift [number]
+  Set the number of pixels to shift the left edge by. This is sometimes
+  needed to micro-adjust the position of the left texture if you are
+  doing weird placement of the frame.
+
+cfg.setleft [function]
+  Function to place the left edge texture. Passed the split frame and the
+  left edge texture as its only two parameters. If this is specified then
+  cfg.leftshift, cfg.leftsplit, cfg.inset and cfg.topanchor are not not
+  used for the left edge placement.
+
+cfg.rightsplit [boolean]
+  Same as for cfg.leftsplit above but for the right edge.
+
+cfg.rightshift [number]
+  Same as for cfg.leftshift above but for the right edge.
+
+cfg.setright [function]
+  Same as for cfg.setleft above but for the right edge.
+
+cfg.midshift [number]
+  Same as for cfg.leftshift above but for the middle portion of the texture.
+
+cfg.setmiddle [function]
+  Same as for cfg.setleft but for the middle texture.
+
+cfg.resizeadjust [number]
+  Sets the number of pixels to adjust the middle texture width by when the
+  containing window is resized. If not provided this is calculated as a
+  function of the inset, the left shift and the right shift. Very rarely
+  needed.
+
+cfg.inset [number]
+  Number of pixels to inset the frame by, if any. Rarely used.
+
+ret.topframe [table]
+  The top frame.
+
+ret.bottomframe [table]
+  The bottom frame.
+
+5.10 KUI:CreateVSplit
+---------------------
+Identical in purpose and function to KUI:CreateHSplit above, except this
+creates a vertical split, splitting the parent frame into a left and right
+component.
+
+cfg.placeframe [function]
+  Used to manually place the splitter frame. This function is passed the
+  created splitter frame as its only parameter. Very rarely used.
+
+cfg.width [number]
+  The width of the static portion of the split, in pixels. This splits
+  the parent frame into two regions, one which is this number of pixels,
+  and the other which is the remainder of the frame.
+
+cfg.rightanchor [boolean]
+  By default, the width specifies the number of pixels to reserve on the
+  left portion of the split. In other words, the split is anchored to
+  the left of the parent frame. Set this to instead have it anchored to
+  the right of the frame.
+
+cfg.topsplit [boolean]
+  If the top edge of the split is a horizontal split, set this to true, so
+  that the top texture can be set to a "tee" which joins nicely with the
+  horizontal split.
+
+cfg.topshift [number]
+  Set the number of pixels to shift the top edge by. This is sometimes
+  needed to micro-adjust the position of the top texture if you are
+  doing weird placement of the frame.
+
+cfg.settop [function]
+  Function to place the top edge texture. Passed the split frame and the
+  top edge texture as its only two parameters. If this is specified then
+  cfg.topshift, cfg.topsplit, cfg.inset and cfg.rightanchor are not not
+  used for the top edge placement.
+
+cfg.bottomsplit [boolean]
+  Same as for cfg.topsplit above but for the bottom edge.
+
+cfg.bottomshift [number]
+  Same as for cfg.topshift above but for the bottom edge.
+
+cfg.setbottom [function]
+  Same as for cfg.settop above but for the bottom edge.
+
+cfg.midshift [number]
+  Same as for cfg.topshift above but for the middle portion of the texture.
+
+cfg.setmiddle [function]
+  Same as for cfg.settop but for the middle texture.
+
+cfg.resizeadjust [number]
+  Sets the number of pixels to adjust the middle texture height by when the
+  containing window is resized. If not provided this is calculated as a
+  function of the inset, the top shift and the bottom shift. Very rarely
+  needed.
+
+cfg.inset [number]
+  Number of pixels to inset the frame by, if any. Rarely used.
+
+ret.leftframe [table]
+  The left hand frame.
+
+ret.rightframe [table]
+  The right hand frame.
+
+
+6.  Containers
+==============
+So now you know what widget types KKoreUI offers. As useful as these
+widgets are, they are meaningless unless you actually put them somewhere
+a user can interact with them. That is what the container types are for.
+These container types provide a "canvas" onto which you can place your
+widgets to form a useful dialog that the user can interact with.
+Strictly speaking a popup menu is a container too, but it is lumped
+in with the actual widgets above, as it is almost identical to a
+dropdown menu.
+
+6.1 KUI:CreateDialogFrame
+-------------------------
+This creates a basic single page dialog frame. The frame can be moved and
+resized if desired.
+
+cfg.x, cfg.y, cfg.name, cfg.canmove, cfg.canresize, cfg.minwidth,
+cfg.maxwidth, cfg.minheight, cfg.minheight
+  As described in section 2 above.
+
+cfg.strata [string]
+  Sets the strata for this dialog box. Defaults to "FULLSCREEN_DIALOG".
+
+cfg.title [string]
+  Sets the title for the dialog box. If you want a dialog box to be
+  movable, you must provide a title.
+
+cfg.titlefont [string]
+  Sets the font to use for the title. Defaults to "GameFontNormal".
+
+cfg.titlewidth [number]
+  Width of the title. Defaults to 150.
+
+cfg.titleheight [number]
+  Height of the title. Defaults to 40.
+
+cfg.border [string or boolean]
+  Specifies whether or not the dialog has a border, and if so, what type.
+  The choices are "THICK" or boolean true (the default), which uses the
+  normal thicker dialog box style border, or "THIN" to use a thinner
+  tooltip style border. If you do not want a border you must explicitly
+  set this to boolean false or the string "NONE".
+
+cfg.blackbg [boolean]
+  Normally dialogs have a semi-opaque background. Sometimes for busy
+  dialogs this can make the background stuff that "shines through"
+  obscure the dialog elements. Setting this to true will use a solid
+  black background so that the dialog widgets stand out better.
+
+cfg.xbutton [boolean]
+  Set to true if you want a little X button in the top right hand corner
+  of the dialog frame that will close the dialog.
+
+cfg.cancelbutton [table]
+cfg.okbutton [table]
+  Set this table up if you want a cancel or OK button at the bottom of the
+  dialog. Options you can set are:
+  .width (defaults to 100)
+    Width of the cancel button.
+  .height (defaults to 20)
+    Height of the cancel button.
+  .text (defaults to "Cancel")
+    Text to display on the cancel button.
+  If this is set and the button is pressed, this throws an OnCancel or
+  OnAccept event.
+
+cfg.statusbar [boolean]
+  Set to true if you want a status bar at the bottom of the dialog
+  that you can use to set messages in. This appears to the left of the
+  OK and cancel buttons, if configured.
+
+cfg.statusfont [string]
+  Sets the font to use for the status bar, if it is configured.
+  Defaults to "GameFontNormal".
+
+cfg.escclose [boolean]
+  Set to true if you want the dialog to be closed when the user presses
+  the Escape key.
+
+ret:SetTitleText (string)
+  Sets the title to the specified string. Only present if you specify a
+  title above.
+
+ret:SetStatusText (string)
+  Sets the status bar text to the given string. This function only appears
+  if a status bar was configured for the dialog.
+
+ret.content [frame]
+  This is set to a frame that covers the usable portion of the dialog,
+  inside the borders and above the buttons and status bar. Note that
+  if you use the return value from KUI:CreateDialogFrame() as the
+  parent argument to any of the KKoreUI widgets, then the widgets
+  will automatically become children of ret.content, not the outer
+  containing frame.
+
+ret.titletext [FontString]
+  Pointer to the title font string.
+
+throw:OnCancel ()
+  Thrown if you configured a cancel button and it is pressed. By the time
+  this handler is called the dialog has already been hidden.
+
+throw:OnAccept ()
+  Thrown if you configured an OK buton and it was pressed. By the time this
+  handler is called the dialog has already been hidden.
+
+Example:
+  -- Create a simple dialog with one edit box in it
+  local cfg = {
+    name = "MyDialog", x = "CENTER", y = "MIDDLE", width = 200, height = 200,
+    canmove = true, xbutton = true, title = "My Dialog", escclose = true,
+    okbutton = {}, cancelbutton = {},
+  }
+  local mydlg = KUI:CreateDialogFrame (cfg)
+  cfg = {
+    x = 20, y = -20, width = 200, label = { text = "Input" }
+  }
+  local myedit = KUI:CreateEditBox (cfg, mydlg)
+
+6.2 KUI:CreateTabbedDialog
+--------------------------
+A tabbed dialog is a dialog frame that can have a number of "tabs" along
+the bottom which change the content above it. A good example of a tabbed
+dialog is the social panel (press 'O' in game). KKoreUI also allows you
+to create sub-tabs (which are presented at the top of the dialog) and
+it provides a header area that can either be tab or sub-tab specific,
+as you choose.
+
+cfg.x, cfg.y, cfg.name, cfg.canmove, cfg.canresize, cfg.minwidth,
+cfg.maxwidth, cfg.minheight, cfg.minheight
+  As described in section 2 above.
+
+cfg.strata [string]
+  Sets the strata for this dialog box. Defaults to "FULLSCREEN_DIALOG".
+
+cfg.title [string]
+  Sets the title for the main tabbed dialog. This can be changed for
+  each tab as you select it.
+
+cfg.tabs [table]
+  This is how you define the tabs that appear along the bottom of the
+  dialog. Each entry in the table must be a named table, and the name
+  of the table forms the name of the tab. Each table can have the
+  following elements inside it:
+  tab.title [string]
+    The title for this tab. If set, when you select this tab it will
+    change the top level title to be this string.
+
+  tab.text [string]
+    The text that appears on the bottom tab. This should be kept very
+    short.
+
+  tab.id [number]
+    The tab number. This should start at 1 and increment by 1 for each
+    tab you define.
+
+  tab.hsplit [table]
+    If you want this tab to have a horizontal split, then set this.
+    The values set in this table are the same as you would pass to
+    KUI:CreateHSplit as described above.  This will create a tab-specific
+    .hsplit element in the return value which can then be used to access
+    the top and bottom halves of the split. You should only set .hsplit
+    or .vsplit, not both.
+
+  tab.vsplit [table]
+    If you want this tab to have a vertical split, then set this as you
+    would for a call to KUI:CreateVSplit as descrbed above.  This will
+    create a tab-specific .vsplit element in the return value which can then
+    be used to access the lft and right halves of the split. You should only
+    set .hsplit or .vsplit, not both.
+
+  tab.tabframe [string]
+    This controls what portion of the tab changes when you select
+    a subtab. If this tab has no subtabs, this value is not used.
+    It also only has meaning if your have as a hsplit or vsplit
+    configured. The intended usage for this is for subtabs that
+    may have common content on one side of the split, and content
+    that changes with the subtab selection on the other side of the
+    split. This element tells KKoreUI which side of the split changes
+    when a subtab is selected. If you have a vertical split then
+    this value can be either "LEFT" or "RIGHT" to have the left or
+    right hand side of the vertical split change as subtabs are
+    selected, or if you have a horizontal split, this can be either
+    "TOP" or "BOTTOM" to change the top or bottom half of the split.
+
+  tab.tabs [table]
+    A table of subtabs, if this tab has any. These tab definitions
+    are identical to the ones above except they cannot themselves
+    have a tabs member, as only one level of subtabs is supported.
+    A subtab also cannot have a title, and trying to set one will
+    simply be ignored.
+
+cfg.titlefont [string]
+  Sets the font to use for the title. Defaults to "GameFontNormal".
+
+cfg.tltexture [string]
+  Name of the texture to use for the top-left hand corner.
+
+ret:SetTitleText (string)
+  Sets the top title text to the specified string.
+
+ret:SetTab (maintab, subtab)
+  Sets the current tab to the specified main and subtab. If no subtab
+  is specified and the tab has subtas, defaults to 1.
+
+ret.title [FontString]
+  Pointer to the top level title font string.
+
+ret.content [frame]
+  This is set to a frame that covers the usable portion of the dialog,
+  inside the borders and above the buttons and tab bar. Note that
+  if you use the return value from KUI:CreateTabbedDialog() as the
+  parent argument to any of the KKoreUI widgets, then the widgets
+  will automatically become children of ret.content, not the outer
+  containing frame. However, this is almost certainly not what you
+  want to do, as this top level .content frame sits "behind" all tabs,
+  and any widgets you place here will be visible on all tabs.
+  Usually you would pass the tab or subtab as the parent argument for
+  any widgets.
+
+ret.topbar [frame]
+  A pointer to the top bar of the tabbed dialog. This is the global
+  top bar and visible to all tabs and subtabs. Each tab and subtab
+  gets its own topbar which can change as you select different tabs.
+  However if you always want the same content on the top bar regardless
+  of the tab or subtab selected, you can use this as a parent for any
+  widgets you want to place here.
+
+ret.tabs [table]
+  A table of all of the tabs. Changing this can have dire consequences
+  so rather just don't. However, each element in this table has use
+  for assigning widgets.
+  ret.tabs[id].content
+    The main content for this tab. If the tab has subtabs, this content
+    covers all subtabs.
+  ret.tabs[id].frame
+    Full frame for this tab, that covers the content and the top bar.
+  ret.tabs[id].content.hsplit
+  ret.tabs[id].content.vsplit
+    Pointers to the horizontal or vertical splits, if configured.
+  ret.tabs[id].topbar
+    Pointer to the top bar for this frame.
+  ret.tabs[id].tbutton
+    Pointer to the actual tab button at the bottom of the dialog.
+  ret.tabs[id].tabs
+    Tabe of subtabs, if any.
+
+6.3 KUI:CreateScrollList
+------------------------
+The standard Blizzard API provides a type of frame called a Scroll Frame.
+This is a frame whose total content size can be a lot larger than the
+visual portion of the frame that is displayed. Essentially, a scroll
+frame is a view or window onto a much larger child frame canvas. These
+frames are generally used for larger dialogs. However, they are unsuited
+to displaying very long lists, for example, all guild members in a guild
+with 500 members. While it is true that a scroll frame could be used
+for such a purpose, it is very inefficient. The KKoreUI scroll list
+solves this problem in much the same way as the internal Blizzard
+FrameXML code does with its FauxScrollFrame API - by creating a frame
+that can have a number of child elements whose content is scrolled,
+rather than scrolling an entire frame. For example, you can create a
+scroll list that can only fit 10 elements vertically, but which
+represents a list of 1000 users. The scroll bars scroll through the list
+and re-populate each of the 10 visual elements from a list, rather than
+creating a single scroll frame whose child is big enough to hold all
+1000 elements. This is vastly more efficient, but it does require
+a bit of extra coding. KKoreUI tries to reduce the amount of code you
+have to write to the barest minimum.
+
+Scroll lists work on the basic principle that there are a finite number
+of visual elements used to display an infinite number of items. If the
+scroll list itself is resizable, the number of visual elements may change
+but the principle of a finite number of visual elements remains. The
+scroll bars may give the visual impression that a large canvas is being
+scrolled, but in fact it is not, only the content of the visual elements
+are changed as the user scrolls through the list. In this implementation,
+each visual element must be of the same height.
+
+When you create or resize a scroll list, KKoreUI determines how many
+visual elements of the specified height will fit in the scroll list
+frame. If there are too many visual elements (the frame was made smaller)
+it hides the extra ones, and if there are too few, it calls a user
+function to create new ones. This same function is used to create the
+initial visual elements too. This is the newitem configuration element
+described below.
+
+When the content is scrolled or a visual item needs to have its content
+set, another function (setitem in the configuration) is called with
+an index indicating which member of the larger display list needs to
+be displayed. When an entry in the list is selected, a third function,
+called selectitem, is called. These functions are discussed in more
+detail below.
+
+Armed with these three functions, KKoreUI can efficiently manage the
+display of the large list of items using the available number of
+visual items. It manages the positioning of the scroll bars, filling
+each visual element with the required info etc.
+
+Each visual element, as stated above, must be a uniform height, but
+KKoreUI places no other restrictions on the visual elements. They can
+be as simple or as complex as you need. The KahLua Konfer Suicide Kings
+addon makes extensive use of some rather complex scroll lists if you
+want to see these in action.
+
+IMPORTANT: this container is different from other KKoreUI containers
+in that it does not actually create a container frame, rather it
+fully occupies the parent frame given as an argument to the function.
+The most typical use for a scroll list is to fill the content frame
+of a vertical split, or any other container frame you create and
+specify as the parent. If there are any other widgets on the frame
+you specify as a parent, they will be obscured by the scroll list.
+Therefore, it is the programmers responsibility to ensure that this
+function is called with a suitably empty parent as its second argument.
+
+In the discussion below, there are two terms used that you need to
+be aware of. The slot number refers to the visual element position.
+For example, if you have a scroll list with 10 visual elements or
+slots, that is covering an item list of 1000 users, the slot number
+will range from 1 to 10. When you are at the top of the list, slot
+1 will display item 1, slot 2 will display item 2 etc. If you scroll
+down the list, slot 1 will now display item 11, slot 2 will display
+item 12 etc. The second term is the item index, or simply the index.
+This is the index into the larger list that the scroll list slots cover.
+In the example above, the index would range from 1 to 1000.
+
+cfg.name [string]
+  Must be provided and must be unique.
+
+cfg.itemheight [number]
+  The height of each item. The newitem function below must create and
+  return a single frame that is exactly this high.
+
+cfg.newitem [function]
+  This is the user-supplied function that is used to create new visual
+  elements when they are needed (either during initial list creation or
+  on the fly if the list is resized). This function takes 2 arguments:
+  the first is the return value from KUI:CreateScrollList (ret), and
+  the second is the visual element number or slot number. The return
+  value from this function is refered to as a "slot" or "slot button"
+  (becuase the most common frame type returned is a button frame).
+
+cfg.setitem [function]
+  This function is used to set the contents of a given slot to display
+  the contents of a given index into the larger list. This function
+  takes 4 arguments: the first is the return value from CreateScrollList
+  (ret), the second is the index into the larger list, the third is
+  the slot number, and the 4th is the actual slot button, which is the
+  return value from a call to newitem above. This function needs to set
+  any content in the slot button that is appropraite for the index being
+  displayed in this slot.
+
+cfg.selectitem [function]
+  This function is called when an item is selected or deselected. It is
+  only called when the selected item in a list actually changes or when
+  the list is being updated. It takes the same arguments as setitem above
+  with an extra boolean. This boolean can actually have 3 states. When the
+  state is boolean true, it means the item specified by the index is being
+  selected. If the item is currently able to be displayed, then the slot
+  and button arguments are non-nil. If the selected item is scrolled off the
+  visible portion of the list, they are nil. When the state is boolean false,
+  it means the given item is being de-selected. The code will always deselect
+  any currently selected item before selecting a new one. If the state is
+  explicitly nil, it means the list has no item selected.
+  When the state is true (the item is being selected), that is the usual
+  time to update any other user interface elements that need to be changed
+  when a list item is selected. It is also where you would enable any of those
+  user interface elements. When state is false, that is the customary
+  time to disable any user interface elements that should be disabled when
+  there is no item selected. It is entirely possible that those elements will
+  be re-enabled almost immediately when a new item is selected, but still the
+  code should do the disabling of such elements here.
+
+cfg.highlightitem [function]
+  This function is called for each slot in the visible list. It takes the
+  same arguments as setitem above with an extra boolean. This boolean is
+  set to true when the given slot is the currently selected item, or false
+  if not. This is used to visually highlight the selected item in the list.
+  Note that if the currently selected item is not being displayed because
+  it is scrolled away from the visible slots, then all of the visible slots
+  will be called with this argument set to false.
+
+ret:UpdateList ()
+  Call this if you have updated the number of items in the larger
+  list, or the contents of that list. Before calling this, however,
+  you *MUST* have set ret.itemcount to be the total number of items
+  in the larger list that is being scrolled through.
+
+ret:SetSelected (index, display, force)
+  Sets the item specified by index as the currently selected item in the
+  list. This is the index into the larger list, not the index into the
+  number of visual elements. If display is boolean true and the selected
+  item is currently not visible, make it visible. If possible, this will
+  cause the selected item to occupy slot 1. This should always be set to
+  false when called from a button OnClick handler, as the button is already
+  displayed (otherwise you couldn't click it). If the force option is
+  specified it forces the selection of the item, even if it is the currently
+  selected item. Usually, if the currently selected item is re-selected
+  the selectitem function is not run. With force set, it is.
+
+ret:GetSelected ()
+  Returns the index of the currently selected item. This is an index into
+  the larger list, not the list of visible items. If no item is currently
+  selected this will return nil.
+
+ret.itemcount [number]
+  The number of items in the full list. This must be set accurately and
+  must be set before calling ret:UpdateList ().
+
+ret.itemheight [number]
+  The same as cfg.itemheight
+
+ret.newitem [function]
+ret.setitem [function]
+ret.selectitem [function]
+ret.highlightitem [function]
+  The functions used to create, set, select and highlight items.
+
+ret.slots [table]
+  A table of the visible slots.
+
+In order to try and reduce the code that users have to write to support
+scroll lists, KKoreUI provides three "helper" functions you may want to
+use in your newitem, setitem and selectitem functions. These helper
+functions are discussed here.
+
+KUI.NewItemHelper (objp, num, name, w, h, stf, och, ocs, pch)
+  This function is meant to assist with the newitem scroll list function.
+  objp is the base object for the scroll list (the return value from
+  CreateScrollList), num is the slot number, name is the base name for
+  the scroll list item frames, w and h are the width and height of the
+  frame, stf is a function you can provide to set the "text" of the
+  slot, och is a function you can set to be called as the handler for
+  the button's OnClick event, and ocs is code that is called from
+  within the default OnClick handler. stf receives 2 arguments, which
+  are objp and a text string. och receives to arguments, which are objp
+  and the event name (always OnClick), and ocs receives 2 arguments,
+  objp and the item index. If ocs returns true, KKoreUI will not call
+  SetSelected() on the item, otherwise it does. This function creates
+  a button based frame and sets the highlight texture so that it
+  highlights when the mouse goes over it. Supports a single SetText
+  function that will set the button text. pch is a post-create hook
+  function that is passed the just-created frame, objp and num, in that
+  order. Use it to customize the frame in any way you see fit.
+
+KUI.SetItemHelper (objp, btn, idx, tfn)
+  Displays a simple text string. btn is the actual button being displayed,
+  idx is the index, and tfn is a function that takes the object and the
+  inde as its parameter and should return the string to display. Very
+  simple and most here just for the sake of completeness.
+
+KUI.SelectItemHelper (objp, idx, slot, btn, onoff, cfn, onfn, offfn, nilfn)
+  Helper for selectitem. The helper will set the selected item to be
+  highlighted, remove the highlighting from unselected items etc.
+  objp is the returned object, idx is the index into the list, slot is the
+  slot number, btn is the actual slot button pointer. onoff is the
+  tri-state boolean mentioned above. onfn, offfn and nilfn are the
+  functions called when onoff is true, false and nil respectively.
+  Those functions are all passed objp, idx, slot, btn and onoff as
+  arguments. cfn is a function that can be used to do internal consistency
+  checking. If it returns nil, then the selection function returns
+  immediately, before calling onfn(). If it returns false, then an error
+  is thrown as the consistency check failed. If it returns any other
+  value, processing continues and onfn() will be called immediately after
+  the call to cfn, if onfn was defined.
+
+KUI.HighlightItemHelper (objp, idx, slot, btn, onoff, onfn, offfn)
+  Helper for highlightitem. This will hide or show a standard texture for
+  a slot. If onfn or offfn are specified, they are called after the show
+  or hide of the highlight texture.
+
+6.4 KUI:CreatePopupList
+-----------------------
+This is a hybrid between KUI:CreatePopupMenu() and KUI:CreateScrollList().
+It is used to create a popup menu which can contain an arbitrarily long
+list of elements. This makes using a popup menu somewhat undesirable, as
+each and every element in a popup menu list creates its own frame. For very
+long lists, like all guild members, this can be excessive. Thus this container
+combines the functionality of both a popup menu and a scroll list. It does
+differ from KUI:CreatePopupMenu() in one major way though: you can not have
+submenus. This is really intended for cases where you really just need a long
+list of names in a popup window.
+
+cfg.x, cfg.y, cfg.canmove, cfg.canresize, cfg.minwidth, cfg.maxwidth,
+cfg.minheight, cfg.minheight
+  As described in section 2 above.
+
+cfg.strata [string]
+  Sets the strata for this popup. Defaults to "FULLSCREEN_DIALOG".
+
+cfg.name [string]
+  Must be provided and must be unique
+
+cfg.itemheight [number]
+  The height of each item.
+
+cfg.header [number]
+  Number of pixels to leave at the top of the popup menu for a header frame.
+
+cfg.footer [number]
+  Number of pixels to leave below the popup menu for a footer frame.
+
+cfg.title [string]
+  The title displayed at the very top of the popup.
+
+cfg.timeout [number]
+  How long the popup will remain visible when the mouse moves away from it
+  before it is automatically hidden.
+
+cfg.arg [anything]
+  Any value you like. Passed to the selection function below.
+
+cfg.func [function]
+  Function to call when an item is selected by the user. Receives two
+  arguments: the index of the item selected, and cfg.arg, which can have
+  any value.
+
+cfg.textfunc [function (table, idx, arg)]
+  Optional special function that you can use to get the value of a specific
+  item. Use this function if the list you will be providing does not have
+  tables with text members, or is not a simple list of strings. This is
+  passed the table as provided to ret.UpdateList(), the index into that table
+  whose text needs to be extracted, and the value of cfg.arg.
+
+ret.UpdateList [function (table)]
+  Function to call to set the new item list. The table must either be a
+  list of tables, each with an element called "text", or it must be a simple
+  list of strings. When the popup is initially created it will have no items
+  and you should call this with the item list before calling :Show() to show
+  the popup. When you are done with the list you can pass the nil value to
+  this function to remove reference to the list table.
+
+ret.header [frame]
+  Pointer to the header frame, if any.
+
+ret.footer [frame]
+  Pointer to the footer frame, if any.

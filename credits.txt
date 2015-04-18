@@ -1,0 +1,50 @@
+I don't know the exact origins of the quote, nor the exact text of it, but
+someone from the old AT&T days said something like:
+
+  "Good coders create, great coders steal."
+
+If code theft is any meaningful metric, then I must be a great coder :)
+Seriously though, this file is to pay my respects and considerable
+gratitude to the original authors of large bits of this code. A casual
+look at the code will reveal that much of KahLua Kore is in fact Ace3.
+The many great people who have contributed to Ace3 are talented people
+indeed, and I am very grateful to them for publishing their code under
+a license that allows me to embed it, and rework it some, in KahLua.
+
+I am sure that given enough years I could have done something almost as
+good as Ace3, but I do not have those years, as I have bigger fish to fry,
+most notably writing the rest of the KahLua mods I have planned. So I took
+the advice from that AT&T engineer and stole some code. Any bugs I created
+doing so are mine and mine alone, and do not reflect on the original
+authors.
+
+Thank you Ace3 team, thank you.
+
+In case anyone is wondering why I reworked the Ace3 code into my own
+shape instead of just using it, well, there is method to my madness.
+In pouring over the original code, I learned a great deal. By actually
+re-typing all of it in (in my own coding style) I trained my brain to
+think in Lua and pick up some of the tricks of the trade. It's how I
+learn. Some stuff I did on my own and ended up with something remarkably
+close to the original (my I18N implementation is a good example, it is
+almost identical and I wrote it before I'd ever seen AceLocale). But mostly
+I wanted to learn and read and go through things slowly and have code that
+I had typed in a repository that I have control over. I even fixed a few
+small bugs along the way (which yes, I reported back to Ace3).
+
+What follows is a list of people who were the original authors of the Ace3
+code I used, as near as I can determine. All credit goes to them.
+
+  Ammo
+  CKknight
+  Cladhaire
+  Joshborke
+  Kaelten
+  Mikk
+  Nevcairiel
+  Xinhuan
+
+The German translation provided by: Stefan Junghanns.
+The Russian translation provided by: Finntroll (no real name given).
+
+A very big thank you to these translators.
