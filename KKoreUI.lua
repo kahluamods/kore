@@ -632,7 +632,7 @@ local function newobj(cfg, kparent, defwt, defht, fname, ftype, template)
   if (cfg.debug) then
     local ttt = frame:CreateTexture (nil, "ARTWORK")
     ttt:SetAllPoints (frame)
-    ttt:SetTexture (0.3, 0.3, 0.3, 0.5)
+    ttt:SetColorTexture (0.3, 0.3, 0.3, 0.5)
   end
   return frame, parent, width, height
 end
@@ -1745,10 +1745,26 @@ end
 function KUI:CreateRadioGroup (cfg, kparent)
 end
 
+local function update_eb_text(this)
+  local val = this.value or 0
+  this.editbox:SetText (floor ((val * 100) + 0.5) / 100)
+end
+
 local function update_editbox(this)
-  local val = this:GetValue()
-  this.editbox:SetText (tostring(val))
-  this:Throw ("OnValueChanged", val, this.mousedown and true or false)
+  if (not this.setup) then
+    local val = this:GetValue()
+    if (this.step and this.step > 0) then
+      local mv = this.minval or 0
+      val = (floor ((val - mv) / this.step + 0.5) * this.step) + mv
+    end
+    if (val ~= this.value) then
+      this.value = val
+      this:Throw ("OnValueChanged", this.value, this.mousedown and true or false)
+    end
+    if (this.value) then
+      update_eb_text (this)
+    end
+  end
 end
 
 local function sde_OnEscapePressed (this)
@@ -1836,11 +1852,14 @@ function KUI:CreateSlider (cfg, kparent)
     dheight = 200
     dwidth = 16
   end
+
   local frame,parent,width,height = newobj(cfg, kparent, dwidth, dheight, cfg.name, "Slider")
 
   local minval = cfg.minval or 0
   local maxval = cfg.maxval or 100
   local value = cfg.initialvalue or minval
+
+  frame.setup = true
 
   frame:EnableMouse (true)
   frame:EnableMouseWheel (true)
@@ -1854,6 +1873,9 @@ function KUI:CreateSlider (cfg, kparent)
   end
   frame:SetMinMaxValues (minval, maxval)
   frame:SetValueStep (cfg.step or 1)
+  frame.minval = minval
+  frame.maxval = maxval
+  frame.step = cfg.step or 1
 
   local sliderbg = {
     bfFile = "Interface/Buttons/UI-SliderBar-Background",
@@ -1917,8 +1939,7 @@ function KUI:CreateSlider (cfg, kparent)
     editbox:SetJustifyH ("CENTER")
     -- The label above the slider (only for horizontal sliders)
     if (cfg.label) then
-      local label = frame:CreateFontString (nil, "OVERLAY",
-        cfg.label.font or "GameFontNormal")
+      local label = frame:CreateFontString (nil, "OVERLAY", cfg.label.font or "GameFontNormal")
       r,g,b,a = label:GetTextColor ()
       if (cfg.label.color) then
         r = cfg.label.color.r or r
@@ -1948,7 +1969,6 @@ function KUI:CreateSlider (cfg, kparent)
 
   mintxt:SetText (tostring (minval))
   maxtxt:SetText (tostring (maxval))
-  editbox:SetText (frame:GetValue ())
 
   local bg = editbox:CreateTexture (nil, "BACKGROUND")
   bg:SetTexture ("Interface/ChatFrame/ChatFrameBackground")
@@ -1965,8 +1985,14 @@ function KUI:CreateSlider (cfg, kparent)
   frame.OnEnter = tip_OnEnter
   frame.OnLeave = tip_OnLeave
 
+  frame.value = value
   frame:SetValue (value)
   frame:SetEnabled (cfg.enabled)
+
+  frame.setup = nil
+
+  update_eb_text (frame)
+
   return frame
 end
 
@@ -1974,7 +2000,7 @@ function KUI:CreateButton (cfg, kparent)
   local frame, parent, width, height =
     newobj(cfg, kparent, 100, 24, cfg.name, "Button", "UIPanelButtonTemplate")
 
-  if  (cfg.hook) then
+  if (cfg.hook) then
     frame:HookScript ("OnClick", function (this, ...)
       this:Throw ("OnClick", ...)
     end)
@@ -2702,7 +2728,7 @@ function KUI:CreateScrollList (cfg, kparent)
 
   local scrollbg = scrollbar:CreateTexture (nil, "BACKGROUND")
   scrollbg:SetAllPoints (scrollbar)
-  scrollbg:SetTexture (0, 0, 0, 0.4)
+  scrollbg:SetColorTexture (0, 0, 0, 0.4)
 
   frame.scrollbar = scrollbar
   frame.offset = 0
@@ -3405,7 +3431,7 @@ local function dd_refresh_frame (fr, tlfr, ilist, nilist)
         -- This is a spacer
         if (not tbf.p_spacer) then
           local st = tbf:CreateTexture (nil, "ARTWORK")
-          st:SetTexture (0.75, 0.75, 0.75, 1)
+          st:SetColorTexture (0.75, 0.75, 0.75, 1)
           st:Hide ()
           tbf.p_spacer = st
         end
@@ -3618,7 +3644,7 @@ local function dd_refresh_frame (fr, tlfr, ilist, nilist)
     if (v.debug) then
       local ttt = tbf:CreateTexture (nil, "ARTWORK")
       ttt:SetAllPoints (tbf)
-      ttt:SetTexture (0.3, 0.3, 0.3)
+      ttt:SetColorTexture (0.3, 0.3, 0.3)
     end
     -- @debug-end@
     relframe = tbf
