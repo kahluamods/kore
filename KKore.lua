@@ -74,7 +74,7 @@ end
 --
 
 local KKORE_MAJOR = "KKore"
-local KKORE_MINOR = 603
+local KKORE_MINOR = 700
 
 local K = LibStub:NewLibrary(KKORE_MAJOR, KKORE_MINOR)
 
@@ -355,6 +355,7 @@ K.CLASS_MAGE        = "08"
 K.CLASS_WARLOCK     = "09"
 K.CLASS_MONK        = "10"
 K.CLASS_DRUID       = "11"
+K.CLASS_DEMONHUNTER = "12"
 K.CLASS_UNKNOWN     = "00"
 
 K.ClassIndex = {
@@ -369,6 +370,7 @@ K.ClassIndex = {
   ["WARLOCK"]     = K.CLASS_WARLOCK,
   ["MONK"]        = K.CLASS_MONK,
   ["DRUID"]       = K.CLASS_DRUID,
+  ["DEMONHUNTER"] = K.CLASS_DEMONHUNTER,
 }
 
 local kClassTable = {}
@@ -385,6 +387,7 @@ local mage = kClassTable["MAGE"]
 local warlock = kClassTable["WARLOCK"]
 local monk = kClassTable["MONK"]
 local druid = kClassTable["DRUID"]
+local dh = kClassTable["DEMONHUNTER"]
 
 -- Same table but using the localised names
 K.LClassIndex = {
@@ -399,6 +402,7 @@ K.LClassIndex = {
   [warlock]     = K.CLASS_WARLOCK,
   [monk]        = K.CLASS_MONK,
   [druid]       = K.CLASS_DRUID,
+  [dh]          = K.CLASS_DEMONHUNTER,
 }
 
 K.LClassIndexNSP = {
@@ -413,6 +417,7 @@ K.LClassIndexNSP = {
   [gsub (warlock, " ", "")]     = K.CLASS_WARLOCK,
   [gsub (monk, " ", "")]        = K.CLASS_MONK,
   [gsub (druid, " ", "")]       = K.CLASS_DRUID,
+  [gsub (dh, " ", "")]          = K.CLASS_DEMONHUNTER,
 }
 
 -- And the reverse
@@ -428,6 +433,7 @@ K.IndexClass = {
   [K.CLASS_WARLOCK]     = { u = "WARLOCK", c = warlock },
   [K.CLASS_MONK]        = { u = "MONK", c = monk },
   [K.CLASS_DRUID]       = { u = "DRUID", c = druid },
+  [K.CLASS_DEMONHUNTER] = { u = "DEMONHUNTER", c = dh },
   [K.CLASS_UNKNOWN]     = { u = "UNKNOWN" },
 }
 for k,v in pairs(K.IndexClass) do
@@ -452,6 +458,7 @@ K.IndexClass[K.CLASS_MAGE].w        = "mage"
 K.IndexClass[K.CLASS_WARLOCK].w     = "warlock"
 K.IndexClass[K.CLASS_MONK].w        = "monk"
 K.IndexClass[K.CLASS_DRUID].w       = "druid"
+K.IndexClass[K.CLASS_DEMONHUNTER].w = "demonhunter"
 
 --
 -- Many mods need to know the different class colors. We set up three tables
@@ -473,6 +480,7 @@ K.ClassColorsRGBPerc = {
   [K.CLASS_WARLOCK]     = RAID_CLASS_COLORS["WARLOCK"],
   [K.CLASS_MONK]        = RAID_CLASS_COLORS["MONK"],
   [K.CLASS_DRUID]       = RAID_CLASS_COLORS["DRUID"],
+  [K.CLASS_DEMONHUNTER] = RAID_CLASS_COLORS["DEMONHUNTER"],
   [K.CLASS_UNKNOWN]     = { r = 0.3, g = 0.3, b = 0.3 },
 }
 

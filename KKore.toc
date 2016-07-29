@@ -1,4 +1,4 @@
-## Interface: 60100
+## Interface: 70000
 ## Title: KahLua Kore |cffff2222-K-|r
 ## Notes: Core features for all |cffff2222KahLua|r mods.
 ## Author: Cruciformer
@@ -8,6 +8,6 @@
 ## X-Category: Library
 ## X-License: Apache
 ## X-Website: http://kahluamod.com/kore
-## X-SVN: http://kahluamod.com/svn/kore
+## X-git: git@github.com:kahluamods/kore
 
 KKore.xml
