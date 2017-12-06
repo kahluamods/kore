@@ -1,4 +1,4 @@
-## Interface: 70000
+## Interface: 70300
 ## Title: KahLua Kore |cffff2222-K-|r
 ## Notes: Core features for all |cffff2222KahLua|r mods.
 ## Author: Cruciformer

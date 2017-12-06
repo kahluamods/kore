@@ -74,7 +74,7 @@ end
 --
 
 local KKORE_MAJOR = "KKore"
-local KKORE_MINOR = 700
+local KKORE_MINOR = 730
 
 local K = LibStub:NewLibrary(KKORE_MAJOR, KKORE_MINOR)
 
@@ -169,13 +169,11 @@ end
 K.player = K.player or {}
 K.guild = K.guild or {}
 K.guild.ranks = K.guild.ranks or {}
+K.guild.roster = K.guild.roster or {}
+K.guild.roster.id = K.guild.roster.id or {}
+K.guild.roster.name = K.guild.roster.name or {}
+K.guild.gmname = K.guild.gmname or ""
 K.raids = K.raids or { numraids = 0, info = {} }
-
-local last_rank_set = 1
-local function GuildControlSetRank_hook (idx)
-  last_rank_set = idx
-end
-hooksecurefunc ("GuildControlSetRank", GuildControlSetRank_hook)
 
 local done_pi_once = false
 local function get_static_player_info ()
@@ -204,53 +202,50 @@ local function update_player_and_guild ()
     K.player.isguilded = true
     if (IsGuildLeader ()) then
       K.player.isgm = true
-      K.player.isofficer = true
     else
       K.player.isgm = false
-      K.player.isofficer = false
     end
   else
     K.player.isguilded = false
     K.player.guild = ""
     K.player.guildrankidx = 999
     K.player.isgm = false
-    K.player.isofficer = false
   end
 
   if (K.player.isguilded) then
+    local i
+
     K.guild.numranks = GuildControlGetNumRanks ()
     K.guild.ranks = {}
-    K.guild.officers = {}
-    local lrank = last_rank_set
-    local i
+    K.guild.numroster = GetNumGuildMembers ()
+    K.guild.roster = {}
+    K.guild.roster.id = {}
+    K.guild.roster.name = {}
+
     for i = 1, K.guild.numranks do
       local rname = GuildControlGetRankName (i)
-      GuildControlSetRank (i)
-      local _,_,ochatread,ochatspeak,canpromote,candemote,caninv,canrem = GuildControlGetRankFlags ()
-      K.guild.ranks[i] = { name = rname, invite = caninv, remove = canrem, ochatspeak = ochatspeak, ochatread = ochatread, promote = canpromote, demote = candemote }
-      if (i == K.player.guildrankidx) then
-        if (ochatread) then
-          K.player.isofficer = true
-        end
-      end
+      K.guild.ranks[i] = rname
     end
-    GuildControlSetRank (lrank)
 
-    local ngm = GetNumGuildMembers ()
-    for i = 1, ngm do
-      local nm, _, ri = GetGuildRosterInfo (i)
-      if (nm) then
-        if (ri == 0 or K.guild.ranks[ri+1].ochatread) then
-          local qnm = K.CanonicalName (nm, nil)
-          K.guild.officers[qnm] = ri
-        end
+    for i = 1, K.guild.numroster do
+      local nm, _, ri, lvl, _, _, _, _, onl, _, cl = GetGuildRosterInfo (i)
+      nm = K.CanonicalName (nm, nil)
+      local iv = { name = nm, rankidx = ri, level = lvl, class = K.ClassIndex[cl], online = onl }
+      tinsert (K.guild.roster.id, iv)
+      K.guild.roster.name[nm] = i
+      if (ri == 0) then
+        K.guild.gmname = nm
       end
     end
   else
     K.guild = {}
     K.guild.numranks = 0
     K.guild.ranks = {}
-    K.guild.officers = {}
+    K.guild.numroster = 0
+    K.guild.roster = {}
+    K.guild.roster.id = {}
+    K.guild.roster.name = {}
+    K.guild.gmname = ""
   end
 
   K:SendMessage ("PLAYER_INFO_UPDATED")
@@ -277,6 +272,7 @@ local KP = K.pvt
 --
 K.debugging = K.debugging or {}
 K.debugframe = nil
+K.maxlevel = MAX_PLAYER_LEVEL_TABLE[GetExpansionLevel()]
 
 function K.debug(addon, lvl, ...)
   if (not K.debugging[addon]) then
@@ -1748,14 +1744,14 @@ local function kcmdfunc(input)
   elseif (cmd == "status") then
     local rs = strfmt ("player=%s faction=%s class=%s level=%s guilded=%s", tostring(K.player.player), tostring(K.player.faction), tostring(K.player.class), tostring(K.player.level), tostring(K.player.isguilded))
     if (K.player.isguilded) then
-      rs = rs.. strfmt (" guild=%q isgm=%s isofficer=%s rankidx=%s numranks=%s", tostring(K.player.guild), tostring(K.player.isgm), tostring(K.player.isofficer), tostring(K.player.guildrankidx), tostring(K.guild.numranks))
+      rs = rs.. strfmt (" guild=%q isgm=%s rankidx=%s numranks=%s", tostring(K.player.guild), tostring(K.player.isgm), tostring(K.player.guildrankidx), tostring(K.guild.numranks))
     end
 
     K.printf ("%s", rs);
     if (K.player.isguilded) then
       local i
       for i = 1, K.guild.numranks do
-        K.printf ("Rank %d: name=%q inv:%s rem:%s ocs:%s ocr:%s pro:%s dem:%s", i, tostring(K.guild.ranks[i].name), tostring(K.guild.ranks[i].invite), tostring(K.guild.ranks[i].remove), tostring(K.guild.ranks[i].ochatspeak), tostring(K.guild.ranks[i].ochatread), tostring(K.guild.ranks[i].promote), tostring(K.guild.ranks[i].demote))
+        K.printf ("Rank %d: name=%q", i, tostring(K.guild.ranks[i]))
       end
     end
   end
