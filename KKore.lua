@@ -6,7 +6,7 @@
      E-mail: cruciformer@gmail.com
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2010 James Kean Johnston. All rights reserved.
+   Copyright 2008-2017 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ end
 --
 
 local KKORE_MAJOR = "KKore"
-local KKORE_MINOR = 730
+local KKORE_MINOR = 731
 
 local K = LibStub:NewLibrary(KKORE_MAJOR, KKORE_MINOR)
 
@@ -154,6 +154,10 @@ function K.CanonicalName (name, realm)
   else
     return K.CapitaliseName (nm)
   end
+end
+
+function K.ShortName (name)
+  return Ambiguate (name, "short")
 end
 
 ---
@@ -1603,7 +1607,7 @@ end
 -- The rest of this file was writting by James Kean Johnston (Cruciformer) and
 -- is subject to the KahLua Kore license, which is the Apache license, Version
 -- 2.0. Please see LICENSE.txt for details.
--- (C) Copyright 2008-2009 James Kean Johnston. All rights reserved.
+-- (C) Copyright 2008-2017 James Kean Johnston. All rights reserved.
 --
 
 --
