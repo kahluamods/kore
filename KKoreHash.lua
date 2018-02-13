@@ -12,65 +12,19 @@
 -- (http://forums.curseforge.com/showthread.php?t=15001). I also modified
 -- that code to allow for a running calculation.
 --
---
--- This portion of this file is the embedded LibStub, with full credit to
--- Kaelton, Cladhaire, ckknight, Mikk, Ammo, Nevcairiel and joshborke.
--- That code is in in the public domain. See http://www.wowace.com/wiki/LibStub
--- for details.
---
-local LIBSTUB_MAJOR, LIBSTUB_MINOR = "LibStub", 2
-local LibStub = _G[LIBSTUB_MAJOR]
-
-if (not LibStub or LibStub.minor < LIBSTUB_MINOR) then
-  LibStub = LibStub or {libs = {}, minors = {} }
-  _G[LIBSTUB_MAJOR] = LibStub
-  LibStub.minor = LIBSTUB_MINOR
-
-  function LibStub:NewLibrary (major, minor)
-    assert(type(major) == "string",
-      "LibStub:Newlibrary: bad argument #1 (string expected).")
-    minor = assert(tonumber(strmatch(minor, "%d+")),
-      "LibStub:NewLibrary: minor version must either be a number or contain a number.")
-    local oldminor = self.minors[major]
-
-    if (oldminor and oldminor >= minor) then
-      return nil
-    end
-
-    self.minors[major] = minor
-    self.libs[major] = self.libs[major] or {}
-    return self.libs[major], oldminor
-  end -- Function LibStub:NewLibrary
-
-  function LibStub:GetLibrary (major, silent)
-    if ((not self.libs[major]) and (not silent)) then
-      error (("Cannot find a library instance of %q."):format (tostring (major)), 2)
-    end
-    return self.libs[major], self.minors[major]
-  end -- Function LibStub:GetLibrary
-
-  function LibStub:IterateLibraries()
-    return pairs(self.libs)
-  end -- Function LibStub:IterateLibraries
-
-  setmetatable(LibStub, { __call = LibStub.GetLibrary })
-end
---
--- End of LibStub code
---
 
 local KKOREHASH_MAJOR = "KKoreHash"
-local KKOREHASH_MINOR = 500
+local KKOREHASH_MINOR = 700
 local H, oldminor = LibStub:NewLibrary(KKOREHASH_MAJOR, KKOREHASH_MINOR)
 
 if (not H) then
   return
 end
 
-local K = LibStub:GetLibrary("KKore")
-if (K) then
-  K:RegisterExtension (KKOREHASH_MAJOR, KKOREHASH_MINOR)
-end
+local K, KM = LibStub:GetLibrary("KKore")
+assert (K, "KKoreHash requires KKore")
+assert (tonumber(KM) >= 732, "KKoreHash requires KKore r732 or later")
+K:RegisterExtension (H, KKOREHASH_MAJOR, KKOREHASH_MINOR)
 
 local bor = bit.bor
 local band = bit.band

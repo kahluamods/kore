@@ -1,0 +1,197 @@
+KahLua Kore - Party and Raid Functions (KKoreParty)
+===================================================
+
+KKoreParty is a library of useful functions for monitoring party and raid
+information. It has no user interface elements and is intended to simply
+record data about the current raid or party, if any. It allows the containing
+mode to extend the data it stores in ways that are meaningful to that mod, and
+does so in a namespace-protected way so that multiple mods can use this code
+without clashing.
+
+1.  Using KKoreParty in your code.
+==================================
+
+KKoreUI's heritage shows in its directory placement requirement. To use
+this (or other KKore libraries such as KKoreHash) simply copy the KKore
+folder into your addon directory and add the following line to your
+addon's TOC file, right after all of the ## directives:
+     KKore\KKore.xml
+Then edit that file (KKore\KKore.xml) and ensure that KKoreParty has been
+uncommented. If you are using any other KKore libraries in your addon,
+they should be uncommented too.
+
+Once this has been done, somewhere at the top of your module code where
+it initializes itself, you need to get a "handle" to KKoreParty. KKoreParty
+has an embedded version of LibStub, so if you were using that for any
+other reason, such as loading Ace3 libraries, you can remove the
+LibStub.lua file from your addon and its TOC file. This is why you want
+KKore to be loaded as early as possible in your TOC. To get a handle
+for KKoreParty, simply add the following lines to your addon:
+
+  local KRP = LibStub:GetLibrary ("KKoreParty")
+  assert (KRP, "YourModuleName requires KKoreParty, which was not loaded")
+
+That's it. Your addon is now ready to use KKoreParty.
+
+2.  Basic Usage.
+================
+
+For the most part, your mod doesn't need to "do" anything to use KRP. If you
+include it in the list of Kore modules to be loaded, it will be silently
+monitoring all raid and party related events it needs to in order to keep
+track of raids and parties. You simply need to query certain top level
+variables in order to examine the state of things. For example, KRP.in_party
+or KRP.in_raid will be set to true if the character is in either a party or a
+raid.
+
+However, some mods may want to add extra data to the basic data that is stored
+by KRP. If they want to do so they need to register their intent using the
+KRP:RegisterAddon() function. This function takes a single argument which is
+an abbreviated name for your addon, and it must be a valid Lua variable name
+because it will result in a special internal table of that name being created.
+For example, the Konfer Suicide Kings mod would call KRP:RegisterAddon ("ksk").
+The return value from this function is a "handle" to a private table that only
+that mod has access to. You can store any data you desire in that table. If
+there is some kind of error, then nil is returned in which case almost nothing
+else will work and this should be considered a fatal error.
+
+3.  Data Elements.
+==================
+
+KRP stores all information about a raid or party in specific data elements,
+all of which are children of the top level KRP table.
+
+KRP.in_party (boolean)
+  true if the player is in a party.
+
+KRP.in_raid (boolean)
+  true if the player is in a raid.
+
+KRP.in_battleground (boolean)
+  true if the player is in a battleground.
+
+KRP.num_members (integer)
+  The number of players in the party or raid, including ourselves, or 0 if we
+  are not in a raid, party or battleground.
+
+KRP.is_pl (boolean)
+  true if the player is the party leader.
+
+KRP.is_rl (boolean)
+  true if the player is in a raid and is the raid leader.
+
+KRP.is_aorl (boolean)
+  true if the player is in a raid and is the leader OR an assistant.
+
+KRP.is_ml (boolean)
+  true if the player is in a raid and is the master looter.
+
+KRP.subgroup (integer)
+  1 - MAX_RAID_GROUPS if the user is in a raid, 0 if not.
+
+KRP.raidid (integer)
+  The current player's raid ID (3 for "raid3", 26 for "raid26" etc).
+  Set to 0 if KRP.in_raid is false.
+
+KRP.party_mlid (integer)
+  The party member (0 being the player) who is the master looter, or
+  nil if no-one in the party is the master looter, or master looting
+  is not being used.
+
+KRP.raid_mlid (integer)
+  The raid member number who is the master looter, or nil if no-one in
+  the raid is the master looter or master looting is not being used.
+
+KRP.master_looter (string)
+  The full player name of the person who is the master looter, or nil if not
+  in a raid or party or master looting not the current loot method.
+
+KRP.loot_method (integer)
+  The current loot method. Possible values are:
+  0 - unknown (KRP.LOOT_METHOD_UNKNOWN)
+  1 - free for all (KRP.LOOT_METHOD_FREEFORALL)
+  2 - group (KRP.LOOT_METHOD_GROUP)
+  3 - personal loot (KRP.LOOT_METHOD_PERSONAL)
+  4 - master looter (KRP.LOOT_METHOD_MASTER)
+
+KRP.leader (string)
+  The full player name of the person who is the party or raid leader, or nil
+  if not in a party or raid.
+
+KRP.role (integer)
+  The players currently assigned role. Possible values are:
+  0 - none (KRP.GROUP_ROLE_NONE)
+  1 - tank (KRP.GROUP_ROLE_TANK)
+  2 - healer (KRP.GROUP_ROLE_TANK)
+  3 - DPS (KRP.GROUP_ROLE_DPS)
+
+KRP.players (table)
+  When in any form of group (party, raid or battleground) this is a list of
+  all of the players in that group, including oursevles. This is a table of
+  tables, indexed by the full player name. Each entry is a table with the
+  following members:
+    name - full player-realm name
+    level - player level
+    class - Kore class number
+    faction - player faction
+    is_guilded - whether or not the player is in our guild
+    guildrankidx - player guild rank (1-based with 1 being GM)
+    is_gm - is the player the GM
+    is_pl - is the player the party leader
+    is_rl - is the player the raid leader
+    is_aorl - is the player a raid assistant or the raid leader
+    is_ml - is the player the master looter
+    user_role - user selected role
+    group_role - raid assigned role
+    subgroup - raid subgroup number or 0 if not in a raid
+    raidid - player raid ID number (1 - 40 or 0 if not in a raid)
+
+4.  Events.
+===========
+
+KRP does almost all mod-specific work via a number of event messages which
+your mod must register for. All of these event messages are passed the
+internal table created by the call to KRP:RegisterAddon() above, if any. It is
+rare for a mod to use callbacks and not have registered for its own config
+space, although this is valid. In such cases the first argument to all of
+these event messages will simply be nil.
+
+For example, to register a function to be called when the player leaves a
+party you could do something like this:
+
+  local function my_plp (mp, evt, player, party)
+    printf ("Player " .. player .. " left the party")
+  end
+
+  KRP:RegisterMessage ("KRP_PLAYER_LEAVE_PARTY", my_plp)
+
+KRP_LOOT_METHOD_UPDATED (method)
+  Fired when the loot method changes. method is one of:
+    KRP.LOOT_METHOD_UNKNOWN
+    KRP.LOOT_METHOD_FREEFORALL
+    KRP.LOOT_METHOD_GROUP
+    KRP.LOOT_METHOD_PERSONAL
+    KRP.LOOT_METHOD_MASTER
+
+KRP_LEADER_CHANGED ()
+  Fired when the party or raid leader changes. This will affect the is_pl,
+  is_rl, is_aorl and leader status variables.
+
+KRP_IN_PARTY_CHANGED (in_party)
+  Fired when the current player's party setting changes. in_party is true if
+  the player is in a party, false otherwise. Also changes the in_party status
+  variable.
+
+KRP_IN_RAID_CHANGED (in_raid)
+  Fired when the current player's raid setting changes. in_raid is true if
+  the player is in a raid, false otherwise. Also changes the in_raid status
+  variable.
+
+KRP_IN_BATTLEGROUND_CHANGED (in_bg)
+  Fired when the current player's battleground setting changes. in_bg is true
+  if the player is in a battleground or arena, false otherwise. Also changes
+  the in_battleground status variable.
+
+KRP_IN_GROUP_CHANGED (in_party, in_raid, in_bg)
+  A composite call if any of the previous 3 events fired.
+

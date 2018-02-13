@@ -75,3 +75,4 @@ L["Cannot enable debugging for '%s' - no such module."] = "Impossible d'activer 
 L["Debug level %d out of bounds - must be between 0 and 10."] = "Niveau de déboguage %s hors limites - doit être compris entre 0 et 10."
 L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."] = "Module '%s' inexistant. Utilisez %s/%s %s%s pour une liste des modules disponibles."
 L["KKore extensions loaded:"] = "Extensions KKore chargées :"
+L["Chest"] = "Coffre"

@@ -29,55 +29,8 @@ else
   texpath = "Interface\\Addons\\" .. addonName .. "\\KKore\\Textures\\"
 end
 
---
--- This portion of this file is the embedded LibStub, with full credit to
--- Kaelton, Cladhaire, ckknight, Mikk, Ammo, Nevcairiel and joshborke.
--- That code is in in the public domain. See http://www.wowace.com/wiki/LibStub
--- for details.
---
-local LIBSTUB_MAJOR, LIBSTUB_MINOR = "LibStub", 2
-local LibStub = _G[LIBSTUB_MAJOR]
-
-if (not LibStub or LibStub.minor < LIBSTUB_MINOR) then
-  LibStub = LibStub or {libs = {}, minors = {} }
-  _G[LIBSTUB_MAJOR] = LibStub
-  LibStub.minor = LIBSTUB_MINOR
-
-  function LibStub:NewLibrary (major, minor)
-    assert(type(major) == "string",
-      "LibStub:Newlibrary: bad argument #1 (string expected).")
-    minor = assert(tonumber(strmatch(minor, "%d+")),
-      "LibStub:NewLibrary: minor version must either be a number or contain a number.")
-    local oldminor = self.minors[major]
-
-    if (oldminor and oldminor >= minor) then
-      return nil
-    end
-
-    self.minors[major] = minor
-    self.libs[major] = self.libs[major] or {}
-    return self.libs[major], oldminor
-  end -- Function LibStub:NewLibrary
-
-  function LibStub:GetLibrary (major, silent)
-    if ((not self.libs[major]) and (not silent)) then
-      error (("Cannot find a library instance of %q."):format (tostring (major)), 2)
-    end
-    return self.libs[major], self.minors[major]
-  end -- Function LibStub:GetLibrary
-
-  function LibStub:IterateLibraries()
-    return pairs(self.libs)
-  end -- Function LibStub:IterateLibraries
-
-  setmetatable(LibStub, { __call = LibStub.GetLibrary })
-end
---
--- End of LibStub code
---
-
 local KKOREUI_MAJOR = "KKoreUI"
-local KKOREUI_MINOR = 500
+local KKOREUI_MINOR = 700
 
 local KUI = LibStub:NewLibrary(KKOREUI_MAJOR, KKOREUI_MINOR)
 
@@ -108,6 +61,13 @@ local safecall
 local floor = math.floor
 local ceil = math.ceil
 local CreateFrame = CreateFrame
+
+local K, KM = LibStub:GetLibrary("KKore")
+assert (K, "KKoreUI requires KKore")
+assert (tonumber(KM) >= 732, "KKoreUI requires KKore r732 or later")
+K:RegisterExtension (KUI, KKOREUI_MAJOR, KKOREUI_MINOR)
+
+local safecall = K.pvt.safecall
 
 local borders = {
   { -- Thin
@@ -143,93 +103,6 @@ KUI.emptydropdown = {
     enabled = false,
   },
 }
-
-local K = LibStub:GetLibrary("KKore")
-if (K) then
-  K:RegisterExtension (KKOREUI_MAJOR, KKOREUI_MINOR)
-  safecall = K.pvt.safecall
-else
-  -- This safecall implementation from Ace3.
---[[
-Copyright (c) 2007, Ace3 Development Team
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-  * Redistributions of source code must retain the above copyright notice,
-    this list of conditions and the following disclaimer.
-  * Redistributions in binary form must reproduce the above copyright notice,
-    this list of conditions and the following disclaimer in the documentation
-    and/or other materials provided with the distribution.
-  * Redistribution of a stand alone version is strictly prohibited without
-    prior written authorization from the Lead of the Ace3 Development Team.
-  * Neither the name of the Ace3 Development Team nor the names of its
-    contributors may be used to endorse or promote products derived from
-    this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-]]
-  local empty_table_meta = {
-    __index = function(tbl, key)
-      tbl[key] = {}
-      return tbl[key]
-    end
-  }
-
-  local errorhandler = function (err)
-    return geterrorhandler()(err)
-  end
-
-  local function CreateDispatcher(argc)
-    local code = [[
-      local xpcall, eh = ...
-      local method, ARGS
-      local function call() return method(ARGS) end
-
-      local function dispatch(func, ...)
-        method = func
-        if not method then return end
-        ARGS = ...
-        return xpcall(call, eh)
-      end
-
-      return dispatch
-    ]]
-
-    local ARGS = {}
-    for i = 1, argc do ARGS[i] = "arg"..i end
-    code = code:gsub("ARGS", tconcat(ARGS, ", "))
-    return assert(loadstring(code, "safecall Dispatcher["..argc.."]"))(xpcall, errorhandler)
-  end
-
-  local Dispatchers = setmetatable({}, {
-    __index=function(self, argc)
-      local dispatcher = CreateDispatcher(argc)
-      rawset(self, argc, dispatcher)
-      return dispatcher
-    end
-  })
-
-  Dispatchers[0] = function(func) return xpcall(func, errorhandler) end
-
-  safecall = function (func, ...)
-    if (type(func) == "function") then
-      return Dispatchers[select("#",...)](func, ...)
-    end
-  end
-end -- Of Ace3 safecall code.
 
 local function fixframelevels(parent, ...)
   local l = 1
@@ -1039,11 +912,6 @@ function KUI:CreateDialogFrame (cfg, kparent)
 
   local bdrop = {}
 
-  if (cfg.blackbg) then
-    bdrop.bgFile = texpath .. "TDF-Fill"
-    bdrop.tile = true
-  end
-
   if (bstyle > 0) then
     bdrop.bgFile = borders[bstyle].bgFile
     bdrop.edgeFile = borders[bstyle].edgeFile
@@ -1051,6 +919,11 @@ function KUI:CreateDialogFrame (cfg, kparent)
     bdrop.edgeSize = borders[bstyle].edgesize
     bdrop.insets = borders[bstyle].insets
     offset = borders[bstyle].offset
+    bdrop.tile = true
+  end
+
+  if (cfg.blackbg) then
+    bdrop.bgFile = texpath .. "TDF-Fill"
     bdrop.tile = true
   end
 
@@ -1225,6 +1098,7 @@ local function sl_SetTextColor (this, r, g, b, a)
 end
 
 local function sl_OnEnable (this, event, onoff)
+  local onoff = onoff or false
   this.enabled = onoff
   local d = onoff and 1 or 2
   this.label:SetTextColor(this.rgb.r/d, this.rgb.g/d, this.rgb.b/d, this.rgb.a)
@@ -1333,6 +1207,7 @@ local function eb_OnEscapePressed (this)
 end
 
 local function eb_OnEnable (this, event, onoff)
+  local onoff = onoff or false
   local d = onoff and 1 or 2
   this:EnableMouse (onoff)
   this:SetTextColor (this.trgb.r/d, this.trgb.g/d, this.trgb.b/d, this.trgb.a)
@@ -1488,6 +1363,7 @@ local function cb_ToggleChecked (this)
 end
 
 local function cb_OnEnable (this, event, onoff)
+  local onoff = onoff or false
   this.enabled = onoff
   local d = onoff and 1 or 2
   SetDesaturation (this.check, not onoff)
@@ -1574,11 +1450,9 @@ local function kui_checkradio(cfg, kparent, size, dh)
 end
 
 local function cb_SetChecked (self, onoff, nothrow)
+  local onoff = onoff or false
   local c = self.check
   local old = self.checked
-  if (onoff == nil) then
-    onoff = false
-  end
 
   self.checked = onoff
   if (onoff) then
@@ -1647,6 +1521,7 @@ local function rb_SetChecked (this)
 end
 
 local function rb_OnValueChanged (this, evt, onoff, user, val)
+  local onoff = onoff or false
   if (this.cvfunc) then
     this.cvfunc (this, onoff, val, user)
   end
@@ -2025,55 +1900,75 @@ function KUI:CreateButton (cfg, kparent)
 end
 
 local function td_SetTab (self, tab, subtab)
-  local seltab
+  local seltab = 0
+  local sseltab = 0
+
   if (not tab) then
-    tab = self.currenttab or 1
+    if (self.deftab) then
+      tab = self.deftab
+    else
+      tab = self.currenttab or 1
+    end
   end
 
-  if (tonumber(tab) ~= nil) then
-    seltab = tonumber(tab)
+  if (tonumber (tab) ~= nil) then
+    seltab = tonumber (tab)
   else
-    for k,v in ipairs(self.tabs) do
+    for k,v in ipairs (self.tabs) do
       if (v.name == tab) then
-        seltab = tonumber(k)
+        seltab = tonumber (k)
       end
     end
   end
 
-  if (seltab) then
-    PanelTemplates_SetTab (self, seltab)
-    local tl = self.tabs
-    for k,v in ipairs(tl) do
-      if (k == seltab) then
-        v.frame:Show ()
-      else
-        v.frame:Hide ()
-      end
-    end
-    self.currenttab = seltab
+  if (not seltab) then
+    return nil
+  end
 
-    if (self.tabs[seltab].title) then
-      self.title:SetText (self.tabs[seltab].title)
-    elseif (self.titletext and self.titletext ~= "") then
-      self.title:SetText (self.titletext)
-    elseif (self.maintitle and self.maintitle ~= "") then
-      self.title:SetText (self.maintitle)
+  PanelTemplates_SetTab (self, seltab)
+  local tl = self.tabs
+  for k,v in ipairs (tl) do
+    if (k == seltab) then
+      v.frame:Show ()
+    else
+      v.frame:Hide ()
     end
+  end
+  self.currenttab = seltab
 
-    --
-    -- Set the "tabcontent" pointer to this current new content.
-    --
-    self.tabcontent = self.tabs[seltab].content
+  if (self.onclick and not subtab) then
+    self.onclick (seltab, 0)
+  end
+
+  if (self.tabs[seltab].title) then
+    self.title:SetText (self.tabs[seltab].title)
+  elseif (self.titletext and self.titletext ~= "") then
+    self.title:SetText (self.titletext)
+  elseif (self.maintitle and self.maintitle ~= "") then
+    self.title:SetText (self.maintitle)
+  end
+
+  --
+  -- Set the "tabcontent" pointer to this current new content.
+  --
+  self.tabcontent = self.tabs[seltab].content
+
+  if (not self.tabs[seltab].tabs) then
+    return seltab
   end
 
   --
   -- If this page has subtabs and an explicit subtab was not specified,
-  -- see if we have have a current subtab or nor, and if not, select the
+  -- see if we have have a current subtab or not, and if not, select the
   -- first subtab.
   --
   if (self.tabs[seltab].tabs) then
     if (not subtab) then
-      subtab = self.tabs[seltab].currenttab or 1
+      if (self.tabs[seltab].deftab) then
+        subtab = self.tabs[seltab].deftab
+      else
+        subtab = self.tabs[seltab].currenttab or 1
+      end
     end
   end
 
@@ -2082,7 +1977,6 @@ local function td_SetTab (self, tab, subtab)
       return seltab
     end
 
-    local sseltab
     if (tonumber(subtab) ~= nil) then
       sseltab = tonumber(subtab)
     else
@@ -2093,18 +1987,32 @@ local function td_SetTab (self, tab, subtab)
       end
     end
 
-    if (sseltab) then
-      PanelTemplates_SetTab (self.tabs[seltab].frame, sseltab)
-      local tl = self.tabs[seltab].tabs
-      for k,v in ipairs(tl) do
-        if (k == sseltab) then
-          v.content:Show ()
-        else
-          v.content:Hide ()
-        end
+    if (not sseltab) then
+      return seltab
+    end
+
+    PanelTemplates_SetTab (self.tabs[seltab].frame, sseltab)
+    local tl = self.tabs[seltab].tabs
+    for k,v in ipairs(tl) do
+      if (k == sseltab) then
+        v.content:Show ()
+      else
+        v.content:Hide ()
       end
-      self.tabs[seltab].currenttab = sseltab
-      self.tabcontent = tl[sseltab].content
+    end
+    self.tabs[seltab].currenttab = sseltab
+    self.tabcontent = tl[sseltab].content
+
+    if (self.onclick) then
+      self.onclick (seltab, sseltab)
+    end
+
+    if (self.tabs[seltab].onclick) then
+      self.tabs[seltab].onclick (seltab, sseltab)
+    end
+
+    if (tl[sseltab].onclick) then
+      tl[sseltab].onclick (seltab, sseltab)
     end
   end
   return seltab
@@ -2136,6 +2044,8 @@ function KUI:CreateTabbedDialog (cfg, kparent)
 
   frame.texs = {}
   frame.maintitle = cfg.title or ""
+  frame.onclick = cfg.onclick
+  frame.deftab = cfg.deftab
 
   local it = frame:CreateTexture (nil, "BACKGROUND")
   it:SetTexture (cfg.tltexture or "Interface/FriendsFrame/FriendsFrameScrollIcon")
@@ -2270,12 +2180,14 @@ function KUI:CreateTabbedDialog (cfg, kparent)
   frame.tabs = {}
   for k,v in pairs(cfg.tabs) do
     local tval = { name = k, title = v.title, text = v.text, id=v.id,
-      hsplit = v.hsplit, vsplit = v.vsplit, tabframe = v.tabframe}
+      hsplit = v.hsplit, vsplit = v.vsplit, tabframe = v.tabframe,
+      onclick = v.onclick}
     if (v.tabs) then
       tval.tabs = {}
+      tval.deftab = v.deftab
       for kk, vv in pairs(v.tabs) do
         local stval = { name = kk, text = vv.text, id = vv.id,
-          hsplit = vv.hsplit, vsplit = vv.vsplit }
+          hsplit = vv.hsplit, vsplit = vv.vsplit, onclick = vv.onclick }
         tinsert (tval.tabs, stval)
       end
       table.sort(tval.tabs, sorter)
@@ -2354,6 +2266,7 @@ function KUI:CreateTabbedDialog (cfg, kparent)
     tb:SetID (k)
     tb:SetText (v.text)
     tb:SetPoint ("TOPLEFT", rf, rtp, rx, ry)
+    tb.onclick = v.onclick
     PanelTemplates_SelectTab (tb)
     PanelTemplates_TabResize (tb, 0)
     tb:SetScript ("OnClick", function (this)
@@ -2361,16 +2274,7 @@ function KUI:CreateTabbedDialog (cfg, kparent)
       this:GetParent():SetTab (tnum)
     end)
     thistab.tbutton = tb
-    tb.SetShown = function (self, onoff)
-      if (onoff == nil) then
-        onoff = true
-      end
-      if (onoff) then
-        self:Show ()
-      else
-        self:Hide ()
-      end
-    end
+    tb.SetShown = BC.SetShown
     rf = tb
     rtp = "TOPRIGHT"
     rx = -16
@@ -2451,16 +2355,7 @@ function KUI:CreateTabbedDialog (cfg, kparent)
           this:GetParent():GetParent():SetTab (this.pbuttonid, tnum)
         end)
         subtab.tbutton = stb
-        stb.SetShown = function (self, onoff)
-          if (onoff == nil) then
-            onoff = true
-          end
-          if (onoff) then
-            self:Show ()
-          else
-            self:Hide ()
-          end
-        end
+        stb.SetShown = BC.SetShown
         srtp = "TOPRIGHT"
         srf = stb
         srx = 0
@@ -2499,7 +2394,7 @@ end
 -- it is called with a nil offset to disable any current selection. This
 -- is because the current selection may no longer be valid after the list
 -- is updated. Thus it is the caller's responsibility to remember any
--- current position of restoring the current selection is important.
+-- current position if restoring the current selection is important.
 -- Second, it is called when a list item is clicked. It is not called
 -- directly, but through the containing list's :SetSelected() method. The
 -- default helper functions do this correctly but if the code implements
@@ -2515,6 +2410,10 @@ local function sl_setsel (objp, offset, force)
   local nslot = nil
   local nbtn = nil
   local ro
+
+  if (offset and (offset > objp.itemcount or offset <= 0)) then
+    offset = nil
+  end
 
   if (objp.selecteditem) then
     -- We have a currently selected item. If the new offset is not the same
@@ -2577,6 +2476,7 @@ local function sl_setsel (objp, offset, force)
 end
 
 local function sl_setrem_highlight (objp, onoff)
+  local onoff = onoff or false
   if (not objp.selecteditem) then
     return
   end
@@ -2809,7 +2709,7 @@ function KUI:CreateScrollList (cfg, kparent)
 
   frame.SetSelected = function (this, offset, display, force)
     sl_setsel (this, offset, force)
-    if (display) then
+    if (display and offset) then
       sl_vertscroll (this, (offset - 1) * this.itemheight)
     end
   end
@@ -2886,7 +2786,7 @@ function KUI.SelectItemHelper (objp, idx, slot, btn, onoff, cfn, onfn, offfn, ni
     end
 
     if (onfn) then
-      return onfn (objp, idx, slot, btn, onoff)
+      return onfn (objp, idx, slot, btn, true)
     end
   elseif (onoff == false) then
     if (offfn) then
@@ -2896,11 +2796,14 @@ function KUI.SelectItemHelper (objp, idx, slot, btn, onoff, cfn, onfn, offfn, ni
     if (nilfn) then
       return nilfn (objp, idx, slot, btn, nil)
     end
+    if (offfn) then
+      return offfn (objp, idx, slot, btn, nil)
+    end
   end
 end
 
 function KUI.HighlightItemHelper (objp, idx, slot, btn, onoff, onfn, offfn)
-  if (onoff == true) then
+  if (onoff) then
     local ntn = "Interface/AuctionFrame/UI-AuctionFrame-FilterBg"
     btn:SetNormalTexture (ntn)
     local nt = btn:GetNormalTexture()
@@ -3751,11 +3654,6 @@ local function dd_refresh_frame (fr, tlfr, ilist, nilist)
   fr:SetMinResize (fr.minwidth or wwidth, fr.minheight or wheight)
   fr:SetMaxResize (fr.maxwidth or maxwidth, fr.maxheight or maxheight)
 
-  -- @debug-start@
-  if (fr.debug) then
-    K.printf ("hasvscroll=%s hasicons=%s hassub=%s hascheck=%s widest=%s xtra=%s", tostring(fr.hasvscroll), tostring(fr.hasicons), tostring(fr.hassub), tostring(fr.hascheck), tostring(fr.widest), tostring(xtra))
-  end
-  -- @debug-end@
   --
   -- Now we need to loop through all of the item frames one last time and
   -- do the final positioning of all elements now that we know which
@@ -3986,6 +3884,8 @@ local function dd_SetValue (this, value, nothrow)
 end
 
 local function dd_OnEnable (this, event, onoff)
+  local onoff = onoff or false
+
   this.enabled = onoff
 
   local button = this.button
@@ -4379,6 +4279,13 @@ create_dd_sa = function (cfg, parent, toplevel, ispopup)
     sframe.toplevel = frame.toplevel
     sframe:HookScript ("OnEnter", tl_OnEnter)
     sframe:HookScript ("OnLeave", tl_OnLeave)
+    local bdrop = {
+      bgFile = KUI.TEXTURE_PATH .. "TDF-Fill",
+      tile = true,
+      tileSize = 32,
+      insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    }
+    sframe:SetBackdrop (bdrop)
   end
 
   if (not frame.cframe) then
