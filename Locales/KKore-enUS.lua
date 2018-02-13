@@ -71,3 +71,4 @@ L["Cannot enable debugging for '%s' - no such module."] = true
 L["Debug level %d out of bounds - must be between 0 and 10."] = true
 L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."] = true
 L["KKore extensions loaded:"] = true
+L["Chest"] = true

@@ -75,3 +75,4 @@ L["Cannot enable debugging for '%s' - no such module."] = "Kann das debuggen fü
 L["Debug level %d out of bounds - must be between 0 and 10."] = "Debug Level %d ist außerhalb des Rahmens - es muss zwischen 0 und 10 liegen."
 L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."] = "Modul '%s' existiert nicht. Benutze %s/%s %s%s für eine Liste aller verfügbarer Module."
 L["KKore extensions loaded:"] = "KKore Erweiterungen geladen:"
+L["Chest"] = true

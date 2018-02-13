@@ -5,10 +5,13 @@
 <Script file="KKore.lua"/>
 <Script file="Locales\KKore-enUS.lua"/>
 <Script file="Locales\KKore-deDE.lua"/>
+<Script file="Locales\KKore-frFR.lua"/>
 <Script file="Locales\KKore-ruRU.lua"/>
 <Script file="KKoreDB.lua"/>
 <Script file="KKoreHash.lua"/>
 <Script file="KKoreUI.lua"/>
+<Script file="KKoreParty.lua"/>
+<Script file="KKoreLoot.lua"/>
 <Script file="LibDeformat-3.0.lua"/>
 
 </Ui>

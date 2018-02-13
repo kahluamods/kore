@@ -75,3 +75,4 @@ L["Cannot enable debugging for '%s' - no such module."] = "Не могу вкл�
 L["Debug level %d out of bounds - must be between 0 and 10."] = "Уровень отладки %d вне диапазона - должен быть от 0 до 10."
 L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."] = "Модуль '%s' не существует. Используйте %s/%s %s%s для отображения списка доступных модулей."
 L["KKore extensions loaded:"] = "KKore расширения загружены:"
+L["Chest"] = true

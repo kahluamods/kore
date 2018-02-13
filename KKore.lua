@@ -41,9 +41,9 @@ if (not LibStub or LibStub.minor < LIBSTUB_MINOR) then
   LibStub.minor = LIBSTUB_MINOR
 
   function LibStub:NewLibrary (major, minor)
-    assert(type(major) == "string",
+    assert (type (major) == "string",
       "LibStub:Newlibrary: bad argument #1 (string expected).")
-    minor = assert(tonumber(strmatch(minor, "%d+")),
+    minor = assert (tonumber (strmatch (minor, "%d+")),
       "LibStub:NewLibrary: minor version must either be a number or contain a number.")
     local oldminor = self.minors[major]
 
@@ -67,23 +67,23 @@ if (not LibStub or LibStub.minor < LIBSTUB_MINOR) then
     return pairs(self.libs)
   end -- Function LibStub:IterateLibraries
 
-  setmetatable(LibStub, { __call = LibStub.GetLibrary })
+  setmetatable (LibStub, { __call = LibStub.GetLibrary })
 end
 --
 -- End of LibStub code
 --
 
 local KKORE_MAJOR = "KKore"
-local KKORE_MINOR = 731
+local KKORE_MINOR = 732
 
-local K = LibStub:NewLibrary(KKORE_MAJOR, KKORE_MINOR)
+local K = LibStub:NewLibrary (KKORE_MAJOR, KKORE_MINOR)
 
 if (not K) then
   return
 end
 
 local kaoname = ...
-if (string.lower(kaoname) == "kkore") then
+if (string.lower (kaoname) == "kkore") then
   K.KORE_PATH = "Interface\\Addons\\KKore\\"
 else
   K.KORE_PATH = "Interface\\Addons\\" .. kaoname .. "\\KKore\\"
@@ -92,10 +92,6 @@ end
 _G["KKore"] = K
 
 K.extensions = K.extensions or {}
-
-function K:RegisterExtension (major, minor)
-  self.extensions[major] = minor
-end
 
 -- Local aliases for global or Lua library functions
 local tinsert = table.insert
@@ -126,6 +122,10 @@ local unpack, error = unpack, error
 
 local k,v,i
 
+local kore_ready = 0
+
+K.local_realm = K.local_realm or select (2, UnitFullName ("player"))
+
 --
 -- Capitalise the first character in a users name. Many thanks to Arrowmaster
 -- in #wowuidev on irc.freenode.net for the pattern below.
@@ -146,8 +146,10 @@ function K.CanonicalName (name, realm)
   if (not name) then
     return nil
   end
-  K.local_realm = K.local_realm or select (2, UnitFullName ("player"))
-  local rn = realm or K.local_realm or gsub (gsub (GetRealmName(), " ", ""), "'", "")
+  local rn = realm or K.local_realm
+  if (not rn or rn == "") then
+    return nil
+  end
   local nm = Ambiguate (name, "mail")
   if not strfind (nm, "-", 1, true) then
     return K.CapitaliseName (nm .. '-' .. rn)
@@ -156,12 +158,31 @@ function K.CanonicalName (name, realm)
   end
 end
 
+function K.FullUnitName (unit)
+  if (not unit or type (unit) ~= "string" or unit == "") then
+    return nil
+  end
+
+  local unit_name, unit_realm = UnitFullName (unit)
+
+  if (not unit_realm or unit_realm == "") then
+    K.local_realm = K.local_realm or select (2, UnitFullName ("player"))
+    unit_realm = K.local_realm
+  end
+
+  if (not unit_name or unit_name == "Unknown" or not unit_realm or unit_realm == "") then
+    return nil
+  end
+
+  return K.CapitaliseName (unit_name .. "-" .. unit_realm)
+end
+
 function K.ShortName (name)
-  return Ambiguate (name, "short")
+  return Ambiguate (name, "guild")
 end
 
 ---
---- Moderns versions of the WoW client have problems with strfmt ("%08x", val)
+--- Some versions of the WoW client have problems with strfmt ("%08x", val)
 --- for any val > 2^31. This simple functions avoids that.
 ---
 function K.hexstr (val)
@@ -176,26 +197,39 @@ K.guild.ranks = K.guild.ranks or {}
 K.guild.roster = K.guild.roster or {}
 K.guild.roster.id = K.guild.roster.id or {}
 K.guild.roster.name = K.guild.roster.name or {}
-K.guild.gmname = K.guild.gmname or ""
+K.guild.gmname = nil
 K.raids = K.raids or { numraids = 0, info = {} }
 
 local done_pi_once = false
 local function get_static_player_info ()
   if (done_pi_once) then
-    return
+    return true
   end
-  local nm, rn = UnitFullName ("player")
-  K.player.player = K.CanonicalName (nm, rn)
+
+  K.local_realm = select (2, UnitFullName ("player"))
+  if (not K.local_realm or K.local_realm == "") then
+    K.local_realm = nil
+    return false
+  end
+
+  K.player.name = K.FullUnitName ("player")
+  if (not K.player.name) then
+    return false
+  end
+
   K.player.faction = UnitFactionGroup ("player")
   K.player.class = K.ClassIndex[select (2, UnitClass ("player"))]
-  if (rn) then
-    done_pi_once = true
-  end
+  done_pi_once = true
+  kore_ready = kore_ready + 1
+  return true
 end
 
 local function update_player_and_guild ()
-  get_static_player_info()
-  K.player.level = UnitLevel("player")
+  if (not get_static_player_info ()) then
+    return
+  end
+
+  K.player.level = UnitLevel ("player")
   if (IsInGuild()) then
     local gname, _, rankidx = GetGuildInfo ("player")
     if (not gname or gname == "") then
@@ -203,20 +237,20 @@ local function update_player_and_guild ()
     end
     K.player.guild = gname
     K.player.guildrankidx = rankidx + 1
-    K.player.isguilded = true
+    K.player.is_guilded = true
     if (IsGuildLeader ()) then
-      K.player.isgm = true
+      K.player.is_gm = true
     else
-      K.player.isgm = false
+      K.player.is_gm = false
     end
   else
-    K.player.isguilded = false
-    K.player.guild = ""
-    K.player.guildrankidx = 999
-    K.player.isgm = false
+    K.player.is_guilded = false
+    K.player.guild = nil
+    K.player.guildrankidx = 0
+    K.player.is_gm = false
   end
 
-  if (K.player.isguilded) then
+  if (K.player.is_guilded) then
     local i
 
     K.guild.numranks = GuildControlGetNumRanks ()
@@ -232,9 +266,9 @@ local function update_player_and_guild ()
     end
 
     for i = 1, K.guild.numroster do
-      local nm, _, ri, lvl, _, _, _, _, onl, _, cl = GetGuildRosterInfo (i)
-      nm = K.CanonicalName (nm, nil)
-      local iv = { name = nm, rankidx = ri, level = lvl, class = K.ClassIndex[cl], online = onl }
+      local nm, _, ri, lvl, _, _, _, _, ol, _, cl = GetGuildRosterInfo (i)
+      nm = K.CanonicalName (nm)
+      local iv = { name = nm, rank = ri + 1, level = lvl, class = K.ClassIndex[cl], online = ol and true or false }
       tinsert (K.guild.roster.id, iv)
       K.guild.roster.name[nm] = i
       if (ri == 0) then
@@ -249,11 +283,10 @@ local function update_player_and_guild ()
     K.guild.roster = {}
     K.guild.roster.id = {}
     K.guild.roster.name = {}
-    K.guild.gmname = ""
+    K.guild.gmname = nil
   end
 
   K:SendMessage ("PLAYER_INFO_UPDATED")
-  K:SendMessage ("GUILD_INFO_UPDATED")
 end
 
 function K:UpdatePlayerAndGuild ()
@@ -277,6 +310,8 @@ local KP = K.pvt
 K.debugging = K.debugging or {}
 K.debugframe = nil
 K.maxlevel = MAX_PLAYER_LEVEL_TABLE[GetExpansionLevel()]
+
+K.debugging["kore"] = 9 -- @debug-delete@
 
 function K.debug(addon, lvl, ...)
   if (not K.debugging[addon]) then
@@ -356,7 +391,6 @@ K.CLASS_WARLOCK     = "09"
 K.CLASS_MONK        = "10"
 K.CLASS_DRUID       = "11"
 K.CLASS_DEMONHUNTER = "12"
-K.CLASS_UNKNOWN     = "00"
 
 K.ClassIndex = {
   ["WARRIOR"]     = K.CLASS_WARRIOR,
@@ -434,7 +468,6 @@ K.IndexClass = {
   [K.CLASS_MONK]        = { u = "MONK", c = monk },
   [K.CLASS_DRUID]       = { u = "DRUID", c = druid },
   [K.CLASS_DEMONHUNTER] = { u = "DEMONHUNTER", c = dh },
-  [K.CLASS_UNKNOWN]     = { u = "UNKNOWN" },
 }
 for k,v in pairs(K.IndexClass) do
   if (v.c) then
@@ -481,7 +514,6 @@ K.ClassColorsRGBPerc = {
   [K.CLASS_MONK]        = RAID_CLASS_COLORS["MONK"],
   [K.CLASS_DRUID]       = RAID_CLASS_COLORS["DRUID"],
   [K.CLASS_DEMONHUNTER] = RAID_CLASS_COLORS["DEMONHUNTER"],
-  [K.CLASS_UNKNOWN]     = { r = 0.3, g = 0.3, b = 0.3 },
 }
 
 function K.RGBPercToDec (rgb)
@@ -516,7 +548,7 @@ function K.RGBDecToColorCode (rgb)
   return string.format("|c%02x%02x%02x%02x", a, rgb.r, rgb.g, rgb.b)
 end
 
-function K.SetupClassColors()
+function K.SetupClassColors ()
   K.ClassColorsRGB = {}
   K.ClassColorsHex = {}
   K.ClassColorsEsc = {}
@@ -543,18 +575,18 @@ function K.SetupClassColors()
 end
 
 -- Set the defaults and conversion tables
-K.SetupClassColors()
+K.SetupClassColors ()
 
 -- Utility function to copy one table to another
-function K.CopyTable(src,dest)
-  if (type(dest) ~= "table") then
+function K.CopyTable (src, dest)
+  if (type (dest) ~= "table") then
     dest = {}
   end
 
-  if (type(src) == "table") then
-    for k, v in pairs(src) do
-      if (type(v) == "table") then
-        v = K.CopyTable(v, dest[k])
+  if (type (src) == "table") then
+    for k, v in pairs (src) do
+      if (type (v) == "table") then
+        v = K.CopyTable (v, dest[k])
       end
       dest[k] = v
     end
@@ -862,34 +894,36 @@ function K:NewCB(target, regName, unregName, unregallName)
 
   -- Create the registry object
   local events = setmetatable({}, empty_table_meta)
-  local registry = {recurse = 0, events = events}
+  local kregistry = {recurse = 0, events = events}
 
-  function registry:Fire(eventname, ...)
+  function kregistry:Fire(eventname, ...)
+    assert(eventname)
+    local arg1 = ...
     if ((not rawget(events, eventname)) or
         (not next(events[eventname]))) then
       return
     end
 
-    local oldrecurse = registry.recurse
-    registry.recurse = oldrecurse + 1
+    local oldrecurse = kregistry.recurse
+    kregistry.recurse = oldrecurse + 1
     DispatchersQ[select("#", ...) + 1](events[eventname], eventname, ...)
-    registry.recurse = oldrecurse
+    kregistry.recurse = oldrecurse
 
-    if (registry.insertQueue and oldrecurse == 0) then
+    if (kregistry.insertQueue and oldrecurse == 0) then
       -- Something in one of the callbacks wanted to register more callbacks,
       -- which got queued.
-      for eventname,callbacks in pairs(registry.insertQueue) do
+      for eventname,callbacks in pairs(kregistry.insertQueue) do
         local first = not rawget(events, eventname) or
           not next(events[eventname])
         for self,func in pairs(callbacks) do
           events[eventname][self] = func
-          if (first and registry.OnUsed) then
-            registry.OnUsed(registry, target, eventname)
+          if (first and kregistry.OnUsed) then
+            kregistry.OnUsed(kregistry, target, eventname)
             first = nil
           end
         end
       end
-      registry.insertQueue = nil
+      kregistry.insertQueue = nil
     end
   end
 
@@ -939,18 +973,18 @@ function K:NewCB(target, regName, unregName, unregallName)
     end
 
     if (events[eventname][self] or
-        registry.recurse < 1) then
+        kregistry.recurse < 1) then
       events[eventname][self] = regfunc
-      if (registry.OnUsed and first) then
-        registry.OnUsed(registry, target, eventname)
+      if (kregistry.OnUsed and first) then
+        kregistry.OnUsed(kregistry, target, eventname)
       end
     else
       -- We're currently process a callback in this registry, so delay
       -- the registration of this new entry by adding it to a queue
       -- that will be added when recursion terminates.
-      registry.insertQueue = registry.insertQueue or
+      kregistry.insertQueue = kregistry.insertQueue or
         setmetatable({}, empty_table_meta)
-      registry.insertQueue[eventname][self] = regfunc
+      kregistry.insertQueue[eventname][self] = regfunc
     end
   end
 
@@ -966,14 +1000,14 @@ function K:NewCB(target, regName, unregName, unregallName)
 
     if (rawget(events, eventname) and events[eventname][self]) then
       events[eventname][self] = nil
-      if (registry.OnUnused and not next(events[eventname])) then
-        registry.OnUnused(registry, target, eventname)
+      if (kregistry.OnUnused and not next(events[eventname])) then
+        kregistry.OnUnused(kregistry, target, eventname)
       end
     end
 
-    if (registry.insertQueue and rawget(registry.insertQueue, eventname)
-        and registry.insertQueue[eventname][self]) then
-      registry.insertQueue[eventname][self] = nil
+    if (kregistry.insertQueue and rawget(kregistry.insertQueue, eventname)
+        and kregistry.insertQueue[eventname][self]) then
+      kregistry.insertQueue[eventname][self] = nil
     end
   end
 
@@ -990,8 +1024,8 @@ function K:NewCB(target, regName, unregName, unregallName)
 
       for i=1,select("#", ...) do
         local self = select(i, ...)
-        if (registry.insertQueue) then
-          for eventname, callbacks in pairs(registry.insertQueue) do
+        if (kregistry.insertQueue) then
+          for eventname, callbacks in pairs(kregistry.insertQueue) do
             if (callbacks[self]) then
               callbacks[self] = nil
             end
@@ -1000,8 +1034,8 @@ function K:NewCB(target, regName, unregName, unregallName)
         for eventname, callbacks in pairs(events) do
           if (callbacks[self]) then
             callbacks[self] = nil
-            if (registry.OnUnused and not next(callbacks)) then
-              registry.OnUnused(registry, target, eventname)
+            if (kregistry.OnUnused and not next(callbacks)) then
+              kregistry.OnUnused(kregistry, target, eventname)
             end
           end
         end
@@ -1009,7 +1043,7 @@ function K:NewCB(target, regName, unregName, unregallName)
     end
   end
 
-  return registry
+  return kregistry
 end
 
 -- AceEvent 3.0 stuff
@@ -1038,6 +1072,12 @@ K.eventframe:SetScript("OnEvent", function(this, event, ...)
   events:Fire(event, ...)
 end)
 
+--
+-- The list of functions that each addon gets when it is initialised via
+-- K:NewAddon(). So for example, each addon gets an addon.SendMessage()
+-- function. Calling addon.SendMessage() is identical to calling
+-- K.SendMessage() directly.
+--
 local evtembeds = {
   "RegisterEvent", "UnregisterEvent",
   "RegisterMessage", "UnregisterMessage",
@@ -1353,13 +1393,20 @@ local com = K.comm
 com.mp_origprefixes = nil
 com.mp_reassemblers = nil
 com.mp_spool = com.mp_spool or {}
+com.ourprefixes = com.ourprefixes or {}
 
 function com:RegisterComm (prefix, method)
   if (method == nil) then
     method = "OnCommReceived"
   end
   RegisterAddonMessagePrefix (prefix)
+  com.ourprefixes[prefix] = true
   return com._RegisterComm (self, prefix, method)
+end
+
+function com:UnregisterComm (prefix, ...)
+  com.ourprefixes[prefix] = nil
+  return com._UnregisterComm (prefix, ...)
 end
 
 function com.SendCommMessage (prefix,text,dist,target,prio,cback,cbackarg)
@@ -1481,7 +1528,7 @@ end -- local do block
 
 if (not com.callbacks) then
   com.__prefixes = {}
-  com.callbacks = K:NewCB(com, "_RegisterComm", "UnregisterComm", "UnregisterAllComm")
+  com.callbacks = K:NewCB(com, "_RegisterComm", "_UnregisterComm", "UnregisterAllComm")
 end
 
 local comOnEvent
@@ -1492,6 +1539,9 @@ com.callbacks.OnUnused = nil
 local function comOnEvent (this, event, ...)
   if (event == "CHAT_MSG_ADDON") then
     local prefix, msg, dist, snd = ...
+    if (not com.ourprefixes[prefix]) then
+      return
+    end
     local sender = K.CanonicalName (snd, nil)
     local control, rest = match (msg, "^([\001-\009])(.*)")
 
@@ -1607,7 +1657,7 @@ end
 -- The rest of this file was writting by James Kean Johnston (Cruciformer) and
 -- is subject to the KahLua Kore license, which is the Apache license, Version
 -- 2.0. Please see LICENSE.txt for details.
--- (C) Copyright 2008-2017 James Kean Johnston. All rights reserved.
+-- (C) Copyright 2008-2018 James Kean Johnston. All rights reserved.
 --
 
 --
@@ -1625,8 +1675,6 @@ end
 -- two members: name and func. name is the name of the command and func
 -- is a reference to the function that will deal with that alias.
 --
-
-update_player_and_guild()
 
 local function listall()
   local k,v
@@ -1660,7 +1708,7 @@ local function kahlua(input)
     K.printf (K.ucolor, "(C) Copyright 2008-2009 J. Kean Johnston (Cruciformer). All rights reserved.")
     K.printf (K.ucolor, L["KKore extensions loaded:"])
     for k,v in pairs (K.extensions) do
-      K.printf (K.ucolor, "    |cffffff00%s|r %s", k, strfmt(L["KAHLUA_VER"], v))
+      K.printf (K.ucolor, "    |cffffff00%s|r %s", k, strfmt(L["KAHLUA_VER"], v.version))
     end
     K.printf (K.ucolor, "This is open source software, distributed under the terms of the Apache license. For the latest version, other KahLua modules and discussion forums, visit |cffffffffhttp://www.kahluamod.com|r.")
     return
@@ -1746,13 +1794,13 @@ local function kcmdfunc(input)
   elseif (cmd == "ginit") then
     update_player_and_guild()
   elseif (cmd == "status") then
-    local rs = strfmt ("player=%s faction=%s class=%s level=%s guilded=%s", tostring(K.player.player), tostring(K.player.faction), tostring(K.player.class), tostring(K.player.level), tostring(K.player.isguilded))
-    if (K.player.isguilded) then
-      rs = rs.. strfmt (" guild=%q isgm=%s rankidx=%s numranks=%s", tostring(K.player.guild), tostring(K.player.isgm), tostring(K.player.guildrankidx), tostring(K.guild.numranks))
+    local rs = strfmt ("player=%s faction=%s class=%s level=%s guilded=%s", tostring(K.player.name), tostring(K.player.faction), tostring(K.player.class), tostring(K.player.level), tostring(K.player.is_guilded))
+    if (K.player.is_guilded) then
+      rs = rs.. strfmt (" guild=%q isgm=%s rankidx=%s numranks=%s", tostring(K.player.guild), tostring(K.player.is_gm), tostring(K.player.guildrankidx), tostring(K.guild.numranks))
     end
 
     K.printf ("%s", rs);
-    if (K.player.isguilded) then
+    if (K.player.is_guilded) then
       local i
       for i = 1, K.guild.numranks do
         K.printf ("Rank %d: name=%q", i, tostring(K.guild.ranks[i]))
@@ -1971,7 +2019,14 @@ function K:NewAddon (obj, name, ver, desc, cmdname, ...)
 
   tinsert (self.earlyq, obj)
   tinsert (self.pewq, obj)
-  tinsert (self.lateq, obj)
+
+  if (kore_ready == 2) then
+    safecall (obj.OnLateInit, obj)
+    obj.SendIPC ("KORE_READY")
+  else
+    tinsert (self.lateq, obj)
+  end
+
   return obj
 end
 
@@ -2011,9 +2066,20 @@ end
 local function addonOnUpdate (this, event)
   this:SetScript ("OnUpdate", nil)
   update_player_and_guild ()
-  while (#K.lateq> 0) do
-    local addon = tremove (K.lateq, 1)
-    safecall (addon.OnLateInit, addon)
+  if (kore_ready == 1) then
+    kore_ready = 2
+    -- For each extension or addon that is using us let them know that basic
+    -- Kore functionality is ready. If a module joins late, after this code
+    -- has been run, then the code that deals with adding the extension will
+    -- send the event.
+    for k, v in pairs (K.extensions) do
+      safecall (v.library.OnLateInit, v.library)
+      v.library.SendIPC (v.library, "KORE_READY")
+    end
+    while (#K.lateq > 0) do
+      local addon = tremove (K.lateq, 1)
+      safecall (addon.OnLateInit, addon)
+    end
   end
 end
 
@@ -2023,3 +2089,426 @@ K.addonframe:RegisterEvent ("PLAYER_LOGIN")
 K.addonframe:RegisterEvent ("PLAYER_ENTERING_WORLD")
 K.addonframe:SetScript ("OnEvent", addonOnEvent)
 K.addonframe:SetScript ("OnUpdate", addonOnUpdate)
+
+K.addons = {}
+
+local addonembeds = {
+  "DoCallbacks", "RegisterAddon", "SuspendAddon", "ResumeAddon",
+  "ActivateAddon", "GetAddon", "AddonCallback", "GetPrivate"
+}
+
+function K.DoCallbacks (self, name, ...)
+  for k, v in pairs (self.addons) do
+    if (type (v) == "table" and type (v.callbacks) == "table") then
+      if (v.active) then
+        -- All callbacks are called with the same first 3 arguments:
+        -- 1. The name of the addon.
+        -- 2. The name of the callback.
+        -- 3. The addon private data table.
+        -- Only active addons have their callbacks called.
+        safecall (v.callbacks[name], k, name, v.private, ...)
+      end
+    end
+  end
+end
+
+--
+-- Function: K:RegisterAddon (name)
+-- Purpose : Called by an addon to register with an ext. This creates both a
+--           private config space for the addon, as well a place to store
+--           any callback functions.
+-- Fires   : NEW_ADDON (name)
+--           ACTIVATE_ADDON (name)
+-- Returns : true if the addon was added and the events fired, false if not.
+--
+function K.RegisterAddon (self, nm)
+  if (not nm or type(nm) ~= "string" or nm == "" or self.addons[nm]) then
+    return false
+  end
+
+  local newadd = {}
+
+  -- New addons start out in the inactive state.
+  newadd.active = false
+
+  -- Private addon config space
+  newadd.private = {}
+
+  -- List of callbacks
+  newadd.callbacks = {}
+
+  self.addons[nm] = newadd
+
+  self:SendMessage ("NEW_ADDON", nm)
+  self:SendMessage ("SUSPEND_ADDON", nm)
+
+  return true
+end
+
+--
+-- Function: K:SuspendAddon (name)
+-- Purpose : Called by an addon to suspend itself. When an addon is suspended
+--           none of its callback functions will be called by Kore as it does
+--           its work. However, if the addon has registered any event handlers
+--           they will still be called.
+-- Fires   : SUSPEND_ADDON (name)
+-- Returns : true if the addon was suspended, false if it was either already
+--           suspended or the addon name is invalid.
+--
+function K.SuspendAddon (self, name)
+  if (not name or type (name) ~= "string" or name == "" or not self.addons[name]
+      or type (self.addons[name]) ~= "table") then
+    return false
+  end
+
+  if (self.addons[name].active) then
+    self.addons[name].active = false
+    self:SendMessage ("SUSPEND_ADDON", name)
+    return true
+  end
+
+  return false
+end
+
+--
+-- Function: K:ResumeAddon (name)
+--           K:ActivateAddon (name)
+-- Purpose : Called by an addon to resume itself.
+-- Fires   : ACTIVATE_ADDON (name)
+-- Returns : true if the addon was resumed, false if it was either already
+--           active or the addon name is invalid.
+--
+function K.ResumeAddon (self, name)
+  if (not name or type (name) ~= "string" or name == "" or not self.addons[name]
+      or type (self.addons[name]) ~= "table") then
+    return false
+  end
+
+  if (not self.addons[name].active) then
+    self.addons[name].active = true
+    self:SendMessage ("ACTIVATE_ADDON", name)
+    return true
+  end
+
+  return false
+end
+K.ActivateAddon = K.ResumeAddon
+
+--
+-- Function: K:GetPrivate (name)
+-- Purpose : Called by an addon to get its private config space.
+-- Returns : The private config space for the named addon or nil if no such
+--           addon exists.
+--
+function K.GetPrivate (self, name)
+  if (not name or type (name) ~= "string" or name == "" or not self.addons[name]
+      or type (self.addons[name]) ~= "table" or not self.addons[name].private
+      or type (self.addons[name].private) ~= "table") then
+    return nil
+  end
+
+  return self.addons[name].private
+end
+
+--
+-- Function: K:AddonCallback (name, callback, handler)
+-- Purpose : Called by an addon with the specified name to register a new
+--           callback. The name of the callback must be a string and only
+--           a defined set of callback names will ever be called by Kore.
+--           The callback arg can be nil to remove a callback. Each addon
+--           can only register a single handler function for each given
+--           callback.
+-- Returns : True if the callback was registered and valid, false otherwise.
+--
+function K.AddonCallback (self, name, callback, handler)
+  if (not name or type (name) ~= "string" or name == ""
+      or not self.addons[name] or type (self.addons[name]) ~= "table"
+      or not self.addons[name].callbacks
+      or type (self.addons[name].callbacks) ~= "table"
+      or not callback or type (callback) ~= "string" or callback == "" 
+      or not self.valid_callbacks[callback]) then
+    return false
+  end
+
+  if (handler and type (handler) ~= "function") then
+    return false
+  end
+
+  self.addons[name].callbacks[callback] = handler
+
+  return true
+end
+
+for k,v in pairs (addonembeds) do
+  KP[v] = K[v]
+end
+
+--
+-- This is for extensions to KKore itself, such as KKoreParty or KKoreLoot.
+-- Those extensions register with the Kore via this function. Addons that
+-- use either the Kore or its extensions can register themselves with the
+-- component(s) they need, which they do using the various Addon functions
+-- above, each of which is added to the list of elements in the extension.
+-- So for example, an addon that wants to use both KKoreParty (KRP) and
+-- KKoreLoot (KLD) would call: KRP:RegisterAddon() and KLD:RegisterAddon.
+--
+function K:RegisterExtension (kext, major, minor)
+  local ext = {}
+  ext.version = minor
+  ext.library = kext
+  self.extensions[major] = ext
+  kext.version = minor
+
+  for k,v in pairs (evtembeds) do
+    kext[v] = KP[v]
+  end
+
+  for k,v in pairs (addonembeds) do
+    kext[v] = KP[v]
+  end
+
+  kext.kore_callbacks = K:NewCB (kext, "RegisterIPC", "UnregisterIPC", "UnregisterAllIPCs")
+  kext.SendIPC = kext.kore_callbacks.Fire
+
+  if (kore_ready == 2) then
+    safecall (kext.OnLateInit, kext)
+    kext.SendIPC ("KORE_READY")
+  end
+end
+
+--
+-- This isn't really useful to any mod that doesn't every have to deal with
+-- items or loot, but it's a small table and a lot of mods do deal with items
+-- so this is now a part of Kore (as of release 732).
+--
+-- One of the things we need to know when looting items is the armour class
+-- of an item. This info is returned by GetItemInfo() but the strings are
+-- localised. So we need to set up a translation table from that localised
+-- string to some constant that has generic meaning to us (and is locale
+-- agnostic). Set up that table now. Please note that this relies heavily
+-- on the fact that some of these functions return values in the same
+-- order for a given UI release. If this proves to be inacurate, this whole
+-- strategy will need to be re-thought.
+--
+K.classfilters = {}
+K.classfilters.weapon = LE_ITEM_CLASS_WEAPON   -- 2
+K.classfilters.armor  = LE_ITEM_CLASS_ARMOR    -- 4
+
+local ohaxe    = LE_ITEM_WEAPON_AXE1H            -- 0
+local thaxe    = LE_ITEM_WEAPON_AXE2H            -- 1
+local bows     = LE_ITEM_WEAPON_BOWS             -- 2
+local guns     = LE_ITEM_WEAPON_GUNS             -- 3
+local ohmace   = LE_ITEM_WEAPON_MACE1H           -- 4
+local thmace   = LE_ITEM_WEAPON_MACE2H           -- 5
+local poles    = LE_ITEM_WEAPON_POLEARM          -- 6
+local ohsword  = LE_ITEM_WEAPON_SWORD1H          -- 7
+local thsword  = LE_ITEM_WEAPON_SWORD2H          -- 8
+local glaives  = LE_ITEM_WEAPON_WARGLAIVE	   -- 9
+local staves   = LE_ITEM_WEAPON_STAFF            -- 10
+local fist     = LE_ITEM_WEAPON_UNARMED          -- 13
+local miscw    = LE_ITEM_WEAPON_GENERIC          -- 14
+local daggers  = LE_ITEM_WEAPON_DAGGER           -- 15
+local thrown   = LE_ITEM_WEAPON_THROWN           -- 16
+local xbows    = LE_ITEM_WEAPON_CROSSBOW         -- 18
+local wands    = LE_ITEM_WEAPON_WAND             -- 19
+local fish     = LE_ITEM_WEAPON_FISHINGPOLE      -- 20
+
+local amisc    = LE_ITEM_ARMOR_GENERIC           -- 0
+local cloth    = LE_ITEM_ARMOR_CLOTH             -- 1
+local leather  = LE_ITEM_ARMOR_LEATHER           -- 2
+local mail     = LE_ITEM_ARMOR_MAIL              -- 3
+local plate    = LE_ITEM_ARMOR_PLATE             -- 4
+local cosmetic = LE_ITEM_ARMOR_COSMETIC          -- 5
+local shields  = LE_ITEM_ARMOR_SHIELD            -- 6
+
+K.classfilters.strict = {}
+K.classfilters.relaxed = {}
+K.classfilters.weapons = {}
+--                                 +------------- Warriors            1
+--                                 |+------------ Paladins            2
+--                                 ||+----------- Hunters             3
+--                                 |||+---------- Rogues              4
+--                                 ||||+--------- Priests             5
+--                                 |||||+-------- Death Knights       6
+--                                 ||||||+------- Shaman              7
+--                                 |||||||+------ Mages               8
+--                                 ||||||||+----- Warlocks            9
+--                                 |||||||||+---- Monks               10
+--                                 ||||||||||+--- Druids              11
+--                                 |||||||||||+-- Demon Hunter        12
+K.classfilters.strict[amisc]    = "111111111111"
+K.classfilters.strict[cloth]    = "000010011000"
+K.classfilters.strict[leather]  = "000100000111"
+K.classfilters.strict[mail]     = "001000100000"
+K.classfilters.strict[plate]    = "110001000000"
+K.classfilters.strict[cosmetic] = "111111111111"
+K.classfilters.strict[shields]  = "110000100000"
+K.classfilters.relaxed[amisc]   = "111111111111"
+K.classfilters.relaxed[cloth]   = "111111111111"
+K.classfilters.relaxed[leather] = "111101100111"
+K.classfilters.relaxed[mail]    = "111001100000"
+K.classfilters.relaxed[plate]   = "110001000000"
+K.classfilters.relaxed[cosmetic]= "111111111111"
+K.classfilters.relaxed[shields] = "110000100000"
+K.classfilters.weapons[ohaxe]   = "111101100101"
+K.classfilters.weapons[thaxe]   = "111001100000"
+K.classfilters.weapons[bows]    = "101100000000"
+K.classfilters.weapons[guns]    = "101100000000"
+K.classfilters.weapons[ohmace]  = "110111100110"
+K.classfilters.weapons[thmace]  = "110001100010"
+K.classfilters.weapons[poles]   = "111001000110"
+K.classfilters.weapons[ohsword] = "111101011101"
+K.classfilters.weapons[thsword] = "111001000000"
+K.classfilters.weapons[staves]  = "101010111110"
+K.classfilters.weapons[fist]    = "101100100111"
+K.classfilters.weapons[miscw]   = "111111111111"
+K.classfilters.weapons[daggers] = "101110111011"
+K.classfilters.weapons[thrown]  = "101100000000"
+K.classfilters.weapons[xbows]   = "101100000000"
+K.classfilters.weapons[wands]   = "000010011000"
+K.classfilters.weapons[glaives] = "100101000101"
+K.classfilters.weapons[fish]    = "111111111111"
+
+K.classfilters.allclasses       = "111111111111"
+
+--
+-- This function will take a given itemlink and examine its tooltip looking
+-- for class restrictions. It will return a class filter mask suitable for
+-- use in a loot system. If no class restriction was found, return the
+-- all-inclusive mask.
+--
+function K.GetItemClassFilter (ilink)
+  local tnm = GetItemInfo (ilink)
+  if (not tnm or tnm == "") then
+    return K.classfilters.allclasses, nil
+  end
+
+  local tt = K.ScanTooltip (ilink)
+  local ss = strfmt (ITEM_CLASSES_ALLOWED, "(.-)\n")
+  local foo = string.match (tt, ss)
+  local boe = nil
+  if (string.match (tt, ITEM_BIND_ON_PICKUP)) then
+    boe = false
+  elseif (string.match (tt, ITEM_BIND_ON_EQUIP)) then
+    boe = true
+  end
+
+  if (foo) then
+    foo = gsub (foo, " ", "")
+    local clist = { "0","0","0","0","0","0","0","0","0","0","0", "0" }
+    for k,v in pairs ( { string.split (",", foo) } ) do
+      local cp = tonumber (K.LClassIndexNSP[v]) or 10
+      clist[cp] = "1"
+    end
+    return tconcat (clist, ""), boe
+  else
+    return K.classfilters.allclasses, boe
+  end
+end
+
+--
+-- This portion of this file (through to the end) was not written by me.
+-- It was a link given to me by Adys on #wowuidev@irc.freenode.net. Many
+-- thanks for this code. It has been modified to suit Kore so any bugs are
+-- mine.
+--
+
+--[[
+Copyright (c) Jerome Leclanche. All rights reserved.
+
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+    1. Redistributions of source code must retain the above copyright notice, 
+       this list of conditions and the following disclaimer.
+    
+    2. Redistributions in binary form must reproduce the above copyright 
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+--]]
+
+local kkorett = CreateFrame ("GameTooltip", "KKoreUTooltip", UIParent,
+  "GameTooltipTemplate")
+kkorett:SetOwner (UIParent, "ANCHOR_PRESERVE")
+kkorett:SetPoint ("CENTER", "UIParent")
+kkorett:Hide ()
+
+local function SetTooltipHack (link)
+  kkorett:SetOwner (UIParent, "ANCHOR_PRESERVE")
+  kkorett:SetHyperlink ("spell:1")
+  kkorett:Show ()
+  kkorett:SetHyperlink (link)
+end
+
+local function UnsetTooltipHack ()
+  kkorett:SetOwner (UIParent, "ANCHOR_PRESERVE")
+  kkorett:Hide ()
+end
+
+function K.ScanTooltip (link)
+  SetTooltipHack (link)
+
+  local lines = kkorett:NumLines ()
+  local tooltiptxt = ""
+
+  for i = 1, lines do
+    local left = _G["KKoreUTooltipTextLeft"..i]:GetText ()
+    local right = _G["KKoreUTooltipTextRight"..i]:GetText ()
+
+    if (left) then
+      tooltiptxt = tooltiptxt .. left
+      if (right) then
+        tooltiptxt = tooltiptxt .. "\t" .. right .. "\n"
+      else
+        tooltiptxt = tooltiptxt .. "\n"
+      end
+    elseif (right) then
+      tooltiptxt = tooltiptxt .. right .. "\n"
+    end
+  end
+
+  UnsetTooltipHack ()
+  return tooltiptxt
+end
+
+--[[ NOT CURRENTLY USED
+function K.GetTooltipLine (link, line, side)
+  side = side or "Left"
+  SetTooltipHack (link)
+
+  local lines = kkorett:NumLines ()
+  if (line > lines) then
+    return UnsetTooltipHack()
+  end
+
+  local text = _G["KSKUTooltipText"..side..line]:GetText ()
+  UnsetTooltipHack ()
+  return text
+end
+
+function K.GetTooltipLines (link, ...)
+  local lines = {}
+  SetTooltipHack (link)
+        
+  for k,v in pairs({...}) do
+    lines[#lines+1] = _G["KSKUTooltipTextLeft"..v]:GetText()
+  end
+
+  UnsetTooltipHack ()
+  return unpack (lines)
+end
+]]
+

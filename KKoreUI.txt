@@ -1087,7 +1087,7 @@ widgets here.
 5.9 KUI:CreateHSplit
 --------------------
 Creates a horizontal splitter, usually used to separate parts of a tab in
-a tabbed dialogm as discussed below. This splitter is not movable as splitters
+a tabbed dialog, as discussed below. This splitter is not movable as splitters
 in Windows applications are. However, if the frame that is being split is
 resizable, one half of the split will resize with it. The other half is
 always a fixed size.
@@ -1395,7 +1395,7 @@ cfg.tabs [table]
   tab.tabframe [string]
     This controls what portion of the tab changes when you select
     a subtab. If this tab has no subtabs, this value is not used.
-    It also only has meaning if your have as a hsplit or vsplit
+    It also only has meaning if your have a hsplit or vsplit
     configured. The intended usage for this is for subtabs that
     may have common content on one side of the split, and content
     that changes with the subtab selection on the other side of the
