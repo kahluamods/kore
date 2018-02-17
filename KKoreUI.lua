@@ -1,9 +1,10 @@
 --[[
    KahLua Kore - core library functions for KahLua addons.
      WWW: http://kahluamod.com/kore
-     SVN: http://kahluamod.com/svn/kore
+     Git: https://github.com/kahluamods/kore
      IRC: #KahLua on irc.freenode.net
      E-mail: cruciformer@gmail.com
+
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
    Copyright 2008-2010 James Kean Johnston. All rights reserved.

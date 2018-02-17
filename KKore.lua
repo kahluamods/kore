@@ -1,12 +1,13 @@
 --[[
    KahLua Kore - core library functions for KahLua addons.
      WWW: http://kahluamod.com/kore
-     SVN: http://kahluamod.com/svn/kore
+     Git: https://github.com/kahluamods/kore
      IRC: #KahLua on irc.freenode.net
      E-mail: cruciformer@gmail.com
+
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2017 James Kean Johnston. All rights reserved.
+   Copyright 2008-2018 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -146,12 +147,27 @@ function K.CanonicalName (name, realm)
   if (not name) then
     return nil
   end
-  local rn = realm or K.local_realm
+
+  K.local_realm = K.local_realm or select (2, UnitFullName ("player"))
+
+  local nm, rn
+  nm, rn = UnitFullName (name)
+
+  if (not nm) then
+    nm = name
+    rn = realm
+  end
+
+  if (not rn or rn == "") then
+    rn = K.local_realm
+  end
+
   if (not rn or rn == "") then
     return nil
   end
+
   local nm = Ambiguate (name, "mail")
-  if not strfind (nm, "-", 1, true) then
+  if (not strfind (nm, "-", 1, true)) then
     return K.CapitaliseName (nm .. '-' .. rn)
   else
     return K.CapitaliseName (nm)

@@ -1,9 +1,10 @@
 --[[
    KahLua Kore - party and raid monitoring.
      WWW: http://kahluamod.com/kore
-     SVN: http://kahluamod.com/svn/kore
+     Git: https://github.com/kahluamods/kore
      IRC: #KahLua on irc.freenode.net
      E-mail: cruciformer@gmail.com
+
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
    Copyright 2008-2018 James Kean Johnston. All rights reserved.
@@ -28,8 +29,6 @@ local KRP, oldminor = LibStub:NewLibrary(KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
 if (not KRP) then
   return
 end
-
-_G["KRP"] = KRP
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreParty requires KKore")
