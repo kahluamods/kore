@@ -150,10 +150,9 @@ function K.CanonicalName (name, realm)
 
   K.local_realm = K.local_realm or select (2, UnitFullName ("player"))
 
-  local nm, rn
-  nm, rn = UnitFullName (name)
+  local nm, rn = UnitFullName (name)
 
-  if (not nm) then
+  if (not nm or nm == "") then
     nm = name
     rn = realm
   end
@@ -166,7 +165,7 @@ function K.CanonicalName (name, realm)
     return nil
   end
 
-  local nm = Ambiguate (name, "mail")
+  nm = Ambiguate (nm, "mail")
   if (not strfind (nm, "-", 1, true)) then
     return K.CapitaliseName (nm .. '-' .. rn)
   else
