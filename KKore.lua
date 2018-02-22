@@ -142,15 +142,45 @@ K.CapitalizeName = K.CapitaliseName
 -- add it so that names are universally in the format Name-Realm. This will
 -- always be a valid tell target as the realm name has had all spaces and
 -- special characters removed (it is the realm name as returned by UnitName()
--- or equivalent functions).
+-- or equivalent functions). This is so much more complicated than it needs to
+-- be. Some Blizzard functions return a full Name-Realm string in which case
+-- we have nothing to do except capitalise it according to our own rules.
+-- Other functions return Name-realm if the player is on a different realm.
+-- Still others return only the name even if they player is on a different
+-- realm but they are in the guild. This has been carefully adjusted over
+-- time to always do The Right Thing(TM).
 function K.CanonicalName (name, realm)
   if (not name) then
     return nil
   end
 
+  --
+  -- If the name is already in Name-Realm format, simply remove any spaces
+  -- and capitalise it according to our function above.
+  --
+  if (strfind (name, "-", 1, true)) then
+    local nm = gsub (name, " ", "")
+    return K.CapitaliseName (nm)
+  end
+
+  --
+  -- If this wasn't set correctly during addon initialisation do it now.
+  --
   K.local_realm = K.local_realm or select (2, UnitFullName ("player"))
 
+  --
+  -- Try UnitFullName (). This returns the player name as the first argument
+  -- and the realm as the second. The realm name already has the spaces
+  -- removed from it. However, this doesn't return anything if the user
+  -- isn't online and it is ambiguous if the name given is a duplicate in the
+  -- raid or the guild. But if this returns anything we go with it as there
+  -- is only so much we can do.
+  --
   local nm, rn = UnitFullName (name)
+
+  if (nm and rn and nm ~= "" and rn ~= "") then
+    return K.Capitalise (nm .. "-" .. rn)
+  end
 
   if (not nm or nm == "") then
     nm = name
@@ -166,10 +196,10 @@ function K.CanonicalName (name, realm)
   end
 
   nm = Ambiguate (nm, "mail")
-  if (not strfind (nm, "-", 1, true)) then
-    return K.CapitaliseName (nm .. '-' .. rn)
-  else
+  if (strfind (nm, "-", 1, true)) then
     return K.CapitaliseName (nm)
+  else
+    return K.CapitaliseName (nm .. '-' .. rn)
   end
 end
 
