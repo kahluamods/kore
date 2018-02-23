@@ -75,7 +75,7 @@ end
 --
 
 local KKORE_MAJOR = "KKore"
-local KKORE_MINOR = 733
+local KKORE_MINOR = 734
 
 local K = LibStub:NewLibrary (KKORE_MAJOR, KKORE_MINOR)
 
