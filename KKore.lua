@@ -75,7 +75,7 @@ end
 --
 
 local KKORE_MAJOR = "KKore"
-local KKORE_MINOR = 734
+local KKORE_MINOR = 735
 
 local K = LibStub:NewLibrary (KKORE_MAJOR, KKORE_MINOR)
 
@@ -149,18 +149,10 @@ K.CapitalizeName = K.CapitaliseName
 -- Still others return only the name even if they player is on a different
 -- realm but they are in the guild. This has been carefully adjusted over
 -- time to always do The Right Thing(TM).
+--
 function K.CanonicalName (name, realm)
   if (not name) then
     return nil
-  end
-
-  --
-  -- If the name is already in Name-Realm format, simply remove any spaces
-  -- and capitalise it according to our function above.
-  --
-  if (strfind (name, "-", 1, true)) then
-    local nm = gsub (name, " ", "")
-    return K.CapitaliseName (nm)
   end
 
   --
@@ -179,7 +171,7 @@ function K.CanonicalName (name, realm)
   local nm, rn = UnitFullName (name)
 
   if (nm and rn and nm ~= "" and rn ~= "") then
-    return K.Capitalise (nm .. "-" .. rn)
+    return K.CapitaliseName (nm .. "-" .. rn)
   end
 
   if (not nm or nm == "") then
