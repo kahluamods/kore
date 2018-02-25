@@ -156,6 +156,15 @@ function K.CanonicalName (name, realm)
   end
 
   --
+  -- If the name is already in Name-Realm format, simply remove any spaces
+  -- and capitalise it according to our function above.
+  --
+  if (strfind (name, "-", 1, true)) then
+    local nm = gsub (name, " ", "")
+    return K.CapitaliseName (nm)
+  end
+
+  --
   -- If this wasn't set correctly during addon initialisation do it now.
   --
   K.local_realm = K.local_realm or select (2, UnitFullName ("player"))
