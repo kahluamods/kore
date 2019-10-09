@@ -159,7 +159,7 @@ local function populate_items ()
 
   for i = 1, nitems do
     if (LootSlotHasItem (i)) then
-      local icon, name, quant, qual, locked  = GetLootSlotInfo (i)
+      local icon, name, quant, _, qual, locked  = GetLootSlotInfo (i)
       local ilink = GetLootSlotLink (i)
       local itemid = nil
       local item = {}
