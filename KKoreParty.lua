@@ -7,7 +7,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2018 James Kean Johnston. All rights reserved.
+   Copyright 2008-2019 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 ]]
 
 local KKOREPARTY_MAJOR = "KKoreParty"
-local KKOREPARTY_MINOR = 700
+local KKOREPARTY_MINOR = 2
 local KRP, oldminor = LibStub:NewLibrary(KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
 
 if (not KRP) then
@@ -32,7 +32,7 @@ end
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreParty requires KKore")
-assert (tonumber(KM) >= 732, "KKoreParty requires KKore r732 or later")
+assert (tonumber(KM) >= 2, "KKoreParty requires KKore r2 or later")
 K:RegisterExtension (KRP, KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
 
 local printf = K.printf
@@ -99,24 +99,30 @@ KRP.master_looter = nil
 -- Full name of the current party or raid leader or nil if none.
 KRP.leader = nil
 
-KRP.LOOT_METHOD_UNKNOWN    = 0
-KRP.LOOT_METHOD_FREEFORALL = 1
-KRP.LOOT_METHOD_GROUP      = 2
-KRP.LOOT_METHOD_PERSONAL   = 3
-KRP.LOOT_METHOD_MASTER     = 4
+KRP.LOOT_METHOD_UNKNOWN     = 0
+KRP.LOOT_METHOD_FREEFORALL  = 1
+KRP.LOOT_METHOD_ROUNDROBIN  = 2
+KRP.LOOT_METHOD_MASTER      = 3
+KRP.LOOT_METHOD_GROUP       = 4
+KRP.LOOT_METHOD_NEEDB4GREED = 5
+KRP.LOOT_METHOD_PERSONAL    = 6
 
-local LOOT_METHOD_UNKNOWN    = KRP.LOOT_METHOD_UNKNWON
-local LOOT_METHOD_FREEFORALL = KRP.LOOT_METHOD_FREEFORALL
-local LOOT_METHOD_GROUP      = KRP.LOOT_METHOD_GROUP
-local LOOT_METHOD_PERSONAL   = KRP.LOOT_METHOD_PERSONAL
-local LOOT_METHOD_MASTER     = KRP.LOOT_METHOD_MASTER
+local LOOT_METHOD_UNKNOWN     = KRP.LOOT_METHOD_UNKNWON
+local LOOT_METHOD_FREEFORALL  = KRP.LOOT_METHOD_FREEFORALL
+local LOOT_METHOD_ROUNDROBIN  = KRP.LOOT_METHOD_ROUNDROBIN
+local LOOT_METHOD_MASTER      = KRP.LOOT_METHOD_MASTER
+local LOOT_METHOD_GROUP       = KRP.LOOT_METHOD_GROUP
+local LOOT_METHOD_NEEDB4GREED = KRP.LOOT_METHOD_NEEDB4GREED
+local LOOT_METHOD_PERSONAL    = KRP.LOOT_METHOD_PERSONAL
 
 local method_to_number = {
-  ["unknown"]      = LOOT_METHOD_UNKNOWN,
-  ["freeforall"]   = LOOT_METHOD_FREEFORALL,
-  ["group"]        = LOOT_METHOD_GROUP,
-  ["personalloot"] = LOOT_METHOD_PERSONAL,
-  ["master"]       = LOOT_METHOD_MASTER,
+  ["unknown"]         = LOOT_METHOD_UNKNOWN,
+  ["freeforall"]      = LOOT_METHOD_FREEFORALL,
+  ["roundrobin"]      = LOOT_METHOD_ROUNDROBIN,
+  ["master"]          = LOOT_METHOD_MASTER,
+  ["group"]           = LOOT_METHOD_GROUP,
+  ["needbeforegreed"] = LOOT_METHOD_NEEDB4GREED,
+  ["personalloot"]    = LOOT_METHOD_PERSONAL,
 }
 
 -- Party or raid loot method
@@ -124,26 +130,6 @@ KRP.loot_method = LOOT_METHOD_UNKNOWN
 
 -- Loot threshold
 KRP.loot_threshold = 0
-
-KRP.USER_ROLE_NONE   = 0
-KRP.USER_ROLE_TANK   = 1
-KRP.USER_ROLE_HEALER = 2
-KRP.USER_ROLE_DPS    = 3
-
-local USER_ROLE_NONE   = KRP.USER_ROLE_NONE
-local USER_ROLE_TANK   = KRP.USER_ROLE_TANK
-local USER_ROLE_HEALER = KRP.USER_ROLE_HEALER
-local USER_ROLE_DPS    = KRP.USER_ROLE_DPS
-
-local user_role_to_number = {
-  ["NONE"]    = USER_ROLE_NONE,
-  ["TANK"]    = USER_ROLE_TANK,
-  ["HEALER"]  = USER_ROLE_HEALER,
-  ["DAMAGER"] = USER_ROLE_DPS,
-}
-
--- Raid role assigned
-KRP.user_role = USER_ROLE_NONE
 
 KRP.GROUP_ROLE_NONE   = 0
 KRP.GROUP_ROLE_TANK   = 1
@@ -384,7 +370,6 @@ end
 -- Utility function to reset role related variables.
 --
 local function reset_role ()
-  KRP.user_role = USER_ROLE_NONE
   KRP.group_role = GROUP_ROLE_NONE
 end
 
@@ -394,9 +379,6 @@ local function update_role_internal ()
   if (not KRP.in_party and not KRP.in_raid and not KRP.in_battleground) then
     return
   else
-    local r = UnitGroupRolesAssigned ("player")
-    KRP.user_role = user_role_to_number[r or "NONE"] or USER_ROLE_NONE
-
     if (GetPartyAssignment ("MAINTANK", "player")) then
       KRP.group_role = GROUP_ROLE_TANK
     elseif (GetPartyAssignment ("MAINASSIST", "player")) then
@@ -406,7 +388,6 @@ local function update_role_internal ()
     end
 
     if (KRP.players and KRP.players[K.player.name]) then
-      KRP.players[K.player.name].user_role = KRP.user_role
       KRP.players[K.player.name].group_role = KRP.group_role
     end
   end
@@ -414,7 +395,7 @@ end
 
 --
 -- Function: KRP.UpdateRole ()
--- Purpose : Updates the player role variables: user_role.
+-- Purpose : Updates the group role variable: group_role.
 -- Fires   : ROLE_CHANGED (role)
 --
 function KRP.UpdateRole (evtonly)
@@ -426,7 +407,7 @@ function KRP.UpdateRole (evtonly)
     update_role_internal ()
   end
 
-  KRP:SendIPC ("ROLE_CHANGED", KRP.user_role, KRP.group_role)
+  KRP:SendIPC ("ROLE_CHANGED", KRP.group_role)
 end
 
 local function reset_group ()
@@ -628,8 +609,6 @@ local function update_group_internal (fire_party, fire_raid, fire_bg)
       ptbl.guildrankidx = 0
       ptbl.is_gm = false
     end
-    local r = UnitGroupRolesAssigned (unm)
-    ptbl.user_role = user_role_to_number[r or "NONE"] or USER_ROLE_NONE
   end
 
   -- Always add ourselves to the players list

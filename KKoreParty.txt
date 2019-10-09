@@ -4,7 +4,7 @@ KahLua Kore - Party and Raid Functions (KKoreParty)
 KKoreParty is a library of useful functions for monitoring party and raid
 information. It has no user interface elements and is intended to simply
 record data about the current raid or party, if any. It allows the containing
-mode to extend the data it stores in ways that are meaningful to that mod, and
+code to extend the data it stores in ways that are meaningful to that mod, and
 does so in a namespace-protected way so that multiple mods can use this code
 without clashing.
 
@@ -118,13 +118,6 @@ KRP.leader (string)
   The full player name of the person who is the party or raid leader, or nil
   if not in a party or raid.
 
-KRP.role (integer)
-  The players currently assigned role. Possible values are:
-  0 - none (KRP.GROUP_ROLE_NONE)
-  1 - tank (KRP.GROUP_ROLE_TANK)
-  2 - healer (KRP.GROUP_ROLE_TANK)
-  3 - DPS (KRP.GROUP_ROLE_DPS)
-
 KRP.players (table)
   When in any form of group (party, raid or battleground) this is a list of
   all of the players in that group, including oursevles. This is a table of
@@ -141,7 +134,6 @@ KRP.players (table)
     is_rl - is the player the raid leader
     is_aorl - is the player a raid assistant or the raid leader
     is_ml - is the player the master looter
-    user_role - user selected role
     group_role - raid assigned role
     subgroup - raid subgroup number or 0 if not in a raid
     raidid - player raid ID number (1 - 40 or 0 if not in a raid)

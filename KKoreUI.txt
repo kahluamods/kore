@@ -280,7 +280,7 @@ they are displayed as throw:EVENTNAME (args).
 
 In discussing each widget type below, the convention is to use
 cfg.ELEMENTNAME to describe elements of the config table passed as the
-first argument, and ret.VALUE to ret:FUNCTION to describe values or
+first argument, and ret.VALUE or ret:FUNCTION to describe values or
 functions found in the returned frame.
 
 5.1 KUI:CreateStringLabel

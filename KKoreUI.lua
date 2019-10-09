@@ -31,7 +31,7 @@ else
 end
 
 local KKOREUI_MAJOR = "KKoreUI"
-local KKOREUI_MINOR = 700
+local KKOREUI_MINOR = 2
 
 local KUI = LibStub:NewLibrary(KKOREUI_MAJOR, KKOREUI_MINOR)
 
@@ -65,7 +65,7 @@ local CreateFrame = CreateFrame
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreUI requires KKore")
-assert (tonumber(KM) >= 732, "KKoreUI requires KKore r732 or later")
+assert (tonumber(KM) >= 2, "KKoreUI requires KKore r2 or later")
 K:RegisterExtension (KUI, KKOREUI_MAJOR, KKOREUI_MINOR)
 
 local safecall = K.pvt.safecall

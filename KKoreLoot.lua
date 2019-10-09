@@ -7,7 +7,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2018 James Kean Johnston. All rights reserved.
+   Copyright 2008-2019 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 ]]
 
 local KKORELOOT_MAJOR = "KKoreLoot"
-local KKORELOOT_MINOR = 700
+local KKORELOOT_MINOR = 2
 local KLD, oldminor = LibStub:NewLibrary(KKORELOOT_MAJOR, KKORELOOT_MINOR)
 
 if (not KLD) then
@@ -32,23 +32,25 @@ end
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreLoot requires KKore")
-assert (tonumber(KM) >= 732, "KKoreLoot requires KKore r732 or later")
+assert (tonumber(KM) >= 2, "KKoreLoot requires KKore r2 or later")
 K:RegisterExtension (KLD, KKORELOOT_MAJOR, KKORELOOT_MINOR)
 
 local KRP, KM = LibStub:GetLibrary("KKoreParty")
 assert (KRP, "KKoreLoot requires KKoreParty")
-assert (tonumber(KM) >= 700, "KKoreLoot requires KKoreParty r700 or later")
+assert (tonumber(KM) >= 2, "KKoreLoot requires KKoreParty r2 or later")
 
 local L = K:GetI18NTable("KKore", false)
 
 local printf = K.printf
 local tinsert = table.insert
 
-local LOOT_METHOD_UNKNOWN    = KRP.LOOT_METHOD_UNKNWON
-local LOOT_METHOD_FREEFORALL = KRP.LOOT_METHOD_FREEFORALL
-local LOOT_METHOD_GROUP      = KRP.LOOT_METHOD_GROUP
-local LOOT_METHOD_PERSONAL   = KRP.LOOT_METHOD_PERSONAL
-local LOOT_METHOD_MASTER     = KRP.LOOT_METHOD_MASTER
+local LOOT_METHOD_UNKNOWN     = KRP.LOOT_METHOD_UNKNWON
+local LOOT_METHOD_FREEFORALL  = KRP.LOOT_METHOD_FREEFORALL
+local LOOT_METHOD_ROUNDROBIN  = KRP.LOOT_METHOD_ROUNDROBIN
+local LOOT_METHOD_MASTER      = KRP.LOOT_METHOD_MASTER
+local LOOT_METHOD_GROUP       = KRP.LOOT_METHOD_GROUP
+local LOOT_METHOD_NEEDB4GREED = KRP.LOOT_METHOD_NEEDB4GREED
+local LOOT_METHOD_PERSONAL    = KRP.LOOT_METHOD_PERSONAL
 
 KLD.addons = {}
 
