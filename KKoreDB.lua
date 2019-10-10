@@ -39,7 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ]]
 
 local KKOREDB_MAJOR = "KKoreDB"
-local KKOREDB_MINOR = 2
+local KKOREDB_MINOR = 3
 local KDB, oldminor = LibStub:NewLibrary(KKOREDB_MAJOR, KKOREDB_MINOR)
 
 if (not KDB) then
@@ -68,7 +68,7 @@ local _G = _G
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreDB requires KKore")
-assert (tonumber(KM) >= 2, "KKoreDB requires KKore r2 or later")
+assert (tonumber(KM) >= 3, "KKoreDB requires KKore r3 or later")
 K:RegisterExtension (KDB, KKOREDB_MAJOR, KKOREDB_MINOR)
 
 KDB.db_registry = KDB.db_registry or {}

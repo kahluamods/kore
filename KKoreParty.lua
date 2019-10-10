@@ -23,7 +23,7 @@
 ]]
 
 local KKOREPARTY_MAJOR = "KKoreParty"
-local KKOREPARTY_MINOR = 2
+local KKOREPARTY_MINOR = 3
 local KRP, oldminor = LibStub:NewLibrary(KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
 
 if (not KRP) then
@@ -32,7 +32,7 @@ end
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreParty requires KKore")
-assert (tonumber(KM) >= 2, "KKoreParty requires KKore r2 or later")
+assert (tonumber(KM) >= 3, "KKoreParty requires KKore r3 or later")
 K:RegisterExtension (KRP, KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
 
 local printf = K.printf

@@ -31,7 +31,7 @@ else
 end
 
 local KKOREUI_MAJOR = "KKoreUI"
-local KKOREUI_MINOR = 2
+local KKOREUI_MINOR = 3
 
 local KUI = LibStub:NewLibrary(KKOREUI_MAJOR, KKOREUI_MINOR)
 

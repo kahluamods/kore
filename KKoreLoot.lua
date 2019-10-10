@@ -23,7 +23,7 @@
 ]]
 
 local KKORELOOT_MAJOR = "KKoreLoot"
-local KKORELOOT_MINOR = 2
+local KKORELOOT_MINOR = 3
 local KLD, oldminor = LibStub:NewLibrary(KKORELOOT_MAJOR, KKORELOOT_MINOR)
 
 if (not KLD) then
@@ -32,12 +32,12 @@ end
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreLoot requires KKore")
-assert (tonumber(KM) >= 2, "KKoreLoot requires KKore r2 or later")
+assert (tonumber(KM) >= 3, "KKoreLoot requires KKore r3 or later")
 K:RegisterExtension (KLD, KKORELOOT_MAJOR, KKORELOOT_MINOR)
 
 local KRP, KM = LibStub:GetLibrary("KKoreParty")
 assert (KRP, "KKoreLoot requires KKoreParty")
-assert (tonumber(KM) >= 2, "KKoreLoot requires KKoreParty r2 or later")
+assert (tonumber(KM) >= 3, "KKoreLoot requires KKoreParty r3 or later")
 
 local L = K:GetI18NTable("KKore", false)
 
