@@ -510,13 +510,13 @@ K.IndexClass = {
   [K.CLASS_HUNTER]      = { u = "HUNTER", c = hunter },
   [K.CLASS_ROGUE]       = { u = "ROGUE", c = rogue },
   [K.CLASS_PRIEST]      = { u = "PRIEST", c = priest },
-  [K.CLASS_DEATHKNIGHT] = { u = "DEATHKNIGHT", c = dk },
+  [K.CLASS_DEATHKNIGHT] = { u = "DEATHKNIGHT", c = dk, ign = true },
   [K.CLASS_SHAMAN]      = { u = "SHAMAN", c = shaman },
   [K.CLASS_MAGE]        = { u = "MAGE", c = mage },
   [K.CLASS_WARLOCK]     = { u = "WARLOCK", c = warlock },
-  [K.CLASS_MONK]        = { u = "MONK", c = monk },
+  [K.CLASS_MONK]        = { u = "MONK", c = monk, ign = true },
   [K.CLASS_DRUID]       = { u = "DRUID", c = druid },
-  [K.CLASS_DEMONHUNTER] = { u = "DEMONHUNTER", c = dh },
+  [K.CLASS_DEMONHUNTER] = { u = "DEMONHUNTER", c = dh, ign = true },
 }
 for k,v in pairs(K.IndexClass) do
   if (v.c) then
