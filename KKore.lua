@@ -430,10 +430,13 @@ K.CLASS_PALADIN     = "02"
 K.CLASS_HUNTER      = "03"
 K.CLASS_ROGUE       = "04"
 K.CLASS_PRIEST      = "05"
+K.CLASS_DEATHKNIGHT = "06"
 K.CLASS_SHAMAN      = "07"
 K.CLASS_MAGE        = "08"
 K.CLASS_WARLOCK     = "09"
+K.CLASS_MONK        = "10"
 K.CLASS_DRUID       = "11"
+K.CLASS_DEMONHUNTER = "12"
 
 K.ClassIndex = {
   ["WARRIOR"]     = K.CLASS_WARRIOR,
@@ -441,24 +444,33 @@ K.ClassIndex = {
   ["HUNTER"]      = K.CLASS_HUNTER,
   ["ROGUE"]       = K.CLASS_ROGUE,
   ["PRIEST"]      = K.CLASS_PRIEST,
+  ["DEATHKNIGHT"] = K.CLASS_DEATHKNIGHT,
   ["SHAMAN"]      = K.CLASS_SHAMAN,
   ["MAGE"]        = K.CLASS_MAGE,
   ["WARLOCK"]     = K.CLASS_WARLOCK,
+  ["MONK"]        = K.CLASS_MONK,
   ["DRUID"]       = K.CLASS_DRUID,
+  ["DEMONHUNTER"] = K.CLASS_DEMONHUNTER,
 }
 
 local kClassTable = {}
 FillLocalizedClassList (kClassTable, false)
+kClassTable["DEATHKNIGHT"] = "Death Knight"
+kClassTable["MONK"] = "Monk"
+kClassTable["DEMONHUNTER"] = "Demon Hunter"
 
 local warrior = kClassTable["WARRIOR"]
 local paladin = kClassTable["PALADIN"]
 local hunter = kClassTable["HUNTER"]
 local rogue = kClassTable["ROGUE"]
 local priest = kClassTable["PRIEST"]
+local dk = kClassTable["DEATHKNIGHT"]
 local shaman = kClassTable["SHAMAN"]
 local mage = kClassTable["MAGE"]
 local warlock = kClassTable["WARLOCK"]
+local monk = kClassTable["MONK"]
 local druid = kClassTable["DRUID"]
+local dh = kClassTable["DEMONHUNTER"]
 
 -- Same table but using the localised names
 K.LClassIndex = {
@@ -467,10 +479,13 @@ K.LClassIndex = {
   [hunter]      = K.CLASS_HUNTER,
   [rogue]       = K.CLASS_ROGUE,
   [priest]      = K.CLASS_PRIEST,
+  [dk]          = K.CLASS_DEATHKNIGHT,
   [shaman]      = K.CLASS_SHAMAN,
   [mage]        = K.CLASS_MAGE,
   [warlock]     = K.CLASS_WARLOCK,
+  [monk]        = K.CLASS_MONK,
   [druid]       = K.CLASS_DRUID,
+  [dh]          = K.CLASS_DEMONHUNTER,
 }
 
 K.LClassIndexNSP = {
@@ -479,10 +494,13 @@ K.LClassIndexNSP = {
   [gsub (hunter, " ", "")]      = K.CLASS_HUNTER,
   [gsub (rogue, " ", "")]       = K.CLASS_ROGUE,
   [gsub (priest, " ", "")]      = K.CLASS_PRIEST,
+  [gsub (dk, " ", "")]          = K.CLASS_DEATHKNIGHT,
   [gsub (shaman, " ", "")]      = K.CLASS_SHAMAN,
   [gsub (mage, " ", "")]        = K.CLASS_MAGE,
   [gsub (warlock, " ", "")]     = K.CLASS_WARLOCK,
+  [gsub (monk, " ", "")]        = K.CLASS_MONK,
   [gsub (druid, " ", "")]       = K.CLASS_DRUID,
+  [gsub (dh, " ", "")]          = K.CLASS_DEMONHUNTER,
 }
 
 -- And the reverse
@@ -492,10 +510,13 @@ K.IndexClass = {
   [K.CLASS_HUNTER]      = { u = "HUNTER", c = hunter },
   [K.CLASS_ROGUE]       = { u = "ROGUE", c = rogue },
   [K.CLASS_PRIEST]      = { u = "PRIEST", c = priest },
+  [K.CLASS_DEATHKNIGHT] = { u = "DEATHKNIGHT", c = dk },
   [K.CLASS_SHAMAN]      = { u = "SHAMAN", c = shaman },
   [K.CLASS_MAGE]        = { u = "MAGE", c = mage },
   [K.CLASS_WARLOCK]     = { u = "WARLOCK", c = warlock },
+  [K.CLASS_MONK]        = { u = "MONK", c = monk },
   [K.CLASS_DRUID]       = { u = "DRUID", c = druid },
+  [K.CLASS_DEMONHUNTER] = { u = "DEMONHUNTER", c = dh },
 }
 for k,v in pairs(K.IndexClass) do
   if (v.c) then
@@ -513,10 +534,13 @@ K.IndexClass[K.CLASS_PALADIN].w     = "paladin"
 K.IndexClass[K.CLASS_HUNTER].w      = "hunter"
 K.IndexClass[K.CLASS_ROGUE].w       = "rogue"
 K.IndexClass[K.CLASS_PRIEST].w      = "priest"
+K.IndexClass[K.CLASS_DEATHKNIGHT].w = "deathknight"
 K.IndexClass[K.CLASS_SHAMAN].w      = "shaman"
 K.IndexClass[K.CLASS_MAGE].w        = "mage"
 K.IndexClass[K.CLASS_WARLOCK].w     = "warlock"
+K.IndexClass[K.CLASS_MONK].w        = "monk"
 K.IndexClass[K.CLASS_DRUID].w       = "druid"
+K.IndexClass[K.CLASS_DEMONHUNTER].w = "demonhunter"
 
 --
 -- Many mods need to know the different class colors. We set up three tables
@@ -532,10 +556,13 @@ K.ClassColorsRGBPerc = {
   [K.CLASS_HUNTER]      = RAID_CLASS_COLORS["HUNTER"],
   [K.CLASS_ROGUE]       = RAID_CLASS_COLORS["ROGUE"],
   [K.CLASS_PRIEST]      = RAID_CLASS_COLORS["PRIEST"],
+  [K.CLASS_DEATHKNIGHT] = RAID_CLASS_COLORS["DEATHKNIGHT"],
   [K.CLASS_SHAMAN]      = RAID_CLASS_COLORS["SHAMAN"],
   [K.CLASS_MAGE]        = RAID_CLASS_COLORS["MAGE"],
   [K.CLASS_WARLOCK]     = RAID_CLASS_COLORS["WARLOCK"],
+  [K.CLASS_MONK]        = RAID_CLASS_COLORS["MONK"],
   [K.CLASS_DRUID]       = RAID_CLASS_COLORS["DRUID"],
+  [K.CLASS_DEMONHUNTER] = RAID_CLASS_COLORS["DEMONHUNTER"],
 }
 
 function K.RGBPercToDec (rgb)
@@ -2357,51 +2384,53 @@ K.classfilters.weapons = {}
 --                                 ||+----------- Hunters             3
 --                                 |||+---------- Rogues              4
 --                                 ||||+--------- Priests             5
---                                 |||||+-------- Unused              6
+--                                 |||||+-------- Death Knights       6
 --                                 ||||||+------- Shaman              7
 --                                 |||||||+------ Mages               8
 --                                 ||||||||+----- Warlocks            9
---                                 |||||||||+---- unused              10
+--                                 |||||||||+---- Monks               10
 --                                 ||||||||||+--- Druids              11
---                                 |||||||||||
-K.classfilters.strict[amisc]    = "11111111111"
-K.classfilters.strict[cloth]    = "00001001100"
-K.classfilters.strict[leather]  = "00010000001"
-K.classfilters.strict[mail]     = "00100010000"
-K.classfilters.strict[plate]    = "11000000000"
-K.classfilters.strict[cosmetic] = "11111111111"
-K.classfilters.strict[shields]  = "11000010000"
-K.classfilters.strict[libram]   = "01000000000"
-K.classfilters.strict[idols]    = "00000000001"
-K.classfilters.strict[totems]   = "00000010000"
-K.classfilters.relaxed[amisc]   = "11111111111"
-K.classfilters.relaxed[cloth]   = "11111111111"
-K.classfilters.relaxed[leather] = "11110010001"
-K.classfilters.relaxed[mail]    = "11100010000"
-K.classfilters.relaxed[plate]   = "11000000000"
-K.classfilters.relaxed[cosmetic]= "11111111111"
-K.classfilters.relaxed[shields] = "11000010000"
-K.classfilters.relaxed[libram]  = "01000000000"
-K.classfilters.relaxed[idols]   = "00000000001"
-K.classfilters.relaxed[totems]  = "00000010000"
-K.classfilters.weapons[ohaxe]   = "11110010000"
-K.classfilters.weapons[thaxe]   = "11100010000"
-K.classfilters.weapons[bows]    = "10110000000"
-K.classfilters.weapons[guns]    = "10110000000"
-K.classfilters.weapons[ohmace]  = "11011010001"
-K.classfilters.weapons[thmace]  = "11000010001"
-K.classfilters.weapons[poles]   = "11100000001"
-K.classfilters.weapons[ohsword] = "11110001100"
-K.classfilters.weapons[thsword] = "11100000000"
-K.classfilters.weapons[staves]  = "10101011101"
-K.classfilters.weapons[fist]    = "10110010001"
-K.classfilters.weapons[miscw]   = "11111111111"
-K.classfilters.weapons[daggers] = "10111011101"
-K.classfilters.weapons[thrown]  = "10110000000"
-K.classfilters.weapons[xbows]   = "10110000000"
-K.classfilters.weapons[wands]   = "00001001100"
-K.classfilters.weapons[fish]    = "11111111111"
-K.classfilters.allclasses       = "11111111111"
+--                                 |||||||||||+-- Demon Hunter        12
+K.classfilters.strict[amisc]    = "111111111111"
+K.classfilters.strict[cloth]    = "000010011000"
+K.classfilters.strict[leather]  = "000100000111"
+K.classfilters.strict[mail]     = "001000100000"
+K.classfilters.strict[plate]    = "110001000000"
+K.classfilters.strict[cosmetic] = "111111111111"
+K.classfilters.strict[shields]  = "110000100000"
+K.classfilters.strict[libram]   = "010000000000"
+K.classfilters.strict[idols]    = "000000000010"
+K.classfilters.strict[totems]   = "000000010000"
+K.classfilters.relaxed[amisc]   = "111111111111"
+K.classfilters.relaxed[cloth]   = "111111111111"
+K.classfilters.relaxed[leather] = "111101100111"
+K.classfilters.relaxed[mail]    = "111001100000"
+K.classfilters.relaxed[plate]   = "110001000000"
+K.classfilters.relaxed[cosmetic]= "111111111111"
+K.classfilters.relaxed[shields] = "110000100000"
+K.classfilters.relaxed[libram]  = "010000000000"
+K.classfilters.relaxed[idols]   = "000000000010"
+K.classfilters.relaxed[totems]  = "000000010000"
+K.classfilters.weapons[ohaxe]   = "111101100101"
+K.classfilters.weapons[thaxe]   = "111001100000"
+K.classfilters.weapons[bows]    = "101100000000"
+K.classfilters.weapons[guns]    = "101100000000"
+K.classfilters.weapons[ohmace]  = "110111100110"
+K.classfilters.weapons[thmace]  = "110001100010"
+K.classfilters.weapons[poles]   = "111001000110"
+K.classfilters.weapons[ohsword] = "111101011101"
+K.classfilters.weapons[thsword] = "111001000000"
+K.classfilters.weapons[staves]  = "101010111110"
+K.classfilters.weapons[fist]    = "101100100111"
+K.classfilters.weapons[miscw]   = "111111111111"
+K.classfilters.weapons[daggers] = "101110111011"
+K.classfilters.weapons[thrown]  = "101100000000"
+K.classfilters.weapons[xbows]   = "101100000000"
+K.classfilters.weapons[wands]   = "000010011000"
+-- K.classfilters.weapons[glaives] = "100101000101"
+K.classfilters.weapons[fish]    = "111111111111"
+
+K.classfilters.allclasses       = "111111111111"
 
 --
 -- This function will take a given itemlink and examine its tooltip looking
