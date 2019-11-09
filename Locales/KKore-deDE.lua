@@ -6,7 +6,7 @@
      E-mail: cruciformer@gmail.com
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2018 James Kean Johnston. All rights reserved.
+   Copyright 2008-2019 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -21,20 +21,15 @@
    limitations under the License.
 ]]
 
-local KKORE_MAJOR = "KKore"
-local K = LibStub:GetLibrary(KKORE_MAJOR)
+local K = LibStub:GetLibrary("KKore")
 
 if (not K) then
   return
 end
 
-if (K.CurrentLocale ~= "deDE") then
-  return
-end
-
-local L = K:RegisterI18NTable(KKORE_MAJOR, "deDE")
+local L = LibStub("AceLocale-3.0"):NewLocale("KKore", "deDE")
 if (not L) then
-  error ("KahLua Kore: kann I18N nicht initialisieren.")
+  return
 end
 
 --
@@ -76,3 +71,22 @@ L["Debug level %d out of bounds - must be between 0 and 10."] = "Debug Level %d 
 L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."] = "Modul '%s' existiert nicht. Benutze %s/%s %s%s für eine Liste aller verfügbarer Module."
 L["KKore extensions loaded:"] = "KKore Erweiterungen geladen:"
 L["Chest"] = true
+
+L["Not Set"] = "Nicht festgelegt"
+L["Tank"] = "Tank"
+L["Ranged DPS"] = "Ranged DPS"
+L["Melee DPS"] = "Melee DPS"
+L["Healer"] = "Healer"
+L["Spellcaster"] = "Spellcaster"
+L["your version of %s is out of date. Please update it."] = "Deine Version von %s ist nicht aktuell. Bitte aktualisiere sie."
+L["VCTITLE"] = "%s %s Version Check"
+L["Version"] = "Version"
+L["In Raid"] = "In Raid"
+L["Who"] = "Wer"
+
+L["KONFER_SEL_TITLE"] = "Auswahl des aktiven %s Konfer-Moduls"
+L["KONFER_SEL_HEADER"] = "Du hast %s Konfer-Module installiert und mehr als eines von ihnen ist aktiv und eingestellt auf automatisches Ãffnen, wenn ein Leichnam oder eine Kiste/Truhe geplÃ¼ndert wird. Dies kann Konflikte verursachen, du solltest eines der Module als aktives auswÃ¤hlen. Alle anderen werden dann ausgeschlossen."
+L["KONFER_SEL_DDTITLE"] = "Modul-Auswahl zum Aktivieren"
+L["KONFER_ACTIVE"] = "aktiv"
+L["KONFER_SUSPENDED"] = "ausgeschlossen"
+L["KONFER_SUSPEND_OTHERS"] = "Du hast das %s Konfer-Modul gerade aktiviert, aber andere Konfer-Module sind ebenfalls aktiv. Mehrere Module zur selben Zeit aktiv zu haben, kann Probleme verursachen, besonders wenn mehr als eins sich beim Looten automatisch Ã¶ffnet. Es wird empfohlen, die anderen Module zu deaktivieren. Wenn du dies tun willst und nur das ausgewÃ¤hlte aktivieren willst, drÃ¼cke den 'OK'-Button. Wenn du sicher bist, dass mehrere Konfer-Module laufen sollen, dann drÃ¼cke 'Abbrechen'."

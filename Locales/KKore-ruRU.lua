@@ -21,20 +21,15 @@
    limitations under the License.
 ]]
 
-local KKORE_MAJOR = "KKore"
-local K = LibStub:GetLibrary(KKORE_MAJOR)
+local K = LibStub:GetLibrary("KKore")
 
 if (not K) then
   return
 end
 
-if (K.CurrentLocale ~= "ruRU") then
-  return
-end
-
-local L = K:RegisterI18NTable(KKORE_MAJOR, "ruRU")
+local L = LibStub("AceLocale-3.0"):NewLocale("KKore", "ruRU")
 if (not L) then
-  error ("KahLua Kore: could not initialize I18N.")
+  return
 end
 
 --
@@ -76,3 +71,22 @@ L["Debug level %d out of bounds - must be between 0 and 10."] = "Уровень 
 L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."] = "Модуль '%s' не существует. Используйте %s/%s %s%s для отображения списка доступных модулей."
 L["KKore extensions loaded:"] = "KKore расширения загружены:"
 L["Chest"] = true
+
+L["Not Set"] = "Нет"
+L["Tank"] = "Танк"
+L["Ranged DPS"] = "Рэйнж ДД"
+L["Melee DPS"] = "Мили ДД"
+L["Healer"] = "Хилер"
+L["Spellcaster"] = "Кастер"
+L["your version of %s is out of date. Please update it."] = true
+L["VCTITLE"] = "%s %s Version Check"
+L["Version"] = true
+L["In Raid"] = true
+L["Who"] = true
+
+L["KONFER_SEL_TITLE"] = "Выберите Активный %s Konfer Модуль"
+L["KONFER_SEL_HEADER"] = "У Вас установлено несколько %s Konfer модулей, и активны более одного, когда Вы осматриваете тело монстра или сундук. Это может вызывать конфликты и Вы должны выбрать лишь один, который будет оставаться активным. Все остальные будут отключены."
+L["KONFER_SEL_DDTITLE"] = "Пометить модуль как Активный"
+L["KONFER_ACTIVE"] = "активный"
+L["KONFER_SUSPENDED"] = "отключен"
+L["KONFER_SUSPEND_OTHERS"] = "Вы активировали %s Konfer модуль, но один из других модулей сейчас также помечен как Активный. Наличие нескольких одновременно активных Konfer модулей может вызывать проблемы, особенно если они должны срабатывать при дележе добычи. Предполагается, что вы должны отключить остальные Konfer модули. Если Вы хотите это сделать и оставить активным, только этот модуль, а остальные отключить нажмите 'Ok'. Если вы уверены, что хотите оставить несколько активных Konfer модулей, нажмите 'Отмена'."

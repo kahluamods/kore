@@ -243,7 +243,7 @@ ret:Catch (event, handler)
   OnHide (this, event)
     Thrown when the widget is hidden by calling :Hide (). This is not
     quite the same thing as hooking the OnHide script.
-  OnValueChanged (this, event, newval, user)
+  OnValueChanged (this, event, newval, user, ...)
     For many widget types that store a value, this is thrown whenever
     the value of the widget changes. Exactly how and when this is called
     depends on the widget type and is discussed below. user is set to true
@@ -370,7 +370,7 @@ throw:OnEscapePressed ()
   value is restored to its last "saved value", this will also throw an
   OnValueChanged () event.
 
-throw:OnValueChanged (value, user)
+throw:OnValueChanged (this, event, value, user)
   Thrown whenever the value of the edit box changes. This will be thrown
   when the value of the edit box is set with :SetText() or when the last
   saved value is restored if a user presses Escape. It will also be thrown

@@ -6,7 +6,7 @@
      E-mail: cruciformer@gmail.com
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2018 James Kean Johnston. All rights reserved.
+   Copyright 2008-2019 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -21,16 +21,15 @@
    limitations under the License.
 ]]
 
-local KKORE_MAJOR = "KKore"
-local K = LibStub:GetLibrary(KKORE_MAJOR)
+local K = LibStub:GetLibrary("KKore")
 
 if (not K) then
   return
 end
 
-local L = K:RegisterI18NTable(KKORE_MAJOR, "enUS")
+local L = LibStub("AceLocale-3.0"):NewLocale("KKore", "enUS", true)
 if (not L) then
-  error ("KahLua Kore: could not initialize I18N.")
+  return
 end
 
 --
@@ -72,3 +71,23 @@ L["Debug level %d out of bounds - must be between 0 and 10."] = true
 L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."] = true
 L["KKore extensions loaded:"] = true
 L["Chest"] = true
+
+-- Konfer related stuff
+L["Not Set"] = true
+L["Tank"] = true
+L["Ranged DPS"] = true
+L["Melee DPS"] = true
+L["Healer"] = true
+L["Spellcaster"] = true
+L["your version of %s is out of date. Please update it."] = true
+L["VCTITLE"] = "%s %s Version Check"
+L["Version"] = true
+L["In Raid"] = true
+L["Who"] = true
+
+L["KONFER_SEL_TITLE"] = "Select Active %s Konfer Module"
+L["KONFER_SEL_HEADER"] = "You have multiple %s Konfer modules installed, and more than one of them is active and set to auto-open when you loot a corpse or chest. This can cause conflicts and you need to select which one of the modules should be the active one. All others will be suspended."
+L["KONFER_SEL_DDTITLE"] = "Select Module to Make Active"
+L["KONFER_ACTIVE"] = "active"
+L["KONFER_SUSPENDED"] = "suspended"
+L["KONFER_SUSPEND_OTHERS"] = "You have just activated the %s Konfer module above, but other Konfer modules are also currently active. Having multiple Konfer modules active at the same time can cause problems, especially if more than one of them is set to auto-open on loot. It is suggested that you suspend all other Konfer modules. If you would like to do this and make the module above the only active one, press 'Ok' below. If you are certain you want to leave multiple Konfer modules running, press 'Cancel'."

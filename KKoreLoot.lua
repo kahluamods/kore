@@ -39,7 +39,7 @@ local KRP, KM = LibStub:GetLibrary("KKoreParty")
 assert (KRP, "KKoreLoot requires KKoreParty")
 assert (tonumber(KM) >= 3, "KKoreLoot requires KKoreParty r3 or later")
 
-local L = K:GetI18NTable("KKore", false)
+local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
 
 local printf = K.printf
 local tinsert = table.insert
