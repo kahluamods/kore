@@ -1782,7 +1782,7 @@ function K.GetTooltipLine(link, line, side)
     return UnsetTooltipHack()
   end
 
-  local text = _G["KSKUTooltipText"..side..line]:GetText()
+  local text = _G["KKUTooltipText"..side..line]:GetText()
   UnsetTooltipHack()
   return text
 end
@@ -1792,7 +1792,7 @@ function K.GetTooltipLines(link, ...)
   SetTooltipHack(link)
         
   for k,v in pairs({...}) do
-    lines[#lines+1] = _G["KSKUTooltipTextLeft"..v]:GetText()
+    lines[#lines+1] = _G["KKUTooltipTextLeft"..v]:GetText()
   end
 
   UnsetTooltipHack()
