@@ -31,7 +31,7 @@ else
 end
 
 local KKOREUI_MAJOR = "KKoreUI"
-local KKOREUI_MINOR = 3
+local KKOREUI_MINOR = 4
 
 local KUI = LibStub:NewLibrary(KKOREUI_MAJOR, KKOREUI_MINOR)
 
@@ -67,7 +67,7 @@ local tmaxn = table.maxn
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert(K, "KKoreUI requires KKore")
-assert(tonumber(KM) >= 2, "KKoreUI requires KKore r2 or later")
+assert(tonumber(KM) >= 4, "KKoreUI requires KKore r4 or later")
 K:RegisterExtension(KUI, KKOREUI_MAJOR, KKOREUI_MINOR)
 
 local xpcall = xpcall
@@ -1191,11 +1191,11 @@ function KUI:CreateStringLabel(cfg, kparent)
 end
 
 local function eb_OnEnterPressed(this)
+  local val = this:GetText()
   local err = this:Throw("OnEnterPressed", val)
   if (err) then
     this:SetFocus()
   else
-    local val = this:GetText()
     this:ClearFocus()
     this:Throw("OnValueChanged", val, true)
     this.setvalue = val
@@ -1558,7 +1558,7 @@ local function rb_getsetvalue(t, g, v, n, set, ...)
             rc.checked = false
             rc.check:Hide()
             if (not n) then
-              rc:Throw("OnValueChanged", false, false, rc.value) -- JKJ
+              rc:Throw("OnValueChanged", false, false, rc.value)
             end
           end
         else
@@ -1728,6 +1728,19 @@ local function sd_OnMouseUp(this)
   this.mousedown = nil
 end
 
+local function sd_changeminmax(this, newmin, newmax)
+  this.minval = newmin
+  this.maxval = newmax
+  this:SetMinMaxValues(newmin, newmax)
+  this.mintxt:SetText(tostring(newmin))
+  this.maxtxt:SetText(tostring(newmax))
+
+  if ((this.value < newmin) or (this.value > newmax)) then
+    this:SetValue(newmax)
+    this.value = newmax
+  end
+end
+
 function KUI:CreateSlider(cfg, kparent)
   local orientation = cfg.orientation or "HORIZONTAL"
   local dheight, dwidth
@@ -1859,7 +1872,7 @@ function KUI:CreateSlider(cfg, kparent)
   mintxt:SetText(tostring(minval))
   maxtxt:SetText(tostring(maxval))
 
-  local bg = editbox:CreateTexture (il, "BACKGROUND")
+  local bg = editbox:CreateTexture (nil, "BACKGROUND")
   bg:SetTexture("Interface/ChatFrame/ChatFrameBackground")
   bg:SetVertexColor(0, 0, 0, 0.25)
   bg:SetAllPoints(editbox)
@@ -1873,6 +1886,7 @@ function KUI:CreateSlider(cfg, kparent)
   frame.OnEnable = sd_OnEnable
   frame.OnEnter = tip_OnEnter
   frame.OnLeave = tip_OnLeave
+  frame.ChangeMinMax = sd_changeminmax
 
   frame.value = value
   frame:SetValue(value)

@@ -24,5 +24,6 @@
 <Script file="KKoreParty.lua"/>
 <Script file="KKoreLoot.lua"/>
 <Script file="KKoreKonfer.lua"/>
+<Script file="KKoreDialogs.lua"/>
 
 </Ui>

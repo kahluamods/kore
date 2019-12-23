@@ -23,7 +23,7 @@
 ]]
 
 local KKOREKONFER_MAJOR = "KKoreKonfer"
-local KKOREKONFER_MINOR = 3
+local KKOREKONFER_MINOR = 4
 local KK, oldminor = LibStub:NewLibrary(KKOREKONFER_MAJOR, KKOREKONFER_MINOR)
 
 if (not KK) then
@@ -32,20 +32,20 @@ end
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert(K, "KKoreKonfer requires KKore")
-assert(tonumber(KM) >= 3, "KKoreKonfer requires KKore r3 or later")
+assert(tonumber(KM) >= 4, "KKoreKonfer requires KKore r4 or later")
 K:RegisterExtension(KK, KKOREKONFER_MAJOR, KKOREKONFER_MINOR)
 
 local KUI, KM = LibStub:GetLibrary("KKoreUI")
 assert(KUI, "KKoreKonfer requires KKoreUI")
-assert(tonumber(KM) >= 3, "KKoreKonfer requires KKoreUI r3 or later")
+assert(tonumber(KM) >= 4, "KKoreKonfer requires KKoreUI r4 or later")
 
 local H, KM = LibStub:GetLibrary("KKoreHash")
 assert(H, "KKoreKonfer requires KKoreHash")
-assert(tonumber(KM) >= 3, "KKoreKonfer requires KKoreHash r3 or later")
+assert(tonumber(KM) >= 4, "KKoreKonfer requires KKoreHash r4 or later")
 
 local KRP, KM = LibStub:GetLibrary("KKoreParty")
 assert(KRP, "KKoreKonfer requires KKoreParty")
-assert(tonumber(KM) >= 3, "KKoreKonfer requires KKoreParty r3 or later")
+assert(tonumber(KM) >= 4, "KKoreKonfer requires KKoreParty r4 or later")
 
 local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
 
@@ -316,6 +316,17 @@ function KK.TimeStamp()
   return strfmt("%04d%02d%02d%02d%02d", yr, mo, dy, hh, mm), yr, mo, dy, hh, mm
 end
 
+function KK.CreateNewID(strtohash)
+  local _, y, mo, d, h, m = KK.TimeStamp()
+  local ts = strfmt("%02d%02d%02d", y-2000, mo, d)
+  local crc = H:CRC32(ts, nil, false)
+  crc = H:CRC32(tostring(h), crc, false)
+  crc = H:CRC32(tostring(m), crc, false)
+  crc = H:CRC32(strtohash, crc, true)
+  ts = ts .. K.hexstr(crc)
+  return ts
+end
+
 function KK.IsSenderMasterLooter(sender)
   if (KRP.in_either and KRP.master_looter and KRP.master_looter == sender) then
     return true
@@ -395,7 +406,7 @@ local function send_to_raid_or_party_am_c(self, cfg, cmd, prio, ...)
   end
 
   local dist
-  if (KRP.in_party and not KRP.in_raid and self.konfer.party) then
+  if (KRP.in_party and self.konfer.party) then
     dist = "PARTY"
   elseif (KRP.in_raid and self.konfer.raid) then
     dist = "RAID"
@@ -406,7 +417,7 @@ local function send_to_raid_or_party_am_c(self, cfg, cmd, prio, ...)
 end
 
 local function send_to_raid_or_party_am(self, cmd, prio, ...)
-  send_to_raid_or_party_am_c(self, self.currentid, cmd, prio, ...)
+  send_to_raid_or_party_am_c(self, nil, cmd, prio, ...)
 end
 
 local function send_to_guild_am_c(self, cfg, cmd, prio, ...)
@@ -417,7 +428,7 @@ end
 
 local function send_to_guild_am(self, cmd, prio, ...)
   if (K.player.is_guilded) then
-    send_addon_msg(self, self.currentid, cmd, prio, "GUILD", nil, ...)
+    send_addon_msg(self, nil, cmd, prio, "GUILD", nil, ...)
   end
 end
 
@@ -426,7 +437,7 @@ local function send_whisper_am_c(self, cfg, target, cmd, prio, ...)
 end
 
 local function send_whisper_am(self, target, cmd, prio, ...)
-  send_addon_msg(self, self.currentid, cmd, prio, "WHISPER", target, ...)
+  send_addon_msg(self, nil, cmd, prio, "WHISPER", target, ...)
 end
 
 local function send_plain_message(self, text)
@@ -719,4 +730,3 @@ function KK.RegisterKonfer(kmod, targ)
 
   check_duplicate_modules(targ, false)
 end
-

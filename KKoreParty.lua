@@ -23,7 +23,7 @@
 ]]
 
 local KKOREPARTY_MAJOR = "KKoreParty"
-local KKOREPARTY_MINOR = 3
+local KKOREPARTY_MINOR = 4
 local KRP, oldminor = LibStub:NewLibrary(KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
 
 if (not KRP) then
@@ -32,11 +32,15 @@ end
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert(K, "KKoreParty requires KKore")
-assert(tonumber(KM) >= 3, "KKoreParty requires KKore r3 or later")
+assert(tonumber(KM) >= 4, "KKoreParty requires KKore r4 or later")
 K:RegisterExtension(KRP, KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
 
 local printf = K.printf
 local tinsert = table.insert
+
+local function debug(lvl,...)
+  K.debug("kore", lvl, ...)
+end
 
 KRP.initialised = false
 
@@ -65,7 +69,7 @@ KRP.raidid = 0
 -- The list of players in the players party or raid, or nil if not in one.
 KRP.players = nil
 
--- The list of player names in the players party. Includes the player themself.
+-- The list of player names in the players party. Includes us.
 KRP.party = nil
 
 -- The list of players in the raid or nil if not in a raid.
@@ -205,7 +209,6 @@ end
 -- Utility function to reset leader related variables.
 --
 local function reset_group_leader()
-  reset_loot_method()
   KRP.is_pl = false
   KRP.is_rl = false
   KRP.is_aorl = false
@@ -224,6 +227,7 @@ end
 --
 local function reset_group()
   reset_group_leader()
+  reset_loot_method()
   reset_role()
   reset_ready()
   KRP.in_party = false
@@ -313,7 +317,6 @@ local function update_leader_internal()
   reset_group_leader()
 
   if (not KRP.in_either and not KRP.in_battleground) then
-    reset_group()
     return
   else
     if (UnitIsGroupAssistant("player")) then
@@ -569,9 +572,9 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
       krp_flag_events = false
     end
     reset_group()
+    KRP:DoCallbacks("update_group_end", in_party, in_raid, in_bg)
     KRP:SendIPC("GROUP_ROSTER_CHANGED")
     KRP:SendIPC("IN_GROUP_CHANGED", in_party, in_raid, in_bg)
-    KRP:DoCallbacks("update_group_end", in_party, in_raid, in_bg)
     return true
   end
 

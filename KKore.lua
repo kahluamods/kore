@@ -70,14 +70,10 @@ local tinsert = table.insert
 local tremove = table.remove
 local setmetatable = setmetatable
 local tconcat = table.concat
-local tostring = tostring
-local GetTime = GetTime
-local min = math.min
+local tostring, tonumber = tostring, tonumber
 local max = math.max
-local floor = floor
 local strfmt = string.format
 local strsub = string.sub
-local strlen = string.len
 local strfind = string.find
 local strlower = string.lower
 local strupper = string.upper
@@ -87,14 +83,115 @@ local gmatch = string.gmatch
 local match = string.match
 local gsub = string.gsub
 local xpcall, pcall = xpcall, pcall
-local pairs, next, type = pairs, next, type
-local select, assert, loadstring = select, assert, loadstring
+local pairs, type = pairs, type
+local select, assert = select, assert
 local band, rshift = bit.band, bit.rshift
 local unpack, error = unpack, error
 
 local k,v,i
-
 local kore_ready = 0
+
+--
+-- The difference between the local time zone and UTC. If you add this
+-- number to the return value of K.time() it will equal K.localtime().
+-- This is useful for recording times in UTC but displaying them in the
+-- local timezone. This is *NOT* robust and will probably give weird
+-- result on teh day that daylight saving starts / stops, if it does for
+-- the user's timezone.
+K.utcdiff = time(date("*t")) - time(date("!*t"))
+
+--
+-- Returns the number of seconds since the UTC epoch.
+--
+function K.time()
+  return time(date("!*t"))
+end
+
+--
+-- Returns the number of seconds since the local epoch.
+--
+function K.localtime()
+  return time(date("*t"))
+end
+
+--
+-- Returns the decomposed date as a table given a time, or the UTC epoch if
+-- no time is provided.
+--
+function K.date(when)
+  local when = when or time(date("!*t"))
+  return date("*t", when)
+end
+
+--
+-- Returns a YYYY-MM-DD HH:MM:SS timestamp for a specified time, or the UTC
+-- epoch if no time is specified.
+--
+function K.TimeStamp(when)
+  local when = when or time(date("!*t"))
+  return date("%Y-%m-%d %H:%M:%S", when)
+end
+
+function K.LocalStamp(when)
+  local when = when or time(date("!*t"))
+  return date("%Y-%m-%d %H:%M:%S", when + K.utcdiff)
+end
+
+--
+-- Returns a YYYY-MM-DD HH:MM timestamp for a specified time, or the UTC
+-- epoch if no time is specified.
+--
+function K.TimeStampNS(when)
+  local when = when or time(date("!*t"))
+  return date("%Y-%m-%d %H:%M", when)
+end
+
+function K.LocalStampNS(when)
+  local when = when or time(date("!*t"))
+  return date("%Y-%m-%d %H:%M", when + K.utcdiff)
+end
+
+--
+-- Returns a YYYY-MM-DD timestamp for a specified time, or the UTC epoch
+-- if no time is specified.
+--
+function K.YMDStamp(when)
+  local when = when or time(date("!*t"))
+  return date("%Y-%m-%d", when)
+end
+
+function K.LocalYMD(when)
+  local when = when or time(date("!*t"))
+  return date("%Y-%m-%d", when + K.utcdiff)
+end
+
+--
+-- Returns a HH:MM timestamp for a specified time, or the UTC epoch
+-- if no time is specified.
+--
+function K.HMStamp(when)
+  local when = when or time(date("!*t"))
+  return date("%H:%M", when)
+end
+
+function K.LocalHM(when)
+  local when = when or time(date("!*t"))
+  return date("%H:%M", when + K.utcdiff)
+end
+
+--
+-- Returns a HH:MM:SS timestamp for a specified time, or the UTC epoch
+-- if no time is specified.
+--
+function K.HMSStamp(when)
+  local when = when or time(date("!*t"))
+  return date("%H:%M:%S", when)
+end
+
+function K.LocalHMS(when)
+  local when = when or time(date("!*t"))
+  return date("%H:%M:%S", when + K.utcdiff)
+end
 
 K.local_realm = K.local_realm or select(2, UnitFullName("player"))
 
@@ -246,21 +343,44 @@ local function update_player_and_guild(nofire)
     return
   end
 
+  local fireevt = false
+
   K.player.level = UnitLevel("player")
   if (IsInGuild()) then
     local gname, _, rankidx = GetGuildInfo("player")
     if (not gname or gname == "") then
       return
     end
-    K.player.guild = gname
-    K.player.guildrankidx = rankidx + 1
+    if (not K.player.is_guilded) then
+      fireevt = true
+    end
     K.player.is_guilded = true
+
+    if (K.player.guild and K.player.guild ~= gname) then
+      fireevt = true
+    end
+    K.player.guild = gname
+
+    if (K.player.guildrankidx and K.player.guildrankidx ~= (rankidx + 1)) then
+      fireevt = true
+    end
+    K.player.guildrankidx = rankidx + 1
+
     if (IsGuildLeader()) then
+      if (not K.player.is_gm) then
+        fireevt = true
+      end
       K.player.is_gm = true
     else
+      if (K.player.is_gm) then
+        fireevt = true
+      end
       K.player.is_gm = false
     end
   else
+    if (K.player.is_guilded) then
+      fireevt = true
+    end
     K.player.is_guilded = false
     K.player.guild = nil
     K.player.guildrankidx = 0
@@ -304,11 +424,15 @@ local function update_player_and_guild(nofire)
   end
 
   if (not nofire) then
+    K:SendMessage("GUILD_INFO_UPDATED")
+  end
+
+  if (fireevt and not nofire) then
     K:SendMessage("PLAYER_INFO_UPDATED")
   end
 end
 
-function K:UpdatePlayerAndGuild(nofire)
+function K.UpdatePlayerAndGuild(nofire)
   update_player_and_guild(nofire)
 end
 
@@ -420,39 +544,41 @@ K.CLASS_MONK        = "10"
 K.CLASS_DRUID       = "11"
 K.CLASS_DEMONHUNTER = "12"
 
+K.UnsupClasses = {
+  K.CLASS_DEATHKNIGHT,
+  K.CLASS_MONK,
+  K.CLASS_DEMONHUNTER,
+}
+
+K.EmptyClassFilter = "000000000000"
+
 K.ClassIndex = {
   ["WARRIOR"]     = K.CLASS_WARRIOR,
   ["PALADIN"]     = K.CLASS_PALADIN,
   ["HUNTER"]      = K.CLASS_HUNTER,
   ["ROGUE"]       = K.CLASS_ROGUE,
   ["PRIEST"]      = K.CLASS_PRIEST,
-  ["DEATHKNIGHT"] = K.CLASS_DEATHKNIGHT,
   ["SHAMAN"]      = K.CLASS_SHAMAN,
   ["MAGE"]        = K.CLASS_MAGE,
   ["WARLOCK"]     = K.CLASS_WARLOCK,
-  ["MONK"]        = K.CLASS_MONK,
   ["DRUID"]       = K.CLASS_DRUID,
-  ["DEMONHUNTER"] = K.CLASS_DEMONHUNTER,
 }
 
 local kClassTable = {}
 FillLocalizedClassList(kClassTable, false)
-kClassTable["DEATHKNIGHT"] = "Death Knight"
-kClassTable["MONK"] = "Monk"
-kClassTable["DEMONHUNTER"] = "Demon Hunter"
+--kClassTable["DEATHKNIGHT"] = "Death Knight"
+--kClassTable["MONK"] = "Monk"
+--kClassTable["DEMONHUNTER"] = "Demon Hunter"
 
 local warrior = kClassTable["WARRIOR"]
 local paladin = kClassTable["PALADIN"]
 local hunter = kClassTable["HUNTER"]
 local rogue = kClassTable["ROGUE"]
 local priest = kClassTable["PRIEST"]
-local dk = kClassTable["DEATHKNIGHT"]
 local shaman = kClassTable["SHAMAN"]
 local mage = kClassTable["MAGE"]
 local warlock = kClassTable["WARLOCK"]
-local monk = kClassTable["MONK"]
 local druid = kClassTable["DRUID"]
-local dh = kClassTable["DEMONHUNTER"]
 
 -- Same table but using the localised names
 K.LClassIndex = {
@@ -461,13 +587,10 @@ K.LClassIndex = {
   [hunter]      = K.CLASS_HUNTER,
   [rogue]       = K.CLASS_ROGUE,
   [priest]      = K.CLASS_PRIEST,
-  [dk]          = K.CLASS_DEATHKNIGHT,
   [shaman]      = K.CLASS_SHAMAN,
   [mage]        = K.CLASS_MAGE,
   [warlock]     = K.CLASS_WARLOCK,
-  [monk]        = K.CLASS_MONK,
   [druid]       = K.CLASS_DRUID,
-  [dh]          = K.CLASS_DEMONHUNTER,
 }
 
 K.LClassIndexNSP = {
@@ -476,13 +599,10 @@ K.LClassIndexNSP = {
   [gsub(hunter, " ", "")]      = K.CLASS_HUNTER,
   [gsub(rogue, " ", "")]       = K.CLASS_ROGUE,
   [gsub(priest, " ", "")]      = K.CLASS_PRIEST,
-  [gsub(dk, " ", "")]          = K.CLASS_DEATHKNIGHT,
   [gsub(shaman, " ", "")]      = K.CLASS_SHAMAN,
   [gsub(mage, " ", "")]        = K.CLASS_MAGE,
   [gsub(warlock, " ", "")]     = K.CLASS_WARLOCK,
-  [gsub(monk, " ", "")]        = K.CLASS_MONK,
   [gsub(druid, " ", "")]       = K.CLASS_DRUID,
-  [gsub(dh, " ", "")]          = K.CLASS_DEMONHUNTER,
 }
 
 -- And the reverse
@@ -492,13 +612,10 @@ K.IndexClass = {
   [K.CLASS_HUNTER]      = { u = "HUNTER", c = hunter },
   [K.CLASS_ROGUE]       = { u = "ROGUE", c = rogue },
   [K.CLASS_PRIEST]      = { u = "PRIEST", c = priest },
-  [K.CLASS_DEATHKNIGHT] = { u = "DEATHKNIGHT", c = dk, ign = true },
   [K.CLASS_SHAMAN]      = { u = "SHAMAN", c = shaman },
   [K.CLASS_MAGE]        = { u = "MAGE", c = mage },
   [K.CLASS_WARLOCK]     = { u = "WARLOCK", c = warlock },
-  [K.CLASS_MONK]        = { u = "MONK", c = monk, ign = true },
   [K.CLASS_DRUID]       = { u = "DRUID", c = druid },
-  [K.CLASS_DEMONHUNTER] = { u = "DEMONHUNTER", c = dh, ign = true },
 }
 for k,v in pairs(K.IndexClass) do
   if (v.c) then
@@ -516,13 +633,10 @@ K.IndexClass[K.CLASS_PALADIN].w     = "paladin"
 K.IndexClass[K.CLASS_HUNTER].w      = "hunter"
 K.IndexClass[K.CLASS_ROGUE].w       = "rogue"
 K.IndexClass[K.CLASS_PRIEST].w      = "priest"
-K.IndexClass[K.CLASS_DEATHKNIGHT].w = "deathknight"
 K.IndexClass[K.CLASS_SHAMAN].w      = "shaman"
 K.IndexClass[K.CLASS_MAGE].w        = "mage"
 K.IndexClass[K.CLASS_WARLOCK].w     = "warlock"
-K.IndexClass[K.CLASS_MONK].w        = "monk"
 K.IndexClass[K.CLASS_DRUID].w       = "druid"
-K.IndexClass[K.CLASS_DEMONHUNTER].w = "demonhunter"
 
 --
 -- Many mods need to know the different class colors. We set up three tables
@@ -538,13 +652,10 @@ K.ClassColorsRGBPerc = {
   [K.CLASS_HUNTER]      = RAID_CLASS_COLORS["HUNTER"],
   [K.CLASS_ROGUE]       = RAID_CLASS_COLORS["ROGUE"],
   [K.CLASS_PRIEST]      = RAID_CLASS_COLORS["PRIEST"],
-  [K.CLASS_DEATHKNIGHT] = RAID_CLASS_COLORS["DEATHKNIGHT"],
   [K.CLASS_SHAMAN]      = RAID_CLASS_COLORS["SHAMAN"],
   [K.CLASS_MAGE]        = RAID_CLASS_COLORS["MAGE"],
   [K.CLASS_WARLOCK]     = RAID_CLASS_COLORS["WARLOCK"],
-  [K.CLASS_MONK]        = RAID_CLASS_COLORS["MONK"],
   [K.CLASS_DRUID]       = RAID_CLASS_COLORS["DRUID"],
-  [K.CLASS_DEMONHUNTER] = RAID_CLASS_COLORS["DEMONHUNTER"],
 }
 
 function K.RGBPercToDec(rgb)
@@ -602,8 +713,6 @@ for k,v in pairs(K.ClassIndex) do
   K.ClassColorsHex2[v] = K.RGBDecToHex(K.ClassColorsRGB2[v])
   K.ClassColorsEsc2[v] = K.RGBPercToColorCode(K.ClassColorsRGBPerc2[v])
 end
-
-local xpcall = xpcall
 
 local function errorhandler(err)
   return geterrorhandler()(err)
@@ -1378,7 +1487,9 @@ K.addons = {}
 
 local addonembeds = {
   "DoCallbacks", "RegisterAddon", "SuspendAddon", "ResumeAddon",
-  "ActivateAddon", "GetAddon", "AddonCallback", "GetPrivate"
+  "ActivateAddon", "GetAddon", "AddonCallback", "GetPrivate",
+  "ConfirmationDialog", "RenameDialog", "PopupSelectionList",
+  "SingleStringInputDialog"
 }
 
 function K.DoCallbacks(self, name, ...)

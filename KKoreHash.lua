@@ -14,7 +14,7 @@
 --
 
 local KKOREHASH_MAJOR = "KKoreHash"
-local KKOREHASH_MINOR = 3
+local KKOREHASH_MINOR = 4
 local H, oldminor = LibStub:NewLibrary(KKOREHASH_MAJOR, KKOREHASH_MINOR)
 
 if (not H) then
@@ -23,7 +23,7 @@ end
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreHash requires KKore")
-assert (tonumber(KM) >= 3, "KKoreHash requires KKore r3 or later")
+assert (tonumber(KM) >= 4, "KKoreHash requires KKore r4 or later")
 K:RegisterExtension (H, KKOREHASH_MAJOR, KKOREHASH_MINOR)
 
 local bor = bit.bor

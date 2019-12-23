@@ -616,6 +616,8 @@ ret.label [FontString]
 ret.lrgb [RGB table]
   Colors for the label.
 
+ret:ChangeMinMax(newmin, newmax)
+
 Example:
   local cfg = {
     x = 0, y = -60, initialvalue = 42,
