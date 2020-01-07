@@ -7,7 +7,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2019 James Kean Johnston. All rights reserved.
+   Copyright 2008-2020 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -30,10 +30,16 @@ if (not KRP) then
   return
 end
 
+local assert = assert
+local GetNumRaidMembers = GetNumGroupMembers or GetNumRaidMembers
+local GetNumPartyMembers = GetNumSubgroupMembers or GetNumPartyMembers
+
+KRP.debug_id = KKOREPARTY_MAJOR
+
 local K, KM = LibStub:GetLibrary("KKore")
 assert(K, "KKoreParty requires KKore")
 assert(tonumber(KM) >= 4, "KKoreParty requires KKore r4 or later")
-K:RegisterExtension(KRP, KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
+K.RegisterExtension(KRP, KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
 
 local printf = K.printf
 local tinsert = table.insert
@@ -44,20 +50,29 @@ end
 
 KRP.initialised = false
 
+--
+-- Whenever a user is in a raid they are automatically in a party too, which
+-- is their raid group. It may be useful to know who the current group members
+-- are so we will maintain both lists.
+--
+-- KRP.in_party therefore doubles as what we used to call KRP.in_either
+-- because it is also set when a user in in a raid. Thus KRP.in_party is
+-- true when a user is in a party, raid or BG, if they are in a raid, and
+-- in_bg if they are in a battleground.
+--
+
 -- Is the player in a party
 KRP.in_party = false
 
 -- Is the player in a raid
 KRP.in_raid = false
 
--- Is the player in either a raid or a party
-KRP.in_either = false
-
 -- Is the player in a battleground
-KRP.in_battleground = false
+KRP.in_bg = false
 
 -- The number of players in the party or raid (including ourselves)
-KRP.num_members = 0
+KRP.num_party = 0
+KRP.num_raid = 0
 
 -- The raid sub-group the player is in, or 0 if not in a raid.
 KRP.subgroup = 0
@@ -90,9 +105,6 @@ KRP.is_aorl = false
 
 -- Is the player both in a party / raid and the master looter
 KRP.is_ml = false
-
--- Which raid group the player is in, or 0 if not in a raid
-KRP.subgroup = 0
 
 -- Which party member (0 for player) is the master looter, or nil if none.
 KRP.party_mlid = nil
@@ -181,6 +193,16 @@ KRP.valid_callbacks = {
   ["new_player"] = true,
   ["update_group_start"] = true,
   ["update_group_end"] = true,
+  ["in_group_changed"] = true,
+  ["loot_method"] = true,
+  ["leader_changed"] = true,
+  ["role_changed"] = true,
+  ["in_party_changed"] = true,
+  ["in_raid_changed"] = true,
+  ["in_bg_changed"] = true,
+  ["readycheck_start"] = true,
+  ["readycheck_reply"] = true,
+  ["readycheck_end"] = true,
 }
 
 --
@@ -232,9 +254,9 @@ local function reset_group()
   reset_ready()
   KRP.in_party = false
   KRP.in_raid = false
-  KRP.in_either = false
-  KRP.in_battleground = false
-  KRP.num_members = 0
+  KRP.in_bg = false
+  KRP.num_party = 0
+  KRP.num_raid = 0
   KRP.subgroup = 0
   KRP.raidid = 0
   KRP.raid = nil
@@ -246,50 +268,50 @@ end
 local function update_loot_method_internal()
   reset_loot_method()
 
-  if ((not KRP.in_either) or KRP.in_battleground) then
+  if ((not KRP.in_party) or KRP.in_bg) then
     return
-  else
-    local lm, pmlid, rmlid = GetLootMethod()
-    local mlname = nil
-
-    KRP.party_mlid = pmlid
-    KRP.raid_mlid = rmlid
-    KRP.loot_method = method_to_number[lm or "unknown"] or LOOT_METHOD_UNKNOWN
-
-    if (KRP.loot_method == LOOT_METHOD_MASTER) then
-      if (pmlid ~= nil) then
-        if (pmlid == 0) then
-          mlname = K.player.name
-        else
-          mlname = K.FullUnitName("party" .. pmlid)
-        end
-      end
-      if (rmlid ~= nil) then
-        mlname = K.FullUnitName("raid" .. rmlid)
-      end
-
-      if (mlname and KRP.players) then
-        for k, v in pairs(KRP.players) do
-          if (v.is_ml) then
-            if (k ~= mlname) then
-              KRP.players[k].is_ml = false
-            end
-          end
-          if (k == mlname) then
-            KRP.players[k].is_ml = true
-          end
-        end
-      end
-    end
-
-    if (mlname and mlname == K.player.name) then
-      KRP.is_ml = true
-    else
-      KRP.is_ml = false
-    end
-    KRP.master_looter = mlname
-    KRP.loot_threshold = GetLootThreshold()
   end
+
+  local lm, pmlid, rmlid = GetLootMethod()
+  local mlname = nil
+
+  KRP.party_mlid = pmlid
+  KRP.raid_mlid = rmlid
+  KRP.loot_method = method_to_number[lm or "unknown"] or LOOT_METHOD_UNKNOWN
+
+  if (KRP.loot_method == LOOT_METHOD_MASTER) then
+    if (pmlid ~= nil) then
+      if (pmlid == 0) then
+        mlname = K.player.name
+      else
+        mlname = K.FullUnitName("party" .. pmlid)
+      end
+    end
+    if (rmlid ~= nil) then
+      mlname = K.FullUnitName("raid" .. rmlid)
+    end
+
+    if (mlname and KRP.players) then
+      for k, v in pairs(KRP.players) do
+        if (v.is_ml) then
+          if (k ~= mlname) then
+            v.is_ml = false
+          end
+        end
+        if (k == mlname) then
+          v.is_ml = true
+        end
+      end
+    end
+  end
+
+  if (mlname and mlname == K.player.name) then
+    KRP.is_ml = true
+  else
+    KRP.is_ml = false
+  end
+  KRP.master_looter = mlname
+  KRP.loot_threshold = GetLootThreshold()
 end
 
 --
@@ -307,7 +329,7 @@ function KRP.UpdateLootMethod(evtonly)
     update_loot_method_internal()
   end
 
-  KRP:SendIPC("LOOT_METHOD_UPDATED", KRP.loot_method)
+  KRP:DoCallbacks("loot_method", KRP.loot_method)
 end
 
 local function update_leader_internal()
@@ -316,45 +338,46 @@ local function update_leader_internal()
 
   reset_group_leader()
 
-  if (not KRP.in_either and not KRP.in_battleground) then
+  if (not KRP.in_party and not KRP.in_bg) then
     return
-  else
-    if (UnitIsGroupAssistant("player")) then
+  end
+
+  if (UnitIsGroupAssistant("player")) then
+    KRP.is_aorl = true
+  end
+
+  if (UnitIsGroupLeader("player")) then
+    if (KRP.in_party) then
+      KRP.is_pl = true
+    end
+    if (KRP.in_raid) then
+      KRP.is_pl = false
+      KRP.is_rl = true
       KRP.is_aorl = true
     end
-
-    if (UnitIsGroupLeader("player")) then
-      if (KRP.in_party) then
-        KRP.is_pl = true
-      end
-      if (KRP.in_raid) then
-        KRP.is_pl = false
-        KRP.is_rl = true
-        KRP.is_aorl = true
-      end
-      if (KRP.is_pl or KRP.is_rl) then
-        KRP.leader = K.player.name
-      end
-    else
-      if (KRP.in_party) then
-        for i = 1, MAX_PARTY_MEMBERS do
-          prn = "party" .. i
-          if (UnitExists(prn)) then
-            if (UnitIsGroupLeader(prn)) then
-              KRP.leader = K.FullUnitName(prn)
-            end
+    if (KRP.is_pl or KRP.is_rl) then
+      KRP.leader = K.player.name
+    end
+  else
+    if (KRP.in_party and not KRP.in_raid and not KRP.in_bg) then
+      local npm = GetNumPartyMembers()
+      for i = 1, npm do
+        prn = "party" .. i
+        if (UnitExists(prn)) then
+          if (UnitIsGroupLeader(prn)) then
+            KRP.leader = K.FullUnitName(prn)
           end
         end
       end
+    end
 
-      if (KRP.in_raid) then
-        local num_raiders = KRP.num_members
-        for i = 1, num_raiders do
-          prn = "raid" .. i
-          if (UnitExists(prn)) then
-            if (UnitIsGroupLeader(prn)) then
-              KRP.leader = K.FullUnitName(prn)
-            end
+    if (KRP.in_raid) then
+      local num_raiders = KRP.num_raid
+      for i = 1, num_raiders do
+        prn = "raid" .. i
+        if (UnitExists(prn)) then
+          if (UnitIsGroupLeader(prn)) then
+            KRP.leader = K.FullUnitName(prn)
           end
         end
       end
@@ -399,30 +422,34 @@ function KRP.UpdateLeader(evtonly)
     return false
   end
 
+  local old_leader = KRP.leader
+
   if (not evtonly) then
     update_leader_internal()
   end
 
-  KRP:SendIPC("LEADER_CHANGED")
+  if (old_leader ~= KRP.leader) then
+    KRP:DoCallbacks("leader_changed")
+  end
 end
 
 local function update_role_internal()
   reset_role()
 
-  if (not KRP.in_either and not KRP.in_battleground) then
+  if (not KRP.in_party and not KRP.in_bg) then
     return
-  else
-    if (GetPartyAssignment("MAINTANK", "player")) then
-      KRP.group_role = GROUP_ROLE_TANK
-    elseif (GetPartyAssignment("MAINASSIST", "player")) then
-      KRP.group_role = GROUP_ROLE_ASSIST
-    else
-      KRP.group_role = GROUP_ROLE_NONE
-    end
+  end
 
-    if (KRP.players and KRP.players[K.player.name]) then
-      KRP.players[K.player.name].group_role = KRP.group_role
-    end
+  if (GetPartyAssignment("MAINTANK", "player")) then
+    KRP.group_role = GROUP_ROLE_TANK
+  elseif (GetPartyAssignment("MAINASSIST", "player")) then
+    KRP.group_role = GROUP_ROLE_ASSIST
+  else
+    KRP.group_role = GROUP_ROLE_NONE
+  end
+
+  if (KRP.players and KRP.players[K.player.name]) then
+    KRP.players[K.player.name].group_role = KRP.group_role
   end
 end
 
@@ -436,11 +463,15 @@ function KRP.UpdateRole(evtonly)
     return false
   end
 
+  local old_role = KRP.group_role
+
   if (not evtonly) then
     update_role_internal()
   end
 
-  KRP:SendIPC("ROLE_CHANGED", KRP.group_role)
+  if (KRP.group_role ~= old_role) then
+    KRP:DoCallbacks("role_changed")
+  end
 end
 
 local krp_flag_events = false
@@ -454,7 +485,6 @@ local krp_flag_events = false
 -- handler for UNIT_FLAGS, when the group variables ARE in place.
 --
 local function update_unit_flags(unm, pt, in_party, in_raid, players)
-  assert(unm)
   local urn
 
   local inparty = in_party or KRP.in_party
@@ -516,12 +546,10 @@ local function update_unit_flags(unm, pt, in_party, in_raid, players)
         ptbl.is_pl = false
         ptbl.is_rl = true
         ptbl.is_aorl = true
-      else
-        ptbl.is_rl = false
+        if (UnitIsGroupAssistant(unm)) then
+          ptbl.is_aorl = true
+        end
       end
-    end
-    if (UnitIsGroupAssistant(unm)) then
-      ptbl.is_aorl = true
     end
   end
 end
@@ -533,11 +561,12 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
 
   local old_inparty = KRP.in_party
   local old_inraid = KRP.in_raid
-  local old_inbg = KRP.in_battleground
-  local in_party, in_raid, in_bg, in_either = false, false, false, false
+  local old_inbg = KRP.in_bg
+  local in_party, in_raid, in_bg = false, false, false
   local changed = false
   local players, party, raid, raidgroups
-  local ngm = GetNumGroupMembers()
+  local nrm = GetNumRaidMembers()
+  local npm = GetNumPartyMembers()
   local _, itype = IsInInstance()
   local prn
 
@@ -553,28 +582,21 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
 
   if (IsInRaid()) then
     in_raid = true
-    in_party = false
+    in_party = true
   end
 
   if ((itype == "pvp") or (itype == "arena") or UnitInBattleground("player")) then
     in_bg = true
-    in_raid = false
-    in_party = false
   end
 
-  if (in_raid or in_party) then
-    in_either = true
-  end
-
-  if (not in_bg and not in_either) then
+  if (not in_bg and not in_party) then
     if (krp_flag_events) then
       KRP:UnregisterEvent("PLAYER_FLAGS_CHANGED")
       krp_flag_events = false
     end
     reset_group()
+    KRP:DoCallbacks("in_group_changed", in_party, in_raid, in_bg)
     KRP:DoCallbacks("update_group_end", in_party, in_raid, in_bg)
-    KRP:SendIPC("GROUP_ROSTER_CHANGED")
-    KRP:SendIPC("IN_GROUP_CHANGED", in_party, in_raid, in_bg)
     return true
   end
 
@@ -642,6 +664,7 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
   if (not player.name) then
     return false
   end
+  player.unitid = "player"
   player.is_ml = KRP.is_ml
   player.subgroup = 0
   player.raidid = 0
@@ -656,20 +679,21 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
     party = {}
     party[0] = player.name
 
-    for i = 1, MAX_PARTY_MEMBERS do
+    for i = 1, npm do
       prn = "party" .. i
       if (UnitExists(prn)) then
         player = {}
+        player.unitid = prn
         player.is_pl = false
         player.is_rl = false
         player.is_aorl = false
         player.is_ml = false
-        if (UnitIsGroupLeader(prn)) then
-          player.is_pl = true
-        end
         -- If we're in raid then dont do this check else each raid party
         -- will erroneous get this party member number marked as master looter.
         if (not in_raid) then
+          if (UnitIsGroupLeader(prn)) then
+            player.is_pl = true
+          end
           if (KRP.party_mlid and KRP.party_mlid == i) then
             player.is_ml = true
           end
@@ -704,12 +728,13 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
       raidgroups[i] = {}
     end
 
-    for i = 1, ngm do
+    for i = 1, nrm do
       prn = "raid" .. i
       if (UnitExists(prn)) then
         local nm, rank, subgrp, _, _, _, _, _, _, role, ml = GetRaidRosterInfo(i)
         if (nm) then
           player = {}
+          player.unitid = prn
           player.subgroup = subgrp
           player.raidid = i
           player.group_role = group_role_to_number[role or "NONE"] or GROUP_ROLE_NONE
@@ -754,15 +779,14 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
   KRP.party = party
   KRP.raid = raid
   KRP.raidgroups = raidgroups
-  KRP.num_members = ngm
+  KRP.num_raid = nrm
+  KRP.num_party = npm
 
   KRP.in_party = in_party
   KRP.in_raid = in_raid
-  KRP.in_either = in_either
-  KRP.in_battleground = in_bg
+  KRP.in_bg = in_bg
 
   player = players[K.player.name]
-  assert(player)
 
   KRP.subgroup = player.subgroup
   KRP.raidid = player.raidid
@@ -773,22 +797,22 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
 
   -- Send out all of the change events
   if (fire_party or old_inparty ~= KRP.in_party) then
-    KRP:SendIPC("IN_PARTY_CHANGED", in_party)
+    KRP:DoCallbacks("in_party_changed", in_party)
     changed = true
   end
 
   if (fire_raid or old_inraid ~= KRP.in_raid) then
-    KRP:SendIPC("IN_RAID_CHANGED", in_raid)
+    KRP:DoCallbacks("in_raid_changed", in_raid)
     changed = true
   end
 
-  if (fire_bg or old_inbg ~= KRP.in_battleground) then
-    KRP:SendIPC("IN_BATTLEGROUND_CHANGED", in_bg)
+  if (fire_bg or old_inbg ~= KRP.in_bg) then
+    KRP:DoCallbacks("in_bg_changed", in_bg)
     changed = true
   end
 
   if (changed) then
-    KRP:SendIPC("IN_GROUP_CHANGED", in_party, in_raid, in_bg)
+    KRP:DoCallbacks("in_group_changed", in_party, in_raid, in_bg)
   end
 
   --
@@ -801,7 +825,6 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
     krp_flag_events = true
   end
 
-  KRP:SendIPC("GROUP_ROSTER_CHANGED")
   KRP:DoCallbacks("update_group_end", in_party, in_raid, in_bg)
 
   return true
@@ -814,13 +837,12 @@ end
 --           refresh the raid data and have all of the various callbacks
 --           run after information that the callbacks may use has changed.
 -- Purpose : Updates the various group related settings, namely:
---           in_party, in_raid, in_battleground, subgroup, num_members,
+--           in_party, in_raid, in_bg, subgroup, num_party, num_raid,
 --           raid, party, players
 -- Fires   : IN_RAID_CHANGED(is_in_raid)
 --           IN_PARTY_CHANGED(is_in_party)
 --           IN_BATTLEGROUND_CHANGED(is_in_bg)
---           IN_GROUP_CHANGED(in_party, in_raid, in_bg)
---           GROUP_ROSTER_CHANGED
+--           Callback in_group_changed(in_party, in_raid, in_bg)
 --
 function KRP.UpdateGroup(fire_party, fire_raid, fire_bg)
   if (fire_party == nil) then
@@ -834,21 +856,16 @@ function KRP.UpdateGroup(fire_party, fire_raid, fire_bg)
   end
 
   if (not KRP.initialised) then
-    KRP.avoided = true
     return false
   end
 
   if (not update_group_internal(fire_party, fire_raid, fire_bg)) then
     K:ScheduleTimer(function()
-      KRP:SendIPC("DO_REFRESH", fire_party, fire_raid, fire_bg)
+      update_group_internal(fire_party, fire_raid, fire_bg)
     end, 1.0)
     return false
   end
   return true
-end
-
-function KRP:OnLateInit()
-  KRP:SendIPC("INITIALISED")
 end
 
 -- Function to deal with the start of a readycheck. This will mark all users
@@ -860,7 +877,7 @@ local function ready_check_start(evt, started_by, timeout, ...)
 
   local nm = K.FullUnitName(started_by)
 
-  if (not nm or not KRP.in_either or not KRP.players or not KRP.players[nm]) then
+  if (not nm or not KRP.in_party or not KRP.players or not KRP.players[nm]) then
     reset_ready()
     return
   end
@@ -874,7 +891,7 @@ local function ready_check_start(evt, started_by, timeout, ...)
   end
   KRP.ready[nm] = RC_READY
 
-  KRP:SendIPC("READYCHECK_START")
+  KRP:DoCallbacks("readycheck_start")
 end
 
 -- Function to deal with a reply to a ready check
@@ -894,6 +911,7 @@ local function ready_check_confirm(evt, unit, status, ...)
   else
     KRP.ready[nm] = RC_NOTREADY
   end
+  KRP:DoCallbacks("readycheck_reply", nm, KRP.ready[nm])
 end
 
 -- And finally a function to deal with the end of a ready check
@@ -912,10 +930,22 @@ local function ready_check_ended(evt, ...)
     end
   end
 
-  KRP:SendIPC("READYCHECK_END")
+  KRP:DoCallbacks("readycheck_end")
 end
 
-KRP:RegisterIPC("INITIALISED", function(evt, ...)
+local function krp_refresh(fire_party, fire_raid, fire_bg)
+  if (not KRP.initialised) then
+    return
+  end
+
+  if (KRP.UpdateGroup(fire_party, fire_raid, fire_bg)) then
+    KRP.UpdateLootMethod(true)
+    KRP.UpdateLeader(true)
+    KRP.UpdateRole(true)
+  end
+end
+
+function KRP:OnLateInit()
   if (KRP.initialised) then
     return
   end
@@ -941,35 +971,11 @@ KRP:RegisterIPC("INITIALISED", function(evt, ...)
 
   KRP.initialised = true
 
-  if (KRP.UpdateGroup()) then
-    KRP.UpdateLootMethod(true)
-    KRP.UpdateLeader(true)
-    KRP.UpdateRole(true)
-  end
-end)
-
-KRP:RegisterIPC("DO_REFRESH", function(evt, fire_party, fire_raid, fire_bg)
-  if (not KRP.initialised) then
-    return
-  end
-
-  if (KRP.UpdateGroup(fire_party, fire_raid, fire_bg)) then
-    KRP.UpdateLootMethod(true)
-    KRP.UpdateLeader(true)
-    KRP.UpdateRole(true)
-  end
-end)
+  krp_refresh()
+end
 
 K:RegisterMessage("PLAYER_INFO_UPDATED", function(evt, ...)
-  if (not KRP.initialised) then
-    return
-  end
-
-  if (KRP.UpdateGroup()) then
-    KRP.UpdateLootMethod(true)
-    KRP.UpdateLeader(true)
-    KRP.UpdateRole(true)
-  end
+  krp_refresh(true, true, true)
 end)
 
 --
@@ -979,13 +985,9 @@ end)
 -- callbacks (addon resumed). So we trap these two events and use them to
 -- schedule a refresh.
 --
-KRP:RegisterIPC("ACTIVATE_ADDON", function(evt, ...)
-  KRP:SendIPC("DO_REFRESH", true, true, true)
-end)
-
-KRP:RegisterIPC("SUSPEND_ADDON", function(evt, ...)
-  KRP:SendIPC("DO_REFRESH", true, true, true)
-end)
+function KRP:OnActivateAddon(name, onoff)
+  krp_refresh(true, true, true)
+end
 
 --
 -- Utility functions that more than one mod will likely need.
@@ -999,7 +1001,7 @@ function KRP.ClassString(str, class)
     sn = str
   end
 
-  if (KRP.in_either and KRP.players) then
+  if (KRP.in_party and KRP.players) then
     local pinfo = KRP.players[sn]
     if (pinfo) then
       return K.ClassColorsEsc[class] .. sn .. "|r"
@@ -1020,7 +1022,7 @@ function KRP.ShortClassString(str, class)
     sn = str
   end
 
-  if (KRP.in_either and KRP.players) then
+  if (KRP.in_party and KRP.players) then
     local pinfo = KRP.players[sn]
     sn = Ambiguate(sn, "guild")
     if (pinfo) then
@@ -1054,4 +1056,3 @@ function KRP.ShortAlwaysClassString(str, class)
   sn = Ambiguate(sn, "guild")
   return K.ClassColorsEsc[class] .. sn .. "|r"
 end
-

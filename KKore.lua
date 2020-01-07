@@ -7,7 +7,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2019 James Kean Johnston. All rights reserved.
+   Copyright 2008-2020 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -725,6 +725,8 @@ local function safecall(func, ...)
   end
 end
 
+K.safecall = safecall
+
 -- Utility function to copy one table to another
 function K.CopyTable(src, dest)
   if (type(dest) ~= "table") then
@@ -1400,10 +1402,6 @@ function K:NewAddon(obj, name, ver, desc, cmdname, ...)
   obj.kore_frame = obj.kore_frame or CreateFrame("Frame", name .. "KoreFrame")
   obj.kore_frame:UnregisterAllEvents()
 
-  obj.kore_callbacks = CallbackHandler:New(obj,
-    "RegisterIPC", "UnregisterIPC", "UnregisterAllIPCs")
-  obj.SendIPC = obj.kore_callbacks.Fire
-
   K.AceKore(obj)
 
   RegisterSlashCommand(cmdname, function(...)
@@ -1415,7 +1413,6 @@ function K:NewAddon(obj, name, ver, desc, cmdname, ...)
 
   if (kore_ready == 2) then
     safecall(obj.OnLateInit, obj)
-    obj.SendIPC("KORE_READY")
   else
     tinsert(self.lateq, obj)
   end
@@ -1467,7 +1464,6 @@ local function addonOnUpdate(this, event)
     -- send the event.
     for k, v in pairs(K.extensions) do
       safecall(v.library.OnLateInit, v.library)
-      v.library.SendIPC(v.library, "KORE_READY")
     end
     while (#K.lateq > 0) do
       local addon = tremove(K.lateq, 1)
@@ -1513,7 +1509,7 @@ end
 --           private config space for the addon, as well a place to store
 --           any callback functions.
 -- Fires   : NEW_ADDON(name)
---           ACTIVATE_ADDON(name)
+--           SUSPEND_ADDON(name)
 -- Returns : true if the addon was added and the events fired, false if not.
 --
 function K.RegisterAddon(self, nm)
@@ -1534,8 +1530,8 @@ function K.RegisterAddon(self, nm)
 
   self.addons[nm] = newadd
 
-  self:SendMessage("NEW_ADDON", nm)
-  self:SendMessage("SUSPEND_ADDON", nm)
+  safecall(self.OnNewAddon, self, nm)
+  safecall(self.OnActivateAddon, self, nm, false)
 
   return true
 end
@@ -1558,7 +1554,8 @@ function K.SuspendAddon(self, name)
 
   if (self.addons[name].active) then
     self.addons[name].active = false
-    self:SendMessage("SUSPEND_ADDON", name)
+    self.addons[name].private = {}
+    safecall(self.OnActivateAddon, self, name, false)
     return true
   end
 
@@ -1581,7 +1578,8 @@ function K.ResumeAddon(self, name)
 
   if (not self.addons[name].active) then
     self.addons[name].active = true
-    self:SendMessage("ACTIVATE_ADDON", name)
+    self.addons[name].private = {}
+    safecall(self.OnActivateAddon, self, name, true)
     return true
   end
 
@@ -1643,11 +1641,11 @@ end
 -- So for example, an addon that wants to use both KKoreParty(KRP) and
 -- KKoreLoot(KLD) would call: KRP:RegisterAddon() and KLD:RegisterAddon.
 --
-function K:RegisterExtension(kext, major, minor)
+function K.RegisterExtension(kext, major, minor)
   local ext = {}
   ext.version = minor
   ext.library = kext
-  self.extensions[major] = ext
+  K.extensions[major] = ext
   kext.version = minor
 
   for k,v in pairs (evtembeds) do
@@ -1658,13 +1656,8 @@ function K:RegisterExtension(kext, major, minor)
     kext[v] = K[v]
   end
 
-  kext.kore_callbacks = CallbackHandler:New(kext,
-    "RegisterIPC", "UnregisterIPC", "UnregisterAllIPCs")
-  kext.SendIPC = kext.kore_callbacks.Fire
-
   if (kore_ready == 2) then
     safecall(kext.OnLateInit, kext)
-    kext.SendIPC("KORE_READY")
   end
 end
 

@@ -21,10 +21,12 @@ if (not H) then
   return
 end
 
+H.debug_id = KKOREHASH_MAJOR
+
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreHash requires KKore")
 assert (tonumber(KM) >= 4, "KKoreHash requires KKore r4 or later")
-K:RegisterExtension (H, KKOREHASH_MAJOR, KKOREHASH_MINOR)
+K.RegisterExtension (H, KKOREHASH_MAJOR, KKOREHASH_MINOR)
 
 local bor = bit.bor
 local band = bit.band

@@ -7,7 +7,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2019 James Kean Johnston. All rights reserved.
+   Copyright 2008-2020 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -30,10 +30,12 @@ if (not KLD) then
   return
 end
 
+KLD.debug_id = KKORELOOT_MAJOR
+
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreLoot requires KKore")
 assert (tonumber(KM) >= 4, "KKoreLoot requires KKore r4 or later")
-K:RegisterExtension (KLD, KKORELOOT_MAJOR, KKORELOOT_MINOR)
+K.RegisterExtension (KLD, KKORELOOT_MAJOR, KKORELOOT_MINOR)
 
 local KRP, KM = LibStub:GetLibrary("KKoreParty")
 assert (KRP, "KKoreLoot requires KKoreParty")
@@ -41,8 +43,13 @@ assert (tonumber(KM) >= 4, "KKoreLoot requires KKoreParty r4 or later")
 
 local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
 
+local strmatch = string.match
 local printf = K.printf
 local tinsert = table.insert
+
+local function debug(lvl,...)
+  K.debug("kore", lvl, ...)
+end
 
 local LOOT_METHOD_UNKNOWN     = KRP.LOOT_METHOD_UNKNWON
 local LOOT_METHOD_FREEFORALL  = KRP.LOOT_METHOD_FREEFORALL
@@ -59,12 +66,11 @@ KLD.valid_callbacks = {
   ["loot_item"] = true,
   ["start_loot_info"] = true,
   ["end_loot_info"] = true,
+  ["looting_ready"] = true,
+  ["loot_assigned"] = true,
 }
 
 KLD.initialised = false
-
--- Set to true if loot method is master loot, false otherwise.
-KLD.master_loot = false
 
 -- Name of the unit being looted or nil if none.
 KLD.unit_name = nil
@@ -97,33 +103,33 @@ KLD.skip_loot = false
 --   candidates - list of possible candidates if we are master looting
 KLD.items = nil
 
-local disenchant_name = GetSpellInfo (13262)
-local herbalism_name = GetSpellInfo (11993)
-local mining_name = GetSpellInfo (32606)
--- local skinning_name = GetSpellInfo (75644)
+local disenchant_name = GetSpellInfo(13262)
+local herbalism_name = GetSpellInfo(11993)
+local mining_name = GetSpellInfo(32606)
+-- local skinning_name = GetSpellInfo(75644)
 
 --
--- Function: get_ml_candidates (slot)
+-- Function: get_ml_candidates(slot)
 -- Purpose : Returns the list of valid candidates for the provided
 --           loot slot item, or nil if there is no current loot slot or
 --           we are not using master looting.
 -- Callback: Calls ml_candidate for each candidate.
 --
-local function get_ml_candidates (slot)
+local function get_ml_candidates(slot)
   if (not KLD.initialised) then
     return nil
   end
 
-  if (not KLD.master_loot) then
+  if (not KRP.master_looter) then
     return nil
   end
 
   local candidates = {}
   local count = 0
   for i = 1, MAX_RAID_MEMBERS do
-    local name = GetMasterLootCandidate (slot, i)
+    local name = GetMasterLootCandidate(slot, i)
     if (name) then
-      name = K.CanonicalName (name, nil)
+      name = K.CanonicalName(name, nil)
       if (not name) then
         return nil
       end
@@ -132,7 +138,7 @@ local function get_ml_candidates (slot)
       cinfo["index"] = i
       cinfo["lootslot"] = slot
       candidates[name] = cinfo
-      KLD:DoCallbacks ("ml_candidate", candidates[name])
+      KLD:DoCallbacks("ml_candidate", candidates[name])
       count = count + 1
     end
   end
@@ -144,23 +150,23 @@ local function get_ml_candidates (slot)
   end
 end
 
-local function reset_items ()
+local function reset_items()
   KLD.items = nil
   KLD.num_items = 0
 end
 
 -- Actually retrieve all of the loot slot item info.
-local function populate_items ()
-  local nitems = GetNumLootItems ()
+local function populate_items()
+  local nitems = GetNumLootItems()
   local items = {}
   local count = 0
 
-  KLD:DoCallbacks ("start_loot_info")
+  KLD:DoCallbacks("start_loot_info")
 
   for i = 1, nitems do
-    if (LootSlotHasItem (i)) then
-      local icon, name, quant, _, qual, locked  = GetLootSlotInfo (i)
-      local ilink = GetLootSlotLink (i)
+    if (LootSlotHasItem(i)) then
+      local icon, name, quant, _, qual, locked  = GetLootSlotInfo(i)
+      local ilink = GetLootSlotLink(i)
       local itemid = nil
       local item = {}
 
@@ -168,7 +174,7 @@ local function populate_items ()
         item["name"] = name
         if (ilink and ilink ~= "") then
           item["ilink"] = ilink
-          itemid = tonumber (string.match (ilink, "item:(%d+)") or "0")
+          itemid = tonumber(strmatch(ilink, "item:(%d+)") or "0")
         end
 
         item["itemid"] = itemid
@@ -176,10 +182,10 @@ local function populate_items ()
         item["quantity"] = quant
         item["quality"] = qual
         item["locked"] = locked or false
-        item["candidates"] = get_ml_candidates (i)
+        item["candidates"] = get_ml_candidates(i)
 
         items[i] = item
-        KLD:DoCallbacks ("loot_item", items[i])
+        KLD:DoCallbacks("loot_item", items[i])
         count = count + 1
       end
     end
@@ -192,19 +198,18 @@ local function populate_items ()
     KLD.items = nil
   end
 
-  KLD:DoCallbacks ("end_loot_info")
-  KLD:SendIPC ("ITEMS_UPDATED")
+  KLD:DoCallbacks("end_loot_info")
 end
 
-local function reset_loot_target ()
+local function reset_loot_target()
   KLD.unit_name = nil
   KLD.unit_guid = nil
   KLD.unit_realguid = false
 end
 
-local function populate_loot_target ()
-  local uname = UnitName ("target")
-  local uguid = UnitGUID ("target")
+local function populate_loot_target()
+  local uname = UnitName("target")
+  local uguid = UnitGUID("target")
   local realguid = true
 
   if (not uname or uname == "") then
@@ -229,81 +234,35 @@ local function populate_loot_target ()
 end
 
 --
--- Function: KLD.LootReady ()
--- Purpose : Retrieve all of the item info from the target. This event seems
---           to be fired when all of the loot information is ready from the
---           server. This should be the event that mods use to trigger the
---           actual looting process.
--- Fires   : LOOTING_READY
---
-function KLD.LootReady ()
-  if (not KLD.initialised) then
-    return
-  end
-
-  if (KLD.skip_loot) then
-    KLD.skip_loot = nil
-    return
-  end
-
-  reset_items ()
-  reset_loot_target ()
-
-  populate_loot_target ()
-  populate_items ()
-
-  KLD:SendIPC ("LOOTING_READY")
-end
-
---
--- Function: KLD.LootClosed ()
--- Purpose : End of the loot process. This resets the loot table and boss info
---           to nil.
--- Fires   : LOOTING_ENDED
---
-function KLD.LootClosed ()
-  if (not KLD.initialised) then
-    return
-  end
-
-  reset_items ()
-  reset_loot_target ()
-
-  KLD.chest_name = nil
-
-  KLD:SendIPC ("LOOTING_ENDED")
-end
-
---
--- Function: KLD.RefreshLoot ()
+-- Function: KLD.RefreshLoot()
 -- Purpose : Refresh the internal view of the loot items on the current
 --           corpse. This should only ever be called when we know that
 --           we have a valid corpse and that loot is not being skipped.
 -- Fires   : ITEMS_UPDATED
 --
-function KLD.RefreshLoot ()
+function KLD.RefreshLoot()
   if (KLD.initialised) then
     return
   end
 
-  reset_loot_target ()
-  reset_items ()
+  reset_loot_target()
+  reset_items()
 
-  populate_loot_target ()
-  populate_items ()
+  populate_loot_target()
+  populate_items()
 end
 
 --
--- Function: KLD.GiveMasterLoot (slot, target)
+-- Function: KLD.GiveMasterLoot(slot, target)
 -- Purpose : Give the loot in KLD.items[slot] to the specified target. If
 --           master looting is not active, or the slot is invalid, returns
 --           1. If the slot and the target are valid but the target is not
 --           in the list of valid recipients for the item, returns 2. If
 --           there was no error, return 0.
--- Fires   : LOOT_ASSIGNED (slot, target)
+-- Fires   : LOOT_ASSIGNED(slot, target)
 --
-function KLD.GiveMasterLoot (slot, target)
-  if (not KLD.initialised or not KLD.master_loot or not slot or slot < 1
+function KLD.GiveMasterLoot(slot, target)
+  if (not KLD.initialised or not KRP.is_ml or not slot or slot < 1
       or not target or target == "" or not KLD.items
       or KLD.num_items < 1 or not KLD.items[slot]) then
     return 1
@@ -315,21 +274,45 @@ function KLD.GiveMasterLoot (slot, target)
     return 2
   end
 
-  GiveMasterLoot (slot, cand[target].index)
+  GiveMasterLoot(slot, cand[target].index)
 
-  KLD:SendIPC ("LOOT_ASSIGNED", slot, target)
+  KLD:DoCallbacks("loot_assigned", slot, target)
   return 0
 end
 
-local function krp_lm_updated (evt, new_method, ...)
-  if (new_method == LOOT_METHOD_MASTER) then
-    KLD.master_loot = true
-  else
-    KLD.master_loot = false
+local function loot_ready_evt()
+  if (not KLD.initialised) then
+    return
   end
+
+  if (KLD.skip_loot) then
+    KLD.skip_loot = nil
+    return
+  end
+
+  reset_items()
+  reset_loot_target()
+
+  populate_loot_target()
+  populate_items()
+
+  KLD:DoCallbacks("looting_ready")
 end
 
-local function unit_spellcast_succeeded (evt, caster, sname, rank, tgt)
+local function loot_closed_evt()
+  if (not KLD.initialised) then
+    return
+  end
+
+  reset_items()
+  reset_loot_target()
+
+  KLD.chest_name = nil
+
+  KLD:DoCallbacks("looting_ended")
+end
+
+local function unit_spellcast_succeeded(evt, caster, sname, rank, tgt)
   if (caster == "player") then
     if (sname == OPENING) then
       KLD.chest_name = tgt
@@ -343,12 +326,12 @@ local function unit_spellcast_succeeded (evt, caster, sname, rank, tgt)
   end
 end
 
-local function kld_do_refresh (evt, ...)
+local function kld_do_refresh(evt, ...)
   if (not KLD.initialised) then
     return
   end
-  KLD.RefreshLoot ()
-  KLD:SendIPC ("LOOTING_READY")
+  KLD.RefreshLoot()
+  KLD:DoCallbacks("looting_ready")
 end
 
 --
@@ -358,35 +341,24 @@ end
 -- callbacks (addon resumed). So we trap these two events and use them to
 -- schedule a refresh.
 --
-local function kld_act_susp (evt, ...)
-  KLD:SendIPC ("DO_REFRESH")
+function KLD:OnActivateAddon(name, onoff)
+  kld_do_refresh()
 end
 
-local function kld_initialised (evt, ...)
+function KLD:OnLateInit()
   if (KLD.initialised) then
     return
   end
 
-  KLD:RegisterEvent ("LOOT_READY", function (evt)
-    KLD.LootReady()
+  KLD:RegisterEvent("LOOT_READY", loot_ready_evt)
+  KLD:RegisterEvent("LOOT_CLOSED", loot_closed_evt)
+  KLD:RegisterEvent("UPDATE_MASTER_LOOT_LIST", function()
+    KLD:RefreshLoot()
   end)
-  KLD:RegisterEvent ("LOOT_CLOSED", function (evt)
-    KLD.LootClosed()
+  KLD:RegisterEvent("UPDATE_MASTER_LOOT_LIST", function()
+    KLD:RefreshLoot()
   end)
-  KLD:RegisterEvent ("UNIT_SPELLCAST_SUCCEEDED", unit_spellcast_succeeded)
-
-  KLD:RegisterIPC ("ACTIVATE_ADDON", kld_act_susp)
-  KLD:RegisterIPC ("SUSPEND_ADDON", kld_act_susp)
-  KLD:RegisterIPC ("DO_REFRESH", kld_do_refresh)
-
-  KRP:RegisterIPC ("LOOT_METHOD_UPDATED", krp_lm_updated)
+  KLD:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", unit_spellcast_succeeded)
 
   KLD.initialised = true
 end
-
-function KLD:OnLateInit ()
-  KLD:RegisterIPC ("INITIALISED", kld_initialised)
-
-  KLD:SendIPC ("INITIALISED")
-end
-

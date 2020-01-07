@@ -7,7 +7,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2019 James Kean Johnston. All rights reserved.
+   Copyright 2008-2020 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -30,10 +30,12 @@ if (not KK) then
   return
 end
 
+KK.debug_id = KKOREKONFER_MAJOR
+
 local K, KM = LibStub:GetLibrary("KKore")
 assert(K, "KKoreKonfer requires KKore")
 assert(tonumber(KM) >= 4, "KKoreKonfer requires KKore r4 or later")
-K:RegisterExtension(KK, KKOREKONFER_MAJOR, KKOREKONFER_MINOR)
+K.RegisterExtension(KK, KKOREKONFER_MAJOR, KKOREKONFER_MINOR)
 
 local KUI, KM = LibStub:GetLibrary("KKoreUI")
 assert(KUI, "KKoreKonfer requires KKoreUI")
@@ -48,6 +50,10 @@ assert(KRP, "KKoreKonfer requires KKoreParty")
 assert(tonumber(KM) >= 4, "KKoreKonfer requires KKoreParty r4 or later")
 
 local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
+
+local function debug(lvl,...)
+  K.debug("kore", lvl, ...)
+end
 
 KK.addons = {}
 KK.valid_callbacks = {
@@ -115,14 +121,14 @@ local function check_duplicate_modules(me, insusp)
   -- be the active one. Pop up the Konfer selection dialog.
   --
   if (insusp) then
-    kchoice.actdialog.which:SetText (tstr)
+    kchoice.actdialog.which:SetText(tstr)
     kchoice.actdialog.mod = me.handle
-    kchoice.seldialog:Hide ()
-    kchoice.actdialog:Show ()
+    kchoice.seldialog:Hide()
+    kchoice.actdialog:Show()
   else
-    kchoice.seldialog.RefreshList (me.party, me.raid)
-    kchoice.actdialog:Hide ()
-    kchoice.seldialog:Show ()
+    kchoice.seldialog.RefreshList(me.party, me.raid)
+    kchoice.actdialog:Hide()
+    kchoice.seldialog:Show()
   end
 end
 
@@ -293,18 +299,13 @@ local function create_konfer_dialogs()
   kchoice.actdialog.msg = KUI:CreateStringLabel(arg, kchoice.actdialog)
 end
 
-local function kk_initialised(evt, ...)
+function KK:OnLateInit()
   if (KK.initialised) then
     return
   end
 
   create_konfer_dialogs()
   KK.initialised = true
-end
-
-function KK:OnLateInit()
-  KK:RegisterIPC("INITIALISED", kk_initialised)
-  KK:SendIPC("INITIALISED")
 end
 
 function KK.TimeStamp()
@@ -328,7 +329,7 @@ function KK.CreateNewID(strtohash)
 end
 
 function KK.IsSenderMasterLooter(sender)
-  if (KRP.in_either and KRP.master_looter and KRP.master_looter == sender) then
+  if (KRP.in_party and KRP.master_looter and KRP.master_looter == sender) then
     return true
   end
   return false
@@ -401,7 +402,7 @@ local function send_addon_msg(self, cfg, cmd, prio, dist, target, ...)
 end
 
 local function send_to_raid_or_party_am_c(self, cfg, cmd, prio, ...)
-  if (not KRP.in_either) then
+  if (not KRP.in_party) then
     return
   end
 
@@ -441,12 +442,12 @@ local function send_whisper_am(self, target, cmd, prio, ...)
 end
 
 local function send_plain_message(self, text)
-  if (not KRP.in_either) then
+  if (not KRP.in_party) then
     return
   end
 
   local dist = "RAID"
-  if (KRP.in_party and not KRP.in_raid) then
+  if (not KRP.in_raid) then
     dist = "PARTY"
   end
 

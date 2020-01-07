@@ -7,7 +7,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2010 James Kean Johnston. All rights reserved.
+   Copyright 2008-2020 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ if (not KUI) then
   return
 end
 
+KUI.debug_id = KKOREUI_MAJOR
 KUI.TEXTURE_PATH = texpath
 
 local _G = _G
@@ -68,7 +69,7 @@ local tmaxn = table.maxn
 local K, KM = LibStub:GetLibrary("KKore")
 assert(K, "KKoreUI requires KKore")
 assert(tonumber(KM) >= 4, "KKoreUI requires KKore r4 or later")
-K:RegisterExtension(KUI, KKOREUI_MAJOR, KKOREUI_MINOR)
+K.RegisterExtension(KUI, KKOREUI_MAJOR, KKOREUI_MINOR)
 
 local xpcall = xpcall
 
