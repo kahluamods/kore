@@ -406,14 +406,20 @@ local function send_to_raid_or_party_am_c(self, cfg, cmd, prio, ...)
     return
   end
 
-  local dist
+  local dist = nil
+
   if (KRP.in_party and self.konfer.party) then
     dist = "PARTY"
-  elseif (KRP.in_raid and self.konfer.raid) then
+  end
+
+  if (KRP.in_raid and self.konfer.raid) then
     dist = "RAID"
-  else
+  end
+
+  if (not dist) then
     return
   end
+
   send_addon_msg(self, cfg, cmd, prio, dist, nil, ...)
 end
 
@@ -446,9 +452,9 @@ local function send_plain_message(self, text)
     return
   end
 
-  local dist = "RAID"
-  if (not KRP.in_raid) then
-    dist = "PARTY"
+  local dist = "PARTY"
+  if (KRP.in_raid) then
+    dist = "RAID"
   end
 
   SendChatMessage(text, dist)

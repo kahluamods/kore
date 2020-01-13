@@ -91,6 +91,19 @@ local unpack, error = unpack, error
 local k,v,i
 local kore_ready = 0
 
+function K.tsize(t)
+  if (not t or type(t) ~= "table") then
+    return 0
+  end
+
+  local count = 0
+  for i in pairs(t) do
+    count = count + 1
+  end
+
+  return count
+end
+
 --
 -- The difference between the local time zone and UTC. If you add this
 -- number to the return value of K.time() it will equal K.localtime().
@@ -218,6 +231,7 @@ K.CapitalizeName = K.CapitaliseName
 -- realm but they are in the guild. This has been carefully adjusted over
 -- time to always do The Right Thing(TM).
 --
+--[[
 function K.CanonicalName(name, realm)
   if (not name) then
     return nil
@@ -290,9 +304,32 @@ function K.FullUnitName(unit)
 
   return K.CapitaliseName(unit_name .. "-" .. unit_realm)
 end
+]]
+
+function K.CanonicalName(name, realm)
+  if (not name) then
+    return nil
+  end
+
+  return K.CapitaliseName(Ambiguate(name, "short"))
+end
+
+function K.FullUnitName(unit)
+  if (not unit or type(unit) ~= "string" or unit == "") then
+    return nil
+  end
+
+  local unit_name, unit_realm = UnitFullName(unit)
+
+  if (not unit_name or unit_name == "Unknown") then
+    return nil
+  end
+
+  return K.CapitaliseName(Ambiguate(unit_name, "short"))
+end
 
 function K.ShortName(name)
-  return Ambiguate(name, "guild")
+  return Ambiguate(name, "short")
 end
 
 ---

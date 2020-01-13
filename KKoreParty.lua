@@ -81,19 +81,6 @@ KRP.subgroup = 0
 -- in a raid.
 KRP.raidid = 0
 
--- The list of players in the players party or raid, or nil if not in one.
-KRP.players = nil
-
--- The list of player names in the players party. Includes us.
-KRP.party = nil
-
--- The list of players in the raid or nil if not in a raid.
-KRP.raid = nil
-
--- The list of players in the various raid groups or nil if not in a raid.
--- This is an array of 8 tables when it is non-nil.
-KRP.raidgroups = nil
-
 -- Is the player both in a party and the party leader
 KRP.is_pl = false
 
@@ -117,6 +104,46 @@ KRP.master_looter = nil
 
 -- Full name of the current party or raid leader or nil if none.
 KRP.leader = nil
+
+-- The list of players in the party or raid, or nil if not in one.
+-- Each element in the table is indexed by the full player name, and is itself
+-- a table with the following members:
+--   .name - same as the index - the full player name
+--   .level - the player level
+--   .class - the player's class (K.ClassIndex)
+--   .faction - players faction
+--   .is_guilded - true if the player is in our guild
+--   .guildrankidx - guild rank index if in our guild
+--   .is_gm - true if the player is our guild GM
+--   .unitid - the unit ID (party3, raid17, player etc)
+--   .subgroup - the raid subgroup or 0 if we're in a party not a raid
+--   .raidid - the X in raidX if we are in a raid
+--   .partyid - the X in partyX, 0 for ourselves 
+--   .is_pl - true if player is the party leader, false otherwise
+--   .is_rl - true if the player is the raid leader, false otherwise
+--   .is_aorl - true if player is raid leader OR assist, false otherwise
+--   .is_ml - true if the player is the master looter
+--   .group_role - GROUP_ROLE_NONE for party members, or NONE, TANK or ASSIST
+--   .online - true if the player is online otherwise false
+--   .dead - true if the player is dead false otherwise
+--   .afk - true if teh player is AFK false otherwise
+--   .guid - unit GUID
+--   .maxhp - player's max HP
+--   .powertype - player's power type (MANA, RAGE, ENERGY etc)
+--   .maxpower - players maximum power
+--   .cantrade - true if they are within trading distance otherwise false
+--   .inrange - true if unit is in range
+KRP.players = nil
+
+-- The list of player names in the players party. Includes us.
+KRP.party = nil
+
+-- The list of players in the raid or nil if not in a raid.
+KRP.raid = nil
+
+-- The list of players in the various raid groups or nil if not in a raid.
+-- This is an array of 8 tables when it is non-nil.
+KRP.raidgroups = nil
 
 KRP.LOOT_METHOD_UNKNOWN     = 0
 KRP.LOOT_METHOD_FREEFORALL  = 1
@@ -534,7 +561,12 @@ local function update_unit_flags(unm, pt, in_party, in_raid, players)
     ptbl.powertype = powertype or "MANA" -- Fall back to mana as a default
     ptbl.maxpower = UnitPowerMax(unm) or 0
     ptbl.cantrade = CheckInteractDistance(unm, 2) or false
-    ptbl.inrange = UnitInRange(unm) or false
+    local irange, rced = UnitInRange(unm)
+    if (rced and not irange) then
+      ptbl.inrange = false
+    else
+      ptbl.inrange = true
+    end
     ptbl.is_aorl = false
     ptbl.is_pl = false
     ptbl.is_rl = false
@@ -668,6 +700,7 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
   player.is_ml = KRP.is_ml
   player.subgroup = 0
   player.raidid = 0
+  player.partyid = 0
   player.group_role = GROUP_ROLE_NONE
 
   players[player.name] = player
@@ -683,17 +716,12 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
       prn = "party" .. i
       if (UnitExists(prn)) then
         player = {}
+        player.partyid = i
         player.unitid = prn
-        player.is_pl = false
-        player.is_rl = false
-        player.is_aorl = false
         player.is_ml = false
         -- If we're in raid then dont do this check else each raid party
         -- will erroneous get this party member number marked as master looter.
         if (not in_raid) then
-          if (UnitIsGroupLeader(prn)) then
-            player.is_pl = true
-          end
           if (KRP.party_mlid and KRP.party_mlid == i) then
             player.is_ml = true
           end
