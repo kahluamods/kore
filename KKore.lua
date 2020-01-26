@@ -342,9 +342,24 @@ function K.hexstr(val)
   return strfmt("%04x%04x", higherbits, lowerbits)
 end
 
+K.GC_GCHAT_LISTEN       = 1
+K.GC_GCHAT_SPEAK        = 2
+K.GC_OCHAT_LISTEN       = 3
+K.GC_OCHAT_SPEAK        = 4
+K.GC_PROMOTE            = 5
+K.GC_DEMOTE             = 6
+K.GC_INVITE             = 7
+K.GC_REMOVE             = 8
+K.GC_SET_MODT           = 9
+K.GC_EDIT_PUBLIC_NOTE   = 10
+K.GC_VIEW_OFFICER_NOTE  = 11
+K.GC_EDIT_OFFICER_NOTE  = 12
+K.GC_MODIFY_GUILD_INFO  = 13
+
 K.player = K.player or {}
 K.guild = K.guild or {}
 K.guild.ranks = K.guild.ranks or {}
+K.guild.flags = K.guild.flags or {}
 K.guild.roster = K.guild.roster or {}
 K.guild.roster.id = K.guild.roster.id or {}
 K.guild.roster.name = K.guild.roster.name or {}
@@ -429,6 +444,7 @@ local function update_player_and_guild(nofire)
 
     K.guild.numranks = GuildControlGetNumRanks()
     K.guild.ranks = {}
+    K.guild.flags = {}
     K.guild.numroster = GetNumGuildMembers()
     K.guild.roster = {}
     K.guild.roster.id = {}
@@ -436,7 +452,9 @@ local function update_player_and_guild(nofire)
 
     for i = 1, K.guild.numranks do
       local rname = GuildControlGetRankName(i)
-      K.guild.ranks[i] = rname
+      local flags = C_GuildInfo.GuildControlGetRankFlags(i)
+      tinsert(K.guild.ranks, rname)
+      tinsert(K.guild.flags, flags)
     end
 
     for i = 1, K.guild.numroster do
@@ -471,6 +489,29 @@ end
 
 function K.UpdatePlayerAndGuild(nofire)
   update_player_and_guild(nofire)
+end
+
+--
+-- Returns true if the user is thought to be an officer or the GM, false
+-- if we can't tell or can determine otherwise.
+--
+function K.UserIsRanked(name)
+  if (not K.player.is_guilded or not K.guild) then
+    return false
+  end
+
+  if (name == K.guild.gmname) then
+    return true
+  end
+
+  local rosterid = K.guild.roster.name[name]
+  if (not rosterid) then
+    return false
+  end
+
+  -- If they can read officer chat we assume they are an officer of some sort.
+  local flags = K.guild.flags[K.guild.roster.id[rosterid].rank]
+  return flags[K.GC_OCHAT_LISTEN]
 end
 
 --
@@ -1330,7 +1371,7 @@ end
 -- track of some of this stuff for our own internal purposes.
 --
 local function guild_update(evt, arg1)
-  if (evt == "PLAYER_GUILD_UPDATE") then
+  if (evt == "PLAYER_GUILD_UPDATE" or evt == "GUILD_RANKS_UPDATE") then
     update_player_and_guild()
     return
   end
@@ -1369,6 +1410,7 @@ end
 
 K:RegisterEvent("PLAYER_GUILD_UPDATE", guild_update)
 K:RegisterEvent("GUILD_ROSTER_UPDATE", guild_update)
+K:RegisterEvent("GUILD_RANKS_UPDATE", guild_update)
 K:RegisterEvent("UPDATE_INSTANCE_INFO", instance_update)
 
 --

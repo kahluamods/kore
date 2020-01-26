@@ -84,6 +84,11 @@ KK.rolenames = {
  [KK.ROLE_TANK]   = L["Tank"],
 }
 
+-- The different configuration types supported, mainly for intra-mod comms.
+-- Currently there is only need for two types: guild and PUG.
+KK.CFGTYPE_GUILD = 1
+KK.CFGTYPE_PUG   = 2
+
 --
 -- Global list of all Konfer modules.
 --
@@ -402,18 +407,25 @@ local function send_addon_msg(self, cfg, cmd, prio, dist, target, ...)
 end
 
 local function send_to_raid_or_party_am_c(self, cfg, cmd, prio, ...)
-  if (not KRP.in_party) then
-    return
+  local cfgt = KK.CFGTYPE_PUG
+  local cfg = cfg or self.currentid
+
+  if (cfg and self.configs and self.configs[cfg]) then
+    cfgt = self.configs[cfg].cfgtype or KK.CFGTYPE_PUG
   end
 
   local dist = nil
 
-  if (KRP.in_party and self.konfer.party) then
-    dist = "PARTY"
-  end
+  if (cfgt == KK.CFGTYPE_GUILD and K.player.is_guilded) then
+    dist = "GUILD"
+  else
+    if (KRP.in_party and self.konfer.party) then
+      dist = "PARTY"
+    end
 
-  if (KRP.in_raid and self.konfer.raid) then
-    dist = "RAID"
+    if (KRP.in_raid and self.konfer.raid) then
+      dist = "RAID"
+    end
   end
 
   if (not dist) then
