@@ -348,7 +348,7 @@ function KK.OldProtoDialog(self)
   self.old_proto = true
 
   local arg = {
-    name = self.handle .. "OldProtoDialog",
+    name = self.konfer.handle .. "OldProtoDialog",
     x = "CENTER", y = "MIDDLE", border = true, blackbg = true,
     okbutton = { text = K.OK_STR }, canmove = false, canresize = false,
     escclose = false, width = 450, height = 100, title = self.title,
@@ -364,7 +364,7 @@ function KK.OldProtoDialog(self)
   arg = {
     x = 8, y = -10, width = 410, height = 64, autosize = false,
     color = { r = 1, g = 0, b = 0, a = 1},
-    text = self.title .. ": " .. strfmt(L["your version of %s is out of date. Please update it."], self.title), font = "GameFontNormal",
+    text = self.konfer.title .. ": " .. strfmt(L["your version of %s is out of date. Please update it."], self.konfer.title), font = "GameFontNormal",
     justifyv = "TOP",
   }
   dlg.str1 = KUI:CreateStringLabel(arg, dlg)
@@ -719,7 +719,8 @@ end
 -- argument to this function is a table with various parameters, as described
 -- below. Returns a handle to the mod, which is a table.
 --
-function KK.RegisterKonfer(kmod, targ)
+function KK.RegisterKonfer(kmod)
+  local targ = kmod.konfer
   if (not targ or type(targ) ~= "table") then
     error("Invalid call to RegisterKonfer.", 2)
   end
