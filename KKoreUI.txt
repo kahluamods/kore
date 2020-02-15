@@ -100,6 +100,8 @@ cfg.label [table]
     a for the red, green, blue and alpha channels respectively. if a is
     omitted it defaults to 1. The values for r, g and b must be between
     0 and 1.
+  width - width
+  height - height
   pos
     Where to position the label with regards to the UI element itself.
     Not all widgets support all values but most do. The possible values

@@ -1271,6 +1271,8 @@ function KUI:CreateEditBox(cfg, kparent)
       b = cfg.label.color.b or b
       a = cfg.label.color.a or 1
     end
+    lh = cfg.label.height or lh
+    lw = cfg.label.width or lw
     frame.lrgb = {r = r, g = g, b = b, a = a}
     if (lh < height) then
       lh = height
@@ -1302,14 +1304,19 @@ function KUI:CreateEditBox(cfg, kparent)
         frame:SetPoint("TOP", ppf, "CENTER", 0, (height + lh) / 2)
       end
     else -- Assume LEFT
-      label:SetPoint("TOPRIGHT", frame, "TOPLEFT", -4, 0)
+      label:SetPoint("TOPRIGHT", frame, "TOPLEFT", -8, 0)
       if (cfg.x) then
         if (cfg.x ~= "CENTER") then
-          frame:SetPoint("LEFT", ppf, "LEFT", cfg.x + lw + 8, 0)
+          frame:SetPoint("LEFT", ppf, "LEFT", cfg.x + lw + 12, 0)
         else
-          frame:SetPoint("LEFT", ppf, "CENTER", (width - lw + 8) / -2, 0)
+          frame:SetPoint("LEFT", ppf, "CENTER", (width - lw + 12) / -2, 0)
         end
       end
+    end
+    if (cfg.label.debug) then
+      local ttt = frame:CreateTexture(nil, "ARTWORK")
+      ttt:SetAllPoints(label)
+      ttt:SetColorTexture(0.3, 0.3, 0.3, 0.5)
     end
   end
 
@@ -2066,7 +2073,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   local fname = cfg.name or("KUITabbedDlg"..self:GetWidgetNum("tabbeddialog"))
   local frame, parent, width, height = newobj(cfg, kparent, 512, 512, fname)
 
-  frame:SetMovable(cfg.canmove or true)
+  frame:SetMovable(cfg.canmove and true or false)
   frame:EnableMouse(true)
   frame:SetFrameStrata(cfg.strata or "FULLSCREEN_DIALOG")
   frame:Hide()

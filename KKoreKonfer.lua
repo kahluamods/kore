@@ -254,7 +254,7 @@ local function create_konfer_dialogs()
       if (k ~= "...") then
         if ((party and v.party) or (raid and v.raid)) then
           local item = {
-            text = strfmt("%s (v%s) - %s", v.modtitle, v.version, v.desc),
+            text = strfmt("%s (v%s) - %s", v.title, v.version, v.desc),
             value = k, checked = false,
           }
           tinsert(items, item)
