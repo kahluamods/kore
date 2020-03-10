@@ -471,6 +471,7 @@ local function update_player_and_guild(nofire)
     K.guild = {}
     K.guild.numranks = 0
     K.guild.ranks = {}
+    K.guild.flags = {}
     K.guild.numroster = 0
     K.guild.roster = {}
     K.guild.roster.id = {}
