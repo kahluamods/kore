@@ -3,7 +3,7 @@
 ## Notes: Core features for all |cffff2222KahLua|r mods.
 ## Author: Cruciformer
 ## Version: @revision@
-## X-email: cruciformer@gmail.com
+## X-email: me@cruciformer.com
 ## X-Credits: Ace3 development team
 ## X-Category: Library
 ## X-License: Apache

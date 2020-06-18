@@ -46,6 +46,7 @@ local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
 local strmatch = string.match
 local printf = K.printf
 local tinsert = table.insert
+local pairs = pairs
 
 local function debug(lvl,...)
   K.debug("kore", lvl, ...)
@@ -174,7 +175,7 @@ local function populate_items()
         item["name"] = name
         if (ilink and ilink ~= "") then
           item["ilink"] = ilink
-          itemid = tonumber(strmatch(ilink, "item:(%d+)") or "0")
+          itemid = strmatch(ilink, "item:(%d+)")
         end
 
         item["itemid"] = itemid
@@ -185,7 +186,6 @@ local function populate_items()
         item["candidates"] = get_ml_candidates(i)
 
         items[i] = item
-        KLD:DoCallbacks("loot_item", items[i])
         count = count + 1
       end
     end
@@ -194,6 +194,10 @@ local function populate_items()
   KLD.num_items = count
   if (KLD.num_items > 0) then
     KLD.items = items
+    -- Only do callbacks once all items are in the list.
+    for k, v in pairs(KLD.items) do
+      KLD:DoCallbacks("loot_item", v)
+    end
   else
     KLD.items = nil
   end
