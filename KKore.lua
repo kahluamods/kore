@@ -533,7 +533,7 @@ function K.debug(addon, lvl, ...)
     return
   end
 
-  local text = ":[:" .. addon .. ":]: " .. string.format(...)
+  local text = ":[:" .. addon .. ":]: " .. strfmt(...)
   local frame = K.debugframe or DEFAULT_CHAT_FRAME
   frame:AddMessage(text, 0.6, 1.0, 1.0)
 end
@@ -588,7 +588,7 @@ function K.printf(...)
     end
   end
 
-  frame:AddMessage(string.format(select(i, ...)), r, g, b, id)
+  frame:AddMessage(strfmt(select(i, ...)), r, g, b, id)
 end
 
 --
@@ -746,11 +746,11 @@ function K.RGBPercToDec(rgb)
 end
 
 function K.RGBDecToHex(rgb)
-  return string.format("%02x%02x%02x", rgb.r, rgb.g, rgb.b)
+  return strfmt("%02x%02x%02x", rgb.r, rgb.g, rgb.b)
 end
 
 function K.RGBPercToHex(rgb)
-  return string.format("%02x%02x%02x", rgb.r*255, rgb.g*255, rgb.b*255)
+  return strfmt("%02x%02x%02x", rgb.r*255, rgb.g*255, rgb.b*255)
 end
 
 function K.RGBPercToColorCode(rgb)
@@ -758,7 +758,7 @@ function K.RGBPercToColorCode(rgb)
   if (rgb.a) then
     a = rgb.a
   end
-  return string.format("|c%02x%02x%02x%02x", a*255, rgb.r*255, rgb.g*255, rgb.b*255)
+  return strfmt("|c%02x%02x%02x%02x", a*255, rgb.r*255, rgb.g*255, rgb.b*255)
 end
 
 function K.RGBDecToColorCode(rgb)
@@ -766,7 +766,7 @@ function K.RGBDecToColorCode(rgb)
   if (rgb.a) then
     a = rgb.a
   end
-  return string.format("|c%02x%02x%02x%02x", a, rgb.r, rgb.g, rgb.b)
+  return strfmt("|c%02x%02x%02x%02x", a, rgb.r, rgb.g, rgb.b)
 end
 
 K.ClassColorsRGB = {}
@@ -858,7 +858,6 @@ local evtembeds = {
 local ctl = _G.ChatThrottleLib
 assert(ctl, "KahLua Kore requires ChatThrottleLib")
 assert(ctl.version >= 24, "KahLua Kore requires ChatThrottleLib >= 24")
-ctl.MIN_FPS = 15
 
 --
 -- Next up is the AceSerializer stuff. Useful for all addons.
