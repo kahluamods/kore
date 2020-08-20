@@ -183,7 +183,7 @@ local function populate_items()
         item["quantity"] = quant
         item["quality"] = qual
         item["locked"] = locked or false
-        item["candidates"] = get_ml_candidates(i)
+        item["candidates"] = get_ml_candidates(i) or {}
 
         items[i] = item
         count = count + 1
