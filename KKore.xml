@@ -11,6 +11,8 @@
 <Script file="Libs\AceComm-3.0.lua"/>
 <Script file="Libs\AceDB-3.0.lua"/>
 <Script file="Libs\LibDeformat-3.0.lua"/>
+<Script file="Libs\LibSerialize.lua"/>
+<Script file="Libs\LibDeflate.lua"/>
 
 <Script file="KKore.lua"/>
 
