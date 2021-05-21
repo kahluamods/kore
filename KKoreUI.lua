@@ -3,7 +3,7 @@
      WWW: http://kahluamod.com/kore
      Git: https://github.com/kahluamods/kore
      IRC: #KahLua on irc.freenode.net
-     E-mail: cruciformer@gmail.com
+     E-mail: me@cruciformer.com
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
@@ -31,7 +31,7 @@ else
 end
 
 local KKOREUI_MAJOR = "KKoreUI"
-local KKOREUI_MINOR = 4
+local KKOREUI_MINOR = 5
 
 local KUI = LibStub:NewLibrary(KKOREUI_MAJOR, KKOREUI_MINOR)
 
@@ -132,6 +132,7 @@ local function fixframelevels(parent, ...)
 end
 
 function KUI.MakeFrame(ftype, fname, parent, templ)
+  templ = templ or (BackdropTemplateMixin and "BackdropTemplate" or nil)
   local f = CreateFrame(ftype, fname, parent, templ)
   local p = f:GetParent()
   if (p and p.GetFrameLevel) then
@@ -219,6 +220,7 @@ function KUI.GetFramePos(frame, tbl)
     return w, h, t, b, l, r
   end
 end
+
 --
 -- Base class for a widget "object"
 --
@@ -975,21 +977,21 @@ function KUI:CreateDialogFrame(cfg, kparent)
     frame.titletext = titletext
 
     local titlebg = frame:CreateTexture(nil, "OVERLAY")
-    titlebg:SetTexture("Interface/DialogFrame/UI-DialogBox-Header")
+    titlebg:SetTexture(131080) -- Interface\\DialogFrame\\UI-DialogBox-Header
     titlebg:SetTexCoord(0.31, 0.67, 0, 0.63)
     titlebg:SetPoint("TOP", frame, "TOP", 0, 12)
     titlebg:SetWidth(cfg.titlewidth or 150)
     titlebg:SetHeight(cfg.titleheight or 40)
 
     local titlebg_l = frame:CreateTexture(nil, "OVERLAY")
-    titlebg_l:SetTexture("Interface/DialogFrame/UI-DialogBox-Header")
+    titlebg_l:SetTexture(131080) -- Interface\\DialogFrame\\UI-DialogBox-Header
     titlebg_l:SetTexCoord(0.21, 0.31, 0, 0.63)
     titlebg_l:SetPoint("RIGHT", titlebg, "LEFT", 0, 0)
     titlebg_l:SetWidth(30)
     titlebg_l:SetHeight(cfg.titleheight or 40)
 
     local titlebg_r = frame:CreateTexture(nil, "OVERLAY")
-    titlebg_r:SetTexture("Interface/DialogFrame/UI-DialogBox-Header")
+    titlebg_r:SetTexture(131080) -- Interface\\DialogFrame\\UI-DialogBox-Header
     titlebg_r:SetTexCoord(0.67, 0.77, 0, 0.63)
     titlebg_r:SetPoint("LEFT", titlebg, "RIGHT", 0, 0)
     titlebg_r:SetWidth(30)
@@ -2180,7 +2182,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
     -- This "draws" the little chevron at the bottom right corner that the user
     -- can drag to resize.
     local line1 = seframe:CreateTexture(nil, "BACKGROUND")
-    line1:SetTexture("Interface/Tooltips/UI-Tooltip-Border")
+    line1:SetTexture(137057) -- Interface/Tooltips/UI-Tooltip-Border
     line1:SetWidth(8)
     line1:SetHeight(8)
     line1:SetPoint("BOTTOMRIGHT", -8, 8)
@@ -2414,6 +2416,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   frame.SetTab = td_SetTab
 
   frame:SetTab(1,1)
+  td_OnSizeChanged(frame, width, height)
 
   return frame
 end
@@ -2816,7 +2819,7 @@ function KUI.SelectItemHelper(objp, idx, slot, btn, onoff, cfn, onfn, offfn, nil
       local rv = cfn()
       if (rv == nil) then return end
       if (rv == false) then
-        error("Severe logic bug! Please report to cruciformer@gmail.com", 1)
+        error("Severe logic bug! Please report to me@cruciformer.com", 1)
         return
       end
     end

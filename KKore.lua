@@ -3,7 +3,7 @@
      WWW: http://kahluamod.com/kore
      Git: https://github.com/kahluamods/kore
      IRC: #KahLua on irc.freenode.net
-     E-mail: cruciformer@gmail.com
+     E-mail: me@cruciformer.com
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
@@ -25,7 +25,7 @@
 local CallbackHandler = LibStub("CallbackHandler-1.0")
 
 local KKORE_MAJOR = "KKore"
-local KKORE_MINOR = 4
+local KKORE_MINOR = 5
 
 local K = LibStub:NewLibrary(KKORE_MAJOR, KKORE_MINOR)
 
@@ -976,32 +976,32 @@ local function DeserNumHelper(num)
   end
 end
 
-local function DeserValue(iter, single, ctl, data)
+local function DeserValue(iter, single, ctv, data)
   if (not single) then
-    ctl,data = iter()
+    ctv,data = iter()
   end
 
-  if (not ctl) then 
+  if (not ctv) then 
     error("Supplied data misses KoreSerializer terminator('^^')")
   end
 
-  if (ctl == "^^") then
+  if (ctv == "^^") then
     return
   end
 
   local res
 
-  if (ctl == "^S") then
+  if (ctv == "^S") then
     res = gsub(data, "~.", DeserStrHelper)
-  elseif (ctl == "^N") then
+  elseif (ctv == "^N") then
     res = DeserNumHelper(data)
     if (not res) then
       error("Invalid serialized number: '"..tostring(data).."'")
     end
-  elseif (ctl == "^F") then     -- ^F<mantissa>^f<exponent>
-    local ctl2,e = iter()
-    if (ctl2 ~= "^f") then
-      error("Invalid serialized floating-point number, expected '^f', not '"..tostring(ctl2).."'")
+  elseif (ctv == "^F") then     -- ^F<mantissa>^f<exponent>
+    local ctv2,e = iter()
+    if (ctv2 ~= "^f") then
+      error("Invalid serialized floating-point number, expected '^f', not '"..tostring(ctv2).."'")
     end
     local m=tonumber(data)
     e=tonumber(e)
@@ -1009,33 +1009,33 @@ local function DeserValue(iter, single, ctl, data)
       error("Invalid serialized floating-point number, expected mantissa and exponent, got '"..tostring(m).."' and '"..tostring(e).."'")
     end
     res = m*(2^e)
-  elseif (ctl == "^B") then
+  elseif (ctv == "^B") then
     res = true
-  elseif (ctl == "^b") then
+  elseif (ctv == "^b") then
     res = false
-  elseif (ctl == "^Z") then
+  elseif (ctv == "^Z") then
     res = nil
-  elseif (ctl == "^T") then
+  elseif (ctv == "^T") then
     res = {}
     local k,v
     while true do
-      ctl,data = iter()
-      if (ctl == "^t") then
+      ctv,data = iter()
+      if (ctv == "^t") then
         break
       end
-      k = DeserValue(iter, true, ctl, data)
+      k = DeserValue(iter, true, ctv, data)
       if (k == nil) then 
         error("Invalid KoreSerializer table format (no table end marker)")
       end
-      ctl,data = iter()
-      v = DeserValue(iter, true, ctl, data)
+      ctv,data = iter()
+      v = DeserValue(iter, true, ctv, data)
       if (v == nil) then
         error("Invalid KoreSerializer table format (no table end marker)")
       end
       res[k]=v
     end
   else
-    error("Invalid KoreSerializer control code '"..ctl.."'")
+    error("Invalid KoreSerializer control code '"..ctv.."'")
   end
 
   if (not single) then
@@ -1049,8 +1049,8 @@ function K.Deserialise(str)
   str = gsub(str, "[%c ]", "")
 
   local iter = gmatch(str, "(^.)([^^]*)")
-  local ctl,data = iter()
-  if ((not ctl) or (ctl ~= "^1")) then
+  local ctv,data = iter()
+  if ((not ctv) or (ctv ~= "^1")) then
     return false, "Supplied data is not KoreSerializer data (rev 1)"
   end
 

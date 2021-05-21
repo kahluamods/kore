@@ -3,7 +3,7 @@
      WWW: http://kahluamod.com/kore
      Git: https://github.com/kahluamods/kore
      IRC: #KahLua on irc.freenode.net
-     E-mail: cruciformer@gmail.com
+     E-mail: me@cruciformer.com
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
@@ -396,7 +396,7 @@ local function send_addon_msg(self, cfg, cmd, prio, dist, target, ...)
     rcmd = cmd.cmd
   end
   local cfg = cfg or self.currentid or "0"
-  local prio = prio or "BULK"
+  local prio = prio or "ALERT"
   local fs = strfmt("%02x:%s:%s:", proto, rcmd, cfg)
   local crc = H:CRC32(fs, nil, false)
   local ndata = K.Serialise(...)
