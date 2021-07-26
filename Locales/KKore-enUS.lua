@@ -84,6 +84,7 @@ L["VCTITLE"] = "%s %s Version Check"
 L["Version"] = true
 L["In Raid"] = true
 L["Who"] = true
+L["Shield"] = true
 
 L["KONFER_SEL_TITLE"] = "Select Active %s Konfer Module"
 L["KONFER_SEL_HEADER"] = "You have multiple %s Konfer modules installed, and more than one of them is active and set to auto-open when you loot a corpse or chest. This can cause conflicts and you need to select which one of the modules should be the active one. All others will be suspended."

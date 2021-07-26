@@ -83,6 +83,7 @@ L["VCTITLE"] = "%s %s Version Check"
 L["Version"] = "Version"
 L["In Raid"] = "In Raid"
 L["Who"] = "Wer"
+L["Shield"] = true
 
 L["KONFER_SEL_TITLE"] = "Auswahl des aktiven %s Konfer-Moduls"
 L["KONFER_SEL_HEADER"] = "Du hast %s Konfer-Module installiert und mehr als eines von ihnen ist aktiv und eingestellt auf automatisches Ãffnen, wenn ein Leichnam oder eine Kiste/Truhe geplÃ¼ndert wird. Dies kann Konflikte verursachen, du solltest eines der Module als aktives auswÃ¤hlen. Alle anderen werden dann ausgeschlossen."

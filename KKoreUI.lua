@@ -7,7 +7,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2020 James Kean Johnston. All rights reserved.
+   Copyright 2008-2021 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -69,7 +69,11 @@ local tmaxn = table.maxn
 local K, KM = LibStub:GetLibrary("KKore")
 assert(K, "KKoreUI requires KKore")
 assert(tonumber(KM) >= 4, "KKoreUI requires KKore r4 or later")
-K.RegisterExtension(KUI, KKOREUI_MAJOR, KKOREUI_MINOR)
+K:RegisterExtension(KUI, KKOREUI_MAJOR, KKOREUI_MINOR)
+
+local function debug(lvl,...)
+  K.debug("kore", lvl, ...)
+end
 
 local xpcall = xpcall
 
@@ -119,6 +123,39 @@ KUI.emptydropdown = {
   },
 }
 
+--
+-- The three different types of dropdown menu:
+-- SINGLE allows selection of a single item from a list. The selected choice
+--   is displayed in the text box. When the menu is dropped down the selected
+--   item has a checkmark. This typically has a label and not a title.
+-- COMPACT allows selection of a single item from a list. When the menu is
+--   dropped down the selected item is checked. The selected item is NOT
+--   displayed in the main text box. Rather, the title is always displayed
+--   in the text box, thus the title must always be provided. A label can
+--   also be provided but that will look weird.
+-- MULTI allows selection of multiple items from a list. When the menu is
+--   dropped down all of the selected items will have a checkmark. The main
+--   widget text is always the title text unless the very first item in the
+--   item list is marked as a title item in which case that is used. A label
+--   can also be provided but it looks wierd.
+--
+-- SINGLE and COMPACT have the following two functions:
+--   SetValue(value) will ensure that the first item in the item list with
+--     the specified value will be selected, and this will be the return
+--     value from calling GetValue(). If no item with the specified value
+--     can be found then no changes are made to the widget.
+--   GetValue() will return the value of the currently selected item or nil
+--     if no current value is selected.
+-- MULTI menus have the following two functions:
+--   SetSelected(value, onoff) will set all items with the specified value
+--     to either selected (onoff is true) or not (it is false).
+--   IsSelected(value) returns true if the specified value is currently
+--     selected, false if it is not, or nil if no such value could be found.
+--
+local MODE_SINGLE       = 1
+local MODE_COMPACT      = 2
+local MODE_MULTI        = 3
+
 local function fixframelevels(parent, ...)
   local l = 1
   local c = select(l, ...)
@@ -158,7 +195,7 @@ end
 
 local function remove_escclose(fname)
   for k,v in pairs(UISpecialFrames) do
-    if (v == cfgname) then
+    if (v == fname) then
       tremove(UISpecialFrames, k)
       return
     end
@@ -358,23 +395,25 @@ local function do_tooltip_onenter(this, enabled)
   if ((not this.tiptitle) and (not this.tiptext)) then
     return
   end
-  local d = enabled and 1 or 2
+  if (not enabled) then
+    return
+  end
   local tf = GameTooltip.SetText
   local r, g, b
 
   GameTooltip_SetDefaultAnchor(GameTooltip, this)
   if (this.tiptitle) then
     tf = GameTooltip.AddLine
-    r = HIGHLIGHT_FONT_COLOR.r / d
-    g = HIGHLIGHT_FONT_COLOR.g / d
-    b = HIGHLIGHT_FONT_COLOR.b / d
+    r = HIGHLIGHT_FONT_COLOR.r
+    g = HIGHLIGHT_FONT_COLOR.g
+    b = HIGHLIGHT_FONT_COLOR.b
     GameTooltip:SetText(this.tiptitle, r, g, b, 1)
   end
 
   if (this.tiptext) then
-    r = NORMAL_FONT_COLOR.r / d
-    g = NORMAL_FONT_COLOR.g / d
-    b = NORMAL_FONT_COLOR.b / d
+    r = NORMAL_FONT_COLOR.r
+    g = NORMAL_FONT_COLOR.g
+    b = NORMAL_FONT_COLOR.b
     tf (GameTooltip, this.tiptext, r, g, b, 1)
   end
 
@@ -463,13 +502,6 @@ local function newobj(cfg, kparent, defwt, defht, fname, ftype, template)
   frame.Throw = BC.Throw
   frame.SetEnabled = BC.SetEnabled
   frame.SetShown = BC.SetShown
-
-  --
-  -- I'd like to, but can't use setmetatable to create a real base class.
-  -- The base frame also uses setmetatable for its own internal methods
-  -- and this overwrites it.
-  --
-  -- setmetatable(frame, {__index=BC})
 
   frame.events = {}
   apply_hooks(frame)
@@ -1019,7 +1051,7 @@ function KUI:CreateDialogFrame(cfg, kparent)
 
   local rightmost = frame
   local rightpoint = "BOTTOMRIGHT"
-  local xoffs, yoffs = -15, 12
+  local xoffs, yoffs = -15, 16
   local addheight = 0
 
   if (frame.title or cfg.xbutton) then
@@ -1061,9 +1093,6 @@ function KUI:CreateDialogFrame(cfg, kparent)
     yoffs = 0
   end
 
-  --
-  -- The statusbar idea and code comes from "Cmouse". Thank you.
-  --
   if (cfg.statusbar) then
     local statusbg = MakeFrame("Frame", nil, frame)
     frame.statusframe = statusbg
@@ -1547,7 +1576,7 @@ end
 local function rb_OnValueChanged(this, evt, onoff, user, val)
   if (this.cvfunc) then
     local onoff = onoff or false
-    this.cvfunc(this, onoff, val, user)
+    this.cvfunc(this, evt, onoff, user, val)
   end
 end
 
@@ -1975,7 +2004,7 @@ local function td_SetTab(self, tab, subtab)
   self.currenttab = seltab
 
   if (self.onclick and not subtab) then
-    self.onclick(seltab, 0)
+    self:onclick(seltab, 0)
   end
 
   if (self.tabs[seltab].title) then
@@ -2042,15 +2071,15 @@ local function td_SetTab(self, tab, subtab)
     self.tabcontent = tl[sseltab].content
 
     if (self.onclick) then
-      self.onclick(seltab, sseltab)
+      self:onclick(seltab, sseltab)
     end
 
     if (self.tabs[seltab].onclick) then
-      self.tabs[seltab].onclick(seltab, sseltab)
+      self.tabs[seltab]:onclick(seltab, sseltab)
     end
 
     if (tl[sseltab].onclick) then
-      tl[sseltab].onclick(seltab, sseltab)
+      tl[sseltab]:onclick(seltab, sseltab)
     end
   end
   return seltab
@@ -2209,10 +2238,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   end
 
   local function sorter(a,b)
-    if (tonumber(a.id) < tonumber(b.id)) then
-      return true
-    end
-    return false
+    return tonumber(a.id) < tonumber(b.id)
   end
 
   frame.tabs = {}
@@ -2234,7 +2260,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   end
   tsort(frame.tabs, sorter)
 
-  local nt = tmaxn(frame.tabs)
+  local num_tabs = tmaxn(frame.tabs)
   local rtp = "BOTTOMLEFT"
   local rf = frame
   local rx, ry = 15, 5
@@ -2330,7 +2356,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
     -- unless that has been changed by some other function.
     --
     if (thistab.tabs) then
-      local snt = tmaxn(thistab.tabs)
+      local num_sub_tabs = tmaxn(thistab.tabs)
       local srtp = "BOTTOMLEFT"
       local srf = thistab.topbar
       local srx, sry = 0, 28
@@ -2399,13 +2425,13 @@ function KUI:CreateTabbedDialog(cfg, kparent)
         srx = 0
         sry = 0
       end
-      PanelTemplates_SetNumTabs(thistab.frame, snt)
+      PanelTemplates_SetNumTabs(thistab.frame, num_sub_tabs)
       PanelTemplates_SetTab(thistab.frame, 1)
     end
   end
 
   frame.tabs[1].frame:Show()
-  PanelTemplates_SetNumTabs(frame, nt)
+  PanelTemplates_SetNumTabs(frame, num_tabs)
   PanelTemplates_SetTab(frame, 1)
 
   frame.SetTitleText = function(this, text)
@@ -2720,8 +2746,10 @@ function KUI:CreateScrollList(cfg, kparent)
   end)
 
   frame:HookScript("OnSizeChanged", function(this, w, h)
-    sl_updatevals(this)
-    sl_vertscroll(this, nil)
+    if (this.ever_updated) then
+      sl_updatevals(this)
+      sl_vertscroll(this, nil)
+    end
   end)
 
   frame:HookScript("OnVerticalScroll", function(this, offset)
@@ -2737,6 +2765,7 @@ function KUI:CreateScrollList(cfg, kparent)
   scrollbar:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 4, 20)
 
   frame.UpdateList = function(this)
+    this.ever_updated = true
     this.selecteditem = nil
     for i = 1, this.visibleslots do
       this.highlightitem(this, nil, 1, this.slots[i], false)
@@ -2757,7 +2786,7 @@ function KUI:CreateScrollList(cfg, kparent)
     return this.selecteditem
   end
 
-  sl_updatevals(frame)
+  -- sl_updatevals(frame)
   return frame
 end
 
@@ -2791,10 +2820,13 @@ function KUI.NewItemHelper(objp, num, name, w, h, stf, och, ocs, pch)
     self.text:SetText(txt)
   end
 
+  rf.fn_och = och
+  rf.fn_ocs = ocs
+
   rf:SetScript("OnClick", och or function(this, button)
     local idx = this:GetID()
-    if (ocs) then
-      if (ocs(this, idx)) then
+    if (this.fn_ocs) then
+      if (this.fn_ocs(this, idx)) then
         return
       end
     end
@@ -2843,10 +2875,10 @@ end
 
 function KUI.HighlightItemHelper(objp, idx, slot, btn, onoff, onfn, offfn)
   if (onoff) then
-    local ntn = "Interface/AuctionFrame/UI-AuctionFrame-FilterBg"
-    btn:SetNormalTexture(ntn)
-    local nt = btn:GetNormalTexture()
-    nt:SetTexCoord(0, 0.53125, 0, 0.625)
+    local normal_texture_nm = "Interface/AuctionFrame/UI-AuctionFrame-FilterBg"
+    btn:SetNormalTexture(normal_texture_nm)
+    local normal_texture = btn:GetNormalTexture()
+    normal_texture:SetTexCoord(0, 0.53125, 0, 0.625)
 
     if (onfn) then
       return onfn(objp, idx, slot, btn, true)
@@ -3011,12 +3043,6 @@ local function nfr_OnLeave(this)
   GameTooltip:Hide()
 end
 
---
--- If this is an item for a dropdown and it is in either SINGLE or COMPACT
--- mode, we do not uncheck it if it is already checked, or if there is already
--- anothe value checked, we uncheck that one and check this one. For MULTI
--- mode dropdowns or for popup menus, this becomes a simple toggle.
---
 local function run_funcs(this, iscreate)
   if (this.func) then
     this.func(this, iscreate)
@@ -3029,69 +3055,64 @@ local function run_funcs(this, iscreate)
   end
 end
 
-local function real_nfr_OnClick(this, isset)
+--
+-- This is only ever used by the individual line items in a dropdown or popup
+-- menu, which is reached via this.toplevel. The THIS parameter is the actual
+-- button frame itself.
+--
+local function real_nfr_OnClick(this)
   local tlf = this.toplevel
+  local tlc = tlf.current
 
-  if (not tlf.mode or (tlf.mode == 3)) then
-    if (this.checked) then
-      if (this.checkmark) then
+  if (tlf.mode == MODE_MULTI) then
+    if (this.checkmark) then
+      if (this.checked) then
         this.checkmark:Hide()
-      end
-    else
-      if (this.checkmark) then
+      else
         this.checkmark:Show()
       end
     end
     this.checked = not this.checked
-    this.toplevel:Throw("OnItemChecked", this, this.checked)
-    if (tlf.mode == 3 and not this.keep) then
+    tlf:Throw("OnItemChecked", this, this.value, this.checked)
+    if (not this.keep) then
       tlf.dropdown:Close()
     end
-  else
-    local changed = false
-    if (tlf.current) then
-      if (tlf.current == this) then
-        if (isset) then
-          return
-        end
-        if (not this.keep) then
-          tlf.dropdown:Close()
-        end
-        return
-      else
-        changed = true
-        tlf.current.checked = false
-        if (tlf.current.checkmark) then
-          tlf.current.checkmark:Hide()
-        end
-        tlf:Throw("OnItemChecked", tlf.current, false)
-        run_funcs(tlf.current, false)
-      end
-    end
-    tlf.current = this
-    if (this.checked == false) then
-      changed = true
-    end
-    this.checked = true
-    if (this.checkmark) then
-      this.checkmark:Show()
-    end
-    if (not this.keep) then
-      if (not isset) then
+    run_funcs(this, false)
+    return
+  end
+
+  if (tlc) then
+    if (tlc == this) then
+      if (not this.keep) then
         tlf.dropdown:Close()
       end
-    end
-    if (this.text) then
-      tlf.text:SetText(this.text:GetText())
-      local r,g,b,a = this.text:GetTextColor()
-      local d = tlf.enabled and 1 or 2
-      tlf.text:SetTextColor(r/d, g/d, b/d, a)
-    end
-    tlf:Throw("OnItemChecked", this, true)
-    if (changed) then
-      tlf:Throw("OnValueChanged", this.value, true)
+      return
+    else
+      tlc.checked = false
+      if (tlc.checkmark) then
+        tlc.checkmark:Hide()
+      end
+      tlf:Throw("OnItemChecked", tlc, tlc.value, tlc.checked)
+      run_funcs(tlc, false)
     end
   end
+
+  tlf.current = this
+  tlc = this
+  this.checked = true
+  if (this.checkmark) then
+    this.checkmark:Show()
+  end
+  if (not this.keep) then
+    tlf.dropdown:Close()
+  end
+
+  if ((tlf.mode == MODE_SINGLE) and this.text) then
+    tlf.text:SetText(this.text:GetText())
+    tlf.text:SetTextColor(this.text:GetTextColor())
+  end
+  tlf:Throw("OnItemChecked", this, this.value, this.checked)
+  tlf:Throw("OnValueChanged", this.value, true, true)
 
   run_funcs(this, false)
 end
@@ -3237,10 +3258,12 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
     -- If this is the top level frame, set it to nil
     tlfr = nil
   end
+
   fr.itemcount = nilist
   fr.items = ilist
   fr.iheight = 0
   fr.iframes = {}
+
   local cf = fr.cframe
 
   --
@@ -3343,10 +3366,10 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
     end
 
     -- Determine if we should keep the window open on click or not
-    if (fr.mode == 1 or fr.mode == 2) then
-      tbf.keep = false
-    else
+    if (fr.mode == MODE_MULTI) then
       tbf.keep = true
+    else
+      tbf.keep = false
     end
     if (v.keep ~= nil) then
       if (type(v.keep) == "boolean") then
@@ -3422,11 +3445,6 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
       if (not tbf.frame) then
         tbf:SetScript("OnClick", nil)
       end
-    end
-
-    -- In COMPACT mode all items are not checkable
-    if (fr.mode == 2) then
-      tbf.checkable = false
     end
 
     -- Adjust for submenus, icons and check marks
@@ -3634,7 +3652,7 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
 
     if (tbf.text and (not tbf.enabled)) then
       local r, g, b, a = tbf.text:GetTextColor()
-      tbf.text:SetTextColor(r/2, g/2, b/2, a)
+      tbf.text:SetTextColor(r/2, g/2, b/2, a or 1)
     end
   end -- Of loop through all of the items
 
@@ -3728,7 +3746,7 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
       -- we uncheck it and mark this one as the current checked value.
       --
       if (v.toplevel.mode) then
-        if (v.toplevel.mode < 3) then
+        if (v.toplevel.mode ~= MODE_MULTI) then
           if (v.toplevel.current) then
             v.toplevel.current.checked = false
             if (v.toplevel.current.checkmark) then
@@ -3742,7 +3760,7 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
         v.checkmark:Show()
       end
     elseif (v.checked and v.clickable) then
-      if (v.toplevel.mode < 3) then
+      if (v.toplevel.mode ~= MODE_MULTI) then
         if (v.toplevel.current) then
           v.toplevel.current.checked = false
           if (v.toplevel.current.checkmark) then
@@ -3812,7 +3830,6 @@ end
 --
 -- Only the top-level frame gets this function
 --
-
 local function dd_UpdateItems(this, newitems)
   assert(newitems, "dropdown items must be provided")
   local ic = 0
@@ -3825,6 +3842,7 @@ local function dd_UpdateItems(this, newitems)
     this.subopen:Close()
     this.subopen = nil
   end
+
   if (this.dropdown) then
     local oldv
     if (this.current) then
@@ -3835,10 +3853,11 @@ local function dd_UpdateItems(this, newitems)
       this.current.checked = false
       this.current = nil
     end
+    local shown = this.dropdown:IsShown()
     this.dropdown:Close()
     dd_refresh_frame(this.dropdown, this.toplevel, newitems, ic)
     if (this.text) then
-      if (this.mode == 3 and this.titletext) then
+      if ((this.mode ~= MODE_SINGLE) and this.titletext) then
         this.text:SetText(this.titletext)
       else
         this.text:SetText("")
@@ -3846,6 +3865,10 @@ local function dd_UpdateItems(this, newitems)
     end
     if (oldv) then
       this:SetValue(oldv, true)
+    end
+    if (shown) then
+      this.dropdown:Show()
+      dd_OnEnter(this)
     end
   else
     this.current = nil
@@ -3886,7 +3909,7 @@ local function dd_SetValue(this, value, nothrow)
         end
         tlf.current = v
         v.checked = true
-        if (v.checkmark) then
+        if (v.checkable and v.checkmark) then
           v.checkmark:Show()
         end
         return true
@@ -3902,16 +3925,18 @@ local function dd_SetValue(this, value, nothrow)
   end
 
   local ret = recursive_set(tl, this.dropdown, value)
-  if (tl.current and tl.current.text) then
-    local tt = tl.current.text
-    local r,g,b,a = tt:GetTextColor()
-    local d = this.enabled and 1 or 2
-    this.text:SetText(tt:GetText())
-    this.text:SetTextColor(r/d,g/d, b/d, a)
-  elseif (tl.current and tl.current.frame) then
-    this.text:SetText("")
-  elseif (not tl.current) then
-    this.text:SetText("")
+  if (tl.mode == MODE_SINGLE) then
+    if (tl.current and tl.current.text) then
+      local tt = tl.current.text
+      local r,g,b,a = tt:GetTextColor()
+      local d = this.enabled and 1 or 2
+      this.text:SetText(tt:GetText())
+      this.text:SetTextColor(r/d, g/d, b/d, a)
+    elseif (tl.current and tl.current.frame) then
+      this.text:SetText("")
+    elseif (not tl.current) then
+      this.text:SetText("")
+    end
   end
 
   if (ret) then
@@ -3919,6 +3944,7 @@ local function dd_SetValue(this, value, nothrow)
       tl:Throw("OnValueChanged", value, false)
     end
   end
+
   return ret
 end
 
@@ -3947,7 +3973,7 @@ local function dd_OnEnable(this, event, onoff)
     this.label:SetTextColor(this.labelcolor.r/d, this.labelcolor.g/d, this.labelcolor.b/d, this.labelcolor.a)
   end
   if (this.dropdown) then
-    if (this.mode == 3) then
+    if (this.mode ~= MODE_SINGLE) then
       if (this.trgb) then
         this.text:SetTextColor(this.trgb.r/d, this.trgb.g/d, this.trgb.b/d, this.trgb.a)
       end
@@ -3970,8 +3996,7 @@ end
 -- the child: StopTimeoutCounter() when the cursor moves into a child frame
 -- and StartTimeoutCounter() when it leaves.
 --
-
-create_dd_sa = function(cfg, parent, toplevel, ispopup)
+local function create_dd_sa(cfg, parent, toplevel, ispopup)
   assert(cfg, "dropdown config must be provided")
   assert(cfg.name, "you must provide a frame name")
   assert(cfg.items, "dropdown items must be provided ("..cfg.name..")")
@@ -4092,7 +4117,7 @@ create_dd_sa = function(cfg, parent, toplevel, ispopup)
     --
     if (cfg.label) then
       local lfont = cfg.label.font or "GameFontNormal"
-      local lwidth = KUI.MeasureStrWidth(cfg.label.text, lfont) + 4
+      local lwidth = cfg.label.width or (KUI.MeasureStrWidth(cfg.label.text, lfont) + 4)
       local label = frame:CreateFontString(nil, "ARTWORK", lfont)
       frame.label = label
       frame.labelcolor = KUI.GetFontColor(lfont, true)
@@ -4136,7 +4161,7 @@ create_dd_sa = function(cfg, parent, toplevel, ispopup)
         end
       end
     end
-  else
+  else -- Not the container portion of a dropdown
     if (not toplevel) then
       frame = newobj(cfg, parent, 100, 100, cfg.name)
     else
@@ -4200,13 +4225,11 @@ create_dd_sa = function(cfg, parent, toplevel, ispopup)
       end
     else
       if (cfg.mode == "MULTI") then
-        frame.mode = 3
+        frame.mode = MODE_MULTI
       elseif (cfg.mode == "COMPACT") then
-        frame.mode = 2
-      elseif (cfg.mode == "SINGLE") then
-        frame.mode = 1
+        frame.mode = MODE_COMPACT
       else
-        frame.mode = 1
+        frame.mode = MODE_SINGLE
       end
     end
   end
@@ -4252,33 +4275,21 @@ create_dd_sa = function(cfg, parent, toplevel, ispopup)
     frame.dropdown = create_dd_sa(cfg, frame, frame, false)
     frame.dropdown:SetFrameLevel(frame.dropdown:GetFrameLevel() + 4)
     frame.dropdown:ClearAllPoints()
-    frame.dropdown:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", -10, 6)
-    if (frame.mode == 3) then
-      if (cfg.title) then
-        local tfont = cfg.title.font or "GameFontNormalSmallLeft"
-        frame.text:SetFontObject(tfont)
-        frame.text:SetText(cfg.title.text)
-        frame.titletext = cfg.title.text
-        frame.trgb = KUI.GetFontColor(tfont, true)
-        if (cfg.title.color) then
-          frame.trgb.r = cfg.title.color.r
-          frame.trgb.g = cfg.title.color.g
-          frame.trgb.b = cfg.title.color.b
-          frame.trgb.a = cfg.title.color.a or 1
-        end
-        check_tooltip_title(frame, cfg, cfg.title.text)
-      else
-        if (frame.dropdown.iframes[1].title) then
-          local tfont = frame.dropdown.iframes[1].font
-          frame.text:SetFontObject(tfont)
-          frame.text:SetText(frame.dropdown.iframes[1].text:GetText())
-          check_tooltip_title(frame, cfg, frame.text:GetText())
-          frame.trgb = KUI.GetFontColor(tfont, true)
-        else
-          frame.trgb = KUI.GetFontColor("GameFontNormalSmallLeft", true)
-        end
+    frame.dropdown:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, 6)
+    if (frame.mode ~= MODE_SINGLE) then
+      local tfont = cfg.title.font or "GameFontNormalSmallLeft"
+      frame.text:SetFontObject(tfont)
+      frame.text:SetText(cfg.title.text)
+      frame.titletext = cfg.title.text
+      frame.trgb = KUI.GetFontColor(tfont, true)
+      if (cfg.title.color) then
+        frame.trgb.r = cfg.title.color.r
+        frame.trgb.g = cfg.title.color.g
+        frame.trgb.b = cfg.title.color.b
+        frame.trgb.a = cfg.title.color.a or 1
       end
-    else
+      check_tooltip_title(frame, cfg, cfg.title.text)
+    else -- MODE_SINGLE
       if (frame.current) then
         if (frame.current.text) then
           frame.text:SetText(frame.current.text:GetText())
@@ -4294,6 +4305,8 @@ create_dd_sa = function(cfg, parent, toplevel, ispopup)
     return frame
   end
 
+  -- From this point on no longer deal with the dropdown container. We deal
+  -- with the actual menu items or dropdown items from hereon out.
   frame.offset = borders[frame.border].offset
   frame:SetBackdrop( { bgFile = borders[frame.border].bgFile,
     edgeFile = borders[frame.border].edgeFile,
@@ -4485,11 +4498,6 @@ create_dd_sa = function(cfg, parent, toplevel, ispopup)
   dd_refresh_frame(frame, toplevel, cfg.items, nitems)
   frame:Hide()
 
-  if (toplevel) then
-    return frame
-  end
-
-  frame.UpdateItems = dd_UpdateItems
   return frame
 end
 
@@ -4822,4 +4830,3 @@ function KUI:CreatePopupList(cfg, parent)
 
   return ret
 end
-

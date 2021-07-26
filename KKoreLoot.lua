@@ -7,7 +7,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2020 James Kean Johnston. All rights reserved.
+   Copyright 2008-2021 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -35,13 +35,78 @@ KLD.debug_id = KKORELOOT_MAJOR
 local K, KM = LibStub:GetLibrary("KKore")
 assert (K, "KKoreLoot requires KKore")
 assert (tonumber(KM) >= 4, "KKoreLoot requires KKore r4 or later")
-K.RegisterExtension (KLD, KKORELOOT_MAJOR, KKORELOOT_MINOR)
+K:RegisterExtension (KLD, KKORELOOT_MAJOR, KKORELOOT_MINOR)
 
 local KRP, KM = LibStub:GetLibrary("KKoreParty")
 assert (KRP, "KKoreLoot requires KKoreParty")
 assert (tonumber(KM) >= 4, "KKoreLoot requires KKoreParty r4 or later")
 
 local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
+
+--
+-- Constants for easy representation of the various armor and weapon types
+-- that a character can equip. This uses the Blizzard localised strings as
+-- much as possible.
+--
+K.INV_HEAD              = 1
+K.INV_NECK              = 2
+K.INV_SHOULDER          = 3
+K.INV_BODY              = 4
+K.INV_CHEST             = 5
+K.INV_WAIST             = 6
+K.INV_LEGS              = 7
+K.INV_FEET              = 8
+K.INV_WRIST             = 9
+K.INV_HANDS             = 10
+K.INV_FINGER            = 11
+K.INV_TRINKET           = 12
+K.INV_1HWEAPON          = 13
+K.INV_SHIELD            = 14
+K.INV_RANGED            = 15
+K.INV_BACK              = 16
+K.INV_2HWEAPON          = 17
+K.INV_BAG               = 18
+K.INV_TABARD            = 19
+K.INV_ROBE              = 20
+K.INV_MHWEAPON          = 21
+K.INV_OHWEAPON          = 22
+K.INV_HOLDABLE          = 23
+K.INV_AMMO              = 24
+K.INV_THROWN            = 25
+K.INV_RANGEDRIGHT       = 26
+K.INV_QUIVER            = 27
+K.INV_RELIC             = 28
+
+K.InvSlotNames = {
+  [K.INV_HEAD]          = INVTYPE_HEAD,
+  [K.INV_NECK]          = INVTYPE_NECK,
+  [K.INV_SHOULDER]      = INVTYPE_SHOULDER,
+  [K.INV_BODY]          = INVTYPE_BODY,
+  [K.INV_CHEST]         = INVTYPE_CHEST,
+  [K.INV_WAIST]         = INVTYPE_WAIST,
+  [K.INV_LEGS]          = INVTYPE_LEGS,
+  [K.INV_FEET]          = INVTYPE_FEET,
+  [K.INV_WRIST]         = INVTYPE_WRIST,
+  [K.INV_HANDS]         = INVTYPE_HAND,
+  [K.INV_FINGER]        = INVTYPE_FINGER,
+  [K.INV_TRINKET]       = INVTYPE_TRINKET,
+  [K.INV_1HWEAPON]      = INVTYPE_WEAPON .. " " .. WEAPON,
+  [K.INV_SHIELD]        = L["Shield"],
+  [K.INV_RANGED]        = INVTYPE_RANGED .. " " .. WEAPON,
+  [K.INV_BACK]          = INVTYPE_CLOAK,
+  [K.INV_2HWEAPON]      = INVTYPE_2HWEAPON .. " " .. WEAPON,
+  [K.INV_BAG]           = INVTYPE_BAG,
+  [K.INV_TABARD]        = INVTYPE_TABARD,
+  [K.INV_ROBE]          = INVTYPE_ROBE,
+  [K.INV_MHWEAPON]      = INVTYPE_WEAPONMAINHAND .. " " .. WEAPON,
+  [K.INV_OHWEAPON]      = INVTYPE_WEAPONOFFHAND .. " " .. WEAPON,
+  [K.INV_HOLDABLE]      = INVTYPE_HOLDABLE,
+  [K.INV_AMMO]          = INVTYPE_AMMO,
+  [K.INV_THROWN]        = INVTYPE_THROWN .. " " .. WEAPON,
+  [K.INV_RANGEDRIGHT]   = INVTYPE_RANGEDRIGHT,
+  [K.INV_QUIVER]        = INVTYPE_QUIVER,
+  [K.INV_RELIC]         = INVTYPE_RELIC,
+}
 
 local strmatch = string.match
 local printf = K.printf
@@ -356,9 +421,6 @@ function KLD:OnLateInit()
 
   KLD:RegisterEvent("LOOT_READY", loot_ready_evt)
   KLD:RegisterEvent("LOOT_CLOSED", loot_closed_evt)
-  KLD:RegisterEvent("UPDATE_MASTER_LOOT_LIST", function()
-    KLD:RefreshLoot()
-  end)
   KLD:RegisterEvent("UPDATE_MASTER_LOOT_LIST", function()
     KLD:RefreshLoot()
   end)

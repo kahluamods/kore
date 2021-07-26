@@ -35,7 +35,7 @@ KK.debug_id = KKOREKONFER_MAJOR
 local K, KM = LibStub:GetLibrary("KKore")
 assert(K, "KKoreKonfer requires KKore")
 assert(tonumber(KM) >= 4, "KKoreKonfer requires KKore r4 or later")
-K.RegisterExtension(KK, KKOREKONFER_MAJOR, KKOREKONFER_MINOR)
+K:RegisterExtension(KK, KKOREKONFER_MAJOR, KKOREKONFER_MINOR)
 
 local KUI, KM = LibStub:GetLibrary("KKoreUI")
 assert(KUI, "KKoreKonfer requires KKoreUI")
@@ -49,11 +49,13 @@ local KRP, KM = LibStub:GetLibrary("KKoreParty")
 assert(KRP, "KKoreKonfer requires KKoreParty")
 assert(tonumber(KM) >= 4, "KKoreKonfer requires KKoreParty r4 or later")
 
-local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
+local ZL = LibStub:GetLibrary("LibDeflate")
+assert(ZL, "KKoreKonfer requires LibDeflate")
 
-local function debug(lvl,...)
-  K.debug("kore", lvl, ...)
-end
+local LS = LibStub:GetLibrary("LibSerialize")
+assert(LS, "KKoreKonfer requires LibSerialize")
+
+local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
 
 KK.addons = {}
 KK.valid_callbacks = {
@@ -63,6 +65,12 @@ local printf = K.printf
 local tsort = table.sort
 local tinsert = table.insert
 local strfmt = string.format
+local strlen = string.len
+local bor = bit.bor
+local band = bit.band
+local bxor = bit.bxor
+local lshift = bit.lshift
+local rshift = bit.rshift
 local MakeFrame= KUI.MakeFrame
 
 -- A static table with the list of possible player roles (from a konfer point
@@ -96,6 +104,19 @@ _G["KKonfer"] = _G["KKonfer"] or {}
 local KKonfer = _G["KKonfer"]
 KKonfer["..."] = KKonfer["..."] or {}
 
+local function opens_on_loot(handle)
+  if (not handle or handle == "") then
+    return false
+  end
+
+  local me = KKonfer[handle]
+  if (not me) then
+    return false
+  end
+
+  return me.open_on_loot(handle) or false
+end
+
 local function check_duplicate_modules(me, insusp)
   local kchoice = KKonfer["..."]
   local tstr = strfmt("%s (v%s) - %s", me.title, me.version, me.desc)
@@ -109,7 +130,7 @@ local function check_duplicate_modules(me, insusp)
   for k,v in pairs(KKonfer) do
     if (k ~= "...") then
       if (not KK.IsSuspended(k)) then
-        if (KK.OpenOnLoot(k)) then
+        if (opens_on_loot(k)) then
           nactive = nactive + 1
         end
       end
@@ -175,19 +196,6 @@ function KK.SetSuspended(handle, onoff)
     check_duplicate_modules(me, true)
   end
   K.printf(K.icolor, "%s: |cffffffff%s|r.", me.title, ds)
-end
-
-function KK.OpenOnLoot(handle)
-  if (not handle or handle == "") then
-    return false
-  end
-
-  local me = KKonfer[handle]
-  if (not me) then
-    return false
-  end
-
-  return me.open_on_loot(handle) or false
 end
 
 local function create_konfer_dialogs()
@@ -305,12 +313,12 @@ local function create_konfer_dialogs()
 end
 
 function KK:OnLateInit()
-  if (KK.initialised) then
+  if (self.initialised) then
     return
   end
 
   create_konfer_dialogs()
-  KK.initialised = true
+  self.initialised = true
 end
 
 function KK.TimeStamp()
@@ -340,7 +348,7 @@ function KK.IsSenderMasterLooter(sender)
   return false
 end
 
-function KK.OldProtoDialog(self)
+function KK:OldProtoDialog()
   if (self.old_proto) then
     return
   end
@@ -364,8 +372,8 @@ function KK.OldProtoDialog(self)
   arg = {
     x = 8, y = -10, width = 410, height = 64, autosize = false,
     color = { r = 1, g = 0, b = 0, a = 1},
-    text = self.konfer.title .. ": " .. strfmt(L["your version of %s is out of date. Please update it."], self.konfer.title), font = "GameFontNormal",
-    justifyv = "TOP",
+    text = self.konfer.title .. ": " .. strfmt(L["your version of %s is out of date. Please update it."], self.konfer.title),
+    font = "GameFontNormal", justifyv = "TOP",
   }
   dlg.str1 = KUI:CreateStringLabel(arg, dlg)
 
@@ -375,33 +383,126 @@ function KK.OldProtoDialog(self)
   dlg:Show()
 end
 
+local function compress_serialised(self, whence, sdata)
+  local cz = ZL:CompressDeflate(sdata, { level = 5 })
+  if (not cz) then
+    self.debug(4, "compress: compress failed (%s)", whence)
+    return nil
+  end
+
+  local es = ZL:EncodeForWoWAddonChannel(cz)
+  if (not es) then
+    self.debug(4, "compress: encode failed (%s)", whence)
+    return nil
+  end
+
+  return es
+end
+
+local function compress_payload(self, whence, ...)
+  local ser = LS:Serialize(...)
+
+  if (not ser) then
+    self.debug(4, "compress: serialize failed (%s)", whence)
+    return nil
+  end
+
+  return compress_serialised(self, whence, ser)
+end
+
+local function inflate_serialised(self, whence, sdata)
+  local unz, und
+
+  und = ZL:DecodeForWoWAddonChannel(zdata)
+  if (not und) then
+    self.debug(4, "inflate: serialize failed (%s)", whence)
+    return nil
+  end
+  unz = ZL:DecompressDeflate(und)
+  if (not unz) then
+    self.debug(4, "inflate: decompress failed (%s)", whence)
+    return nil
+  end
+
+  return unz
+end
+
+local function inflate_payload(self, whence, zdata)
+  local unz = inflate_serialised(self, whence, zdata)
+  if (unz) then
+    return LS:Deserialize(unz)
+  else
+    return nil
+  end
+end
+
 --
--- Communications functions that are mixed in to the calling mod. This allows
--- these functions to look up the calling mod for various parameters which in
--- turn asllows us to share these functions with all Konfer mods. The only
--- caveat is that these functions must be called thus:
---     mod:FunctionName()
--- so that the base mod is passed along as self.
+-- This is the function that is responsible for creating all internal addon
+-- messages we send. It implements all and any "protocol" we want to use to
+-- communicate between different instances of the addon. It has a reciprocal
+-- function comm_received below that should be used to decode all messages
+-- received by the addon. Thus, as long as these two functions can deal with
+-- changes between each other, pretty much any protocol can be used. For right
+-- now the basic protocol is that each message is always a string that begins
+-- with two lower case hexadecimal numbers, followed by a colon, followed
+-- immediately by the payload, which extends from this point to the end of the
+-- message. The payload itself has its own simple protocol discussed below.
+-- The two hex characters are converted into an 8-bit number with the top 3
+-- bits being used for the version of the global message protocol, and the
+-- lower 5 bits being used as the addon protocol version number. The first
+-- one (the global version number) is solely for internal use here, whereas
+-- the addon protocol is passed to the dispatcher so that the addon can have a
+-- versioned message protocol.
+--
+-- For the global protocol version number we currently reserve two versions:
+-- version 0 uses the normal payload as described below, and version 1 uses
+-- deflate level 5 for the data portion of the payload.
+--
+-- The payload protocol is always a colon separated list in the form:
+--   command:cfgid:crc32:data
+--
+-- Each handler is called with the command, config ID, protocol version and
+-- then any other data.
 --
 local function send_addon_msg(self, cfg, cmd, prio, dist, target, ...)
-  local konf = self.konfer
-  assert(konf)
-
-  local proto = self.protocol
-  local rcmd = cmd
+  local proto = band(self.protocol, 31)
+  local wproto = 0
+  local rcmd
   if (type(cmd) == "table") then
-    assert(cmd.proto)
-    assert(cmd.cmd)
     proto = cmd.proto
     rcmd = cmd.cmd
+  else
+    rcmd = cmd
   end
+
+  local sdata = LS:Serialize(...)
+
+  if (not sdata) then
+    self.debug(4, "failed to serialise data for %q", rcmd)
+    return
+  end
+
+  local len = strlen(sdata)
+  if (len >= 128) then
+    local ndata = compress_serialised(self, rcmd, sdata)
+    if (not ndata) then
+      return
+    end
+    local nlen = strlen(ndata)
+    if (nlen < len) then
+      sdata = ndata
+      wproto = 1
+      self.debug(9, "compressed %q from %d to %d (%d)", rcmd, len, nlen, len - nlen)
+    end
+  end
+
+  local protos = bor(lshift(wproto, 5), proto)
   local cfg = cfg or self.currentid or "0"
   local prio = prio or "ALERT"
-  local fs = strfmt("%02x:%s:%s:", proto, rcmd, cfg)
+  local fs = strfmt("%02x:%s:%s:", protos, rcmd, cfg)
   local crc = H:CRC32(fs, nil, false)
-  local ndata = K.Serialise(...)
-  crc = H:CRC32(ndata, crc, true)
-  fs = fs .. K.hexstr(crc) .. ":" .. ndata
+  crc = H:CRC32(sdata, crc, true)
+  fs = fs .. K.hexstr(crc) .. ":" .. sdata
 
   K:SendCommMessage(self.CHAT_MSG_PREFIX, fs, dist, target, prio)
 end
@@ -492,6 +593,85 @@ local function send_raid_warning(self, text)
     end
   else
     SendChatMessage("{skull}{skull} " .. text .. " {skull}{skull}", "PARTY")
+  end
+end
+
+local userwarn = userwarn or {}
+
+-- Designed to process host addon's OnCommReceived with a dispatcher.
+local function comm_received(self, prefix, msg, dist, snd, dispatcher)
+  local sender = K.CanonicalName(snd)
+  if (sender == K.player.name) then
+    return -- Ignore our own messages
+  end
+
+  if (dist == "UNKNOWN" and (sender ~= nil and sender ~= "")) then
+    return
+  end
+
+  self.debug(9, "received: prefix=%q dist=%q sender=%q", tostring(prefix), tostring(dist), tostring(sender))
+
+  local iter = gmatch(msg, "([^:]+)()")
+  local ps = iter()
+  if (not ps) then
+    self.debug(4, "bad msg received from %q", sender)
+    return
+  end
+  local protos = tonumber(ps, 16)
+  local wproto = band(rshift(protos, 5), 7)
+  local proto = band(protos, 31)
+  if (proto > self.protocol) then
+    KK.OldProtoDialog(keg)
+    return
+  end
+
+  local cmd = iter()
+  if (not cmd) then
+    self.debug(4, "malformed cmd msg received from %q", sender)
+    return
+  end
+  local cfg = iter()
+  if (not cfg) then
+    self.debug(4, "malformed cfg msg received from %q", sender)
+    return
+  end
+  local msum, pos = iter()
+  if (not msum) then
+    self.debug(4, "malformed msum msg received from %q", sender)
+    return
+  end
+  local data = strsub(msg, pos+1)
+  if (not data) then
+    self.debug(4, "malformed data msg received from %q", sender)
+    return
+  end
+  local crc = H:CRC32(ps, nil, false)
+  crc = H:CRC32(":", crc, false)
+  crc = H:CRC32(cmd, crc, false)
+  crc = H:CRC32(":", crc, false)
+  crc = H:CRC32(cfg, crc, false)
+  crc = H:CRC32(":", crc, false)
+  crc = H:CRC32(data, crc, true)
+  local mf = K.hexstr(crc)
+
+  if (mf ~= msum) then
+    local t = K.time()
+    local n = userwarn[sender]
+    if (n and ((n - t) >= 600)) then
+      userwarn[sender] = nil
+    end
+
+    if (not userwarn[sender]) then
+      printf(K.ecolor, "WARNING: addon message from %q was fake!", sender)
+      userwarn[sender] = t
+    end
+    return
+  end
+
+  if (wproto == 1) then
+    dispatcher(self, sender, proto, cmd, cfg, inflate_payload(self, cmd, data))
+  else
+    dispatcher(self, sender, proto, cmd, cfg, LS:Deserialise(data))
   end
 end
 
@@ -700,7 +880,7 @@ local function kk_version_check(self)
   end
 end
 
-function kk_version_check_reply(self, sender, version)
+local function kk_version_check_reply(self, sender, version)
   if (not self.vcdlg or not self.vcdlg.vcreplies) then
     return
   end
@@ -745,6 +925,13 @@ function KK.RegisterKonfer(kmod)
   kmod.SendWarning = send_raid_warning
   kmod.VersionCheck = kk_version_check
   kmod.VersionCheckReply = kk_version_check_reply
+  kmod.CompressPayload = compress_payload
+  kmod.InflatePayload = inflate_payload
+  kmod.CompressSerialised = compress_serialised
+  kmod.CompressSerialized = compress_serialised
+  kmod.InflateSerialised = inflate_serialised
+  kmod.InflateSerialiszd = inflate_serialised
+  kmod.KonferCommReceived = comm_received
 
   KKonfer[targ.handle] = targ
 

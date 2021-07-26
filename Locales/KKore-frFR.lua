@@ -83,6 +83,7 @@ L["VCTITLE"] = "%s %s Version Check"
 L["Version"] = "Version"
 L["In Raid"] = "In Raid"
 L["Who"] = "Qui"
+L["Shield"] = true
 
 L["KONFER_SEL_TITLE"] = "S\195\169lectionner le module Konfer %s actif"
 L["KONFER_SEL_HEADER"] = "Vous avez plusieurs add-ons Konfer %s install\195\169s, et plus d'un est actif et configur\195\169 pour s'ouvrir automatiquement lors du loot d'un corps ou d'un coffre. Ceci peut provoquer des conflits, vous devez donc choisir lequel activer, tous les autres seront d\195\169sactiv\195\169s."

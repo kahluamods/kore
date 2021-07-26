@@ -1,6 +1,6 @@
 ## Interface: 20501
-## Title: KahLua Kore |cffff2222-K-|r
-## Notes: Core features for all |cffff2222KahLua|r mods.
+## Title: KahLua Kore Libraries |cffff2222-K-|r
+## Notes: Core libraries for all |cffff2222KahLua|r mods.
 ## Author: Cruciformer
 ## Version: @revision@
 ## X-email: me@cruciformer.com

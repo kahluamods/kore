@@ -7,7 +7,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2020 James Kean Johnston. All rights reserved.
+   Copyright 2008-2021 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -55,13 +55,13 @@ _G["KKore"] = K
 -- Kahlua mod when it registers with KKore.
 --
 
-function K.AceKore(obj)
+function K:AceKore(obj)
   LibStub("AceEvent-3.0"):Embed(obj)
   LibStub("AceComm-3.0"):Embed(obj)
   LibStub("AceTimer-3.0"):Embed(obj)
 end
 
-K.AceKore(K)
+K:AceKore(K)
 
 K.extensions = K.extensions or {}
 
@@ -91,25 +91,12 @@ local unpack, error = unpack, error
 local k,v,i
 local kore_ready = 0
 
-function K.tsize(t)
-  if (not t or type(t) ~= "table") then
-    return 0
-  end
-
-  local count = 0
-  for i in pairs(t) do
-    count = count + 1
-  end
-
-  return count
-end
-
 --
 -- The difference between the local time zone and UTC. If you add this
 -- number to the return value of K.time() it will equal K.localtime().
 -- This is useful for recording times in UTC but displaying them in the
 -- local timezone. This is *NOT* robust and will probably give weird
--- result on teh day that daylight saving starts / stops, if it does for
+-- result on the day that daylight saving starts / stops, if it does for
 -- the user's timezone.
 K.utcdiff = time(date("*t")) - time(date("!*t"))
 
@@ -527,6 +514,7 @@ K.debugging["kore"] = 9 -- @debug-delete@
 function K.debug(addon, lvl, ...)
   if (not K.debugging[addon]) then
     K.debugging[addon] = 0
+    K.debugging[addon] = 9 -- @debug-delete@
   end
 
   if (K.debugging[addon] < lvl) then
@@ -858,205 +846,6 @@ local evtembeds = {
 local ctl = _G.ChatThrottleLib
 assert(ctl, "KahLua Kore requires ChatThrottleLib")
 assert(ctl.version >= 24, "KahLua Kore requires ChatThrottleLib >= 24")
-
---
--- Next up is the AceSerializer stuff. Useful for all addons.
---
--- IMPORTANT NOTE: this is a modified version of AceSerializer. It was modified
--- to encode a colon as a seperator and now sadly that is stored in many
--- saved variables, so we need to keep this.
---
-local function SerStrHelper(ch)
-  local n = strbyte(ch)
-
-  if (n == 30) then
-    return "\126\121"
-  elseif (n == 58) then
-    return "\126\122"
-  elseif (n <= 32) then             -- nonprint + space
-    return "\126" .. strchar(n+64)
-  elseif (n == 94) then         -- value separator 
-    return "\126\125"
-  elseif (n == 126) then        -- our own escape character
-    return "\126\124"
-  elseif (n == 127) then        -- nonprint (DEL)
-    return "\126\123"
-  else
-    assert(false)               -- can't be reached if caller uses a sane regex
-  end
-end
-
-local function SerValue(v, res, nres)
-  local t = type(v)
-
-  if (t == "string") then
-    res[nres+1] = "^S"
-    res[nres+2] = gsub(v,"[%c \94\126\127]", SerStrHelper)
-    nres = nres + 2
-  elseif (t == "number") then
-    local str = tostring(v)
-    if (tonumber(str) == v or --[[str == K.NaNstring or]] str == K.InfString or
-      str == K.NInfstring) then
-      res[nres+1] = "^N"
-      res[nres+2] = str
-      nres = nres + 2
-    else
-      local m, e = frexp(v)
-      res[nres+1] = "^F"
-      res[nres+2] = strfmt("%.0f", m * 2^53)
-      res[nres+3] = "^f"
-      res[nres+4] = tostring(e-53)
-      nres = nres + 4
-    end
-  elseif (t == "table") then
-    nres = nres + 1
-    res[nres] = "^T"
-    for k,v in pairs(v) do
-      nres = SerValue(k, res, nres)
-      nres = SerValue(v, res, nres)
-    end
-    nres = nres + 1
-    res[nres] = "^t"
-  elseif (t == "boolean") then
-    nres = nres + 1
-    if (v == true) then
-      res[nres] = "^B"
-    else
-      res[nres] = "^b"
-    end
-  elseif (t == "nil") then
-    nres = nres + 1
-    res[nres] = "^Z"
-  end
-
-  return nres
-end
-
-local sertbl = { "^1" }
-
-function K.Serialise(...)
-  local nres = 1
-
-  for i = 1, select("#", ...) do
-    local v = select(i, ...)
-    nres = SerValue(v, sertbl, nres)
-  end
-
-  nres = nres + 1
-  sertbl[nres] = "^^"
-  return tconcat(sertbl, "", 1, nres)
-end
-K.Serialize = K.Serialise -- Help Americans who can't spell
-
-local function DeserStrHelper(esc)
-  if (esc < "~\121") then
-    return strchar(strbyte(esc,2,2)-64)
-  elseif (esc == "~\121") then
-    return ("\030")
-  elseif (esc == "~\122") then
-    return ("\58")
-  elseif (esc == "~\123") then
-    return "\127"
-  elseif (esc == "~\124") then
-    return "\126"
-  elseif (esc == "~\125") then
-    return "\94"
-  end
-end
-
-local function DeserNumHelper(num)
-  --[[if (num == K.NaNstring) then
-    return 0/0
-  else]]if (num == K.NInfstring) then
-    return -1/0
-  elseif (num == K.Infstring) then
-    return 1/0
-  else
-    return tonumber(num)
-  end
-end
-
-local function DeserValue(iter, single, ctv, data)
-  if (not single) then
-    ctv,data = iter()
-  end
-
-  if (not ctv) then 
-    error("Supplied data misses KoreSerializer terminator('^^')")
-  end
-
-  if (ctv == "^^") then
-    return
-  end
-
-  local res
-
-  if (ctv == "^S") then
-    res = gsub(data, "~.", DeserStrHelper)
-  elseif (ctv == "^N") then
-    res = DeserNumHelper(data)
-    if (not res) then
-      error("Invalid serialized number: '"..tostring(data).."'")
-    end
-  elseif (ctv == "^F") then     -- ^F<mantissa>^f<exponent>
-    local ctv2,e = iter()
-    if (ctv2 ~= "^f") then
-      error("Invalid serialized floating-point number, expected '^f', not '"..tostring(ctv2).."'")
-    end
-    local m=tonumber(data)
-    e=tonumber(e)
-    if (not (m and e)) then
-      error("Invalid serialized floating-point number, expected mantissa and exponent, got '"..tostring(m).."' and '"..tostring(e).."'")
-    end
-    res = m*(2^e)
-  elseif (ctv == "^B") then
-    res = true
-  elseif (ctv == "^b") then
-    res = false
-  elseif (ctv == "^Z") then
-    res = nil
-  elseif (ctv == "^T") then
-    res = {}
-    local k,v
-    while true do
-      ctv,data = iter()
-      if (ctv == "^t") then
-        break
-      end
-      k = DeserValue(iter, true, ctv, data)
-      if (k == nil) then 
-        error("Invalid KoreSerializer table format (no table end marker)")
-      end
-      ctv,data = iter()
-      v = DeserValue(iter, true, ctv, data)
-      if (v == nil) then
-        error("Invalid KoreSerializer table format (no table end marker)")
-      end
-      res[k]=v
-    end
-  else
-    error("Invalid KoreSerializer control code '"..ctv.."'")
-  end
-
-  if (not single) then
-    return res, DeserValue(iter)
-  else
-    return res
-  end
-end
-
-function K.Deserialise(str)
-  str = gsub(str, "[%c ]", "")
-
-  local iter = gmatch(str, "(^.)([^^]*)")
-  local ctv,data = iter()
-  if ((not ctv) or (ctv ~= "^1")) then
-    return false, "Supplied data is not KoreSerializer data (rev 1)"
-  end
-
-  return pcall(DeserValue, iter)
-end
-K.Deserialize = K.Deserialise -- Help Americans who can't spell
 
 --
 -- Utility function: return a number of nil values, followed by any number
@@ -1435,8 +1224,8 @@ K.loginq = K.loginq or {}
 K.pewq = K.pewq or {}
 K.lateq = K.lateq or {}
 
-local function addon_tostring(self)
-  return self.kore_name
+local function addon_tostring(this)
+  return this.kore_name
 end
 
 --
@@ -1481,7 +1270,7 @@ function K:NewAddon(obj, name, ver, desc, cmdname, ...)
   obj.kore_frame = obj.kore_frame or CreateFrame("Frame", name .. "KoreFrame")
   obj.kore_frame:UnregisterAllEvents()
 
-  K.AceKore(obj)
+  K:AceKore(obj)
 
   RegisterSlashCommand(cmdname, function(...)
     safecall(obj.OnSlashCommand, obj, ...)
@@ -1567,7 +1356,7 @@ local addonembeds = {
   "SingleStringInputDialog"
 }
 
-function K.DoCallbacks(self, name, ...)
+function K:DoCallbacks(name, ...)
   for k, v in pairs(self.addons) do
     if (type(v) == "table" and type(v.callbacks) == "table") then
       if (v.active) then
@@ -1591,7 +1380,7 @@ end
 --           SUSPEND_ADDON(name)
 -- Returns : true if the addon was added and the events fired, false if not.
 --
-function K.RegisterAddon(self, nm)
+function K:RegisterAddon(nm)
   if (not nm or type(nm) ~= "string" or nm == "" or self.addons[nm]) then
     return false
   end
@@ -1625,7 +1414,7 @@ end
 -- Returns : true if the addon was suspended, false if it was either already
 --           suspended or the addon name is invalid.
 --
-function K.SuspendAddon(self, name)
+function K:SuspendAddon(name)
   if (not name or type(name) ~= "string" or name == "" or not self.addons[name]
       or type(self.addons[name]) ~= "table") then
     return false
@@ -1649,7 +1438,7 @@ end
 -- Returns : true if the addon was resumed, false if it was either already
 --           active or the addon name is invalid.
 --
-function K.ResumeAddon(self, name)
+function K:ResumeAddon(name)
   if (not name or type(name) ~= "string" or name == "" or not self.addons[name]
       or type(self.addons[name]) ~= "table") then
     return false
@@ -1672,7 +1461,7 @@ K.ActivateAddon = K.ResumeAddon
 -- Returns : The private config space for the named addon or nil if no such
 --           addon exists.
 --
-function K.GetPrivate(self, name)
+function K:GetPrivate(name)
   if (not name or type(name) ~= "string" or name == "" or not self.addons[name]
       or type(self.addons[name]) ~= "table" or not self.addons[name].private
       or type(self.addons[name].private) ~= "table") then
@@ -1692,7 +1481,7 @@ end
 --           callback.
 -- Returns : True if the callback was registered and valid, false otherwise.
 --
-function K.AddonCallback(self, name, callback, handler)
+function K:AddonCallback(name, callback, handler)
   if (not name or type(name) ~= "string" or name == ""
       or not self.addons[name] or type(self.addons[name]) ~= "table"
       or not self.addons[name].callbacks
@@ -1720,7 +1509,7 @@ end
 -- So for example, an addon that wants to use both KKoreParty(KRP) and
 -- KKoreLoot(KLD) would call: KRP:RegisterAddon() and KLD:RegisterAddon.
 --
-function K.RegisterExtension(kext, major, minor)
+function K:RegisterExtension(kext, major, minor)
   local ext = {}
   ext.version = minor
   ext.library = kext
@@ -1911,8 +1700,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --]]
 
-local kkorett = CreateFrame("GameTooltip", "KKoreUTooltip", UIParent,
-  "GameTooltipTemplate")
+local kkorett = CreateFrame("GameTooltip", "KKoreUTooltip", UIParent, "GameTooltipTemplate")
 kkorett:SetOwner(UIParent, "ANCHOR_PRESERVE")
 kkorett:SetPoint("CENTER", "UIParent")
 kkorett:Hide()

@@ -6,7 +6,7 @@
      E-mail: me@cruciformer.com
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2020 James Kean Johnston. All rights reserved.
+   Copyright 2008-2021 James Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -56,11 +56,11 @@ local ucolor = K.ucolor
 local ecolor = K.ecolor
 local icolor = K.icolor
 
-function K.ConfirmationDialog(kmod, ttxt, msg, val, func, farg, isshown, height, option)
+function K.ConfirmationDialog(kmod, ttxt, msg, val, func, farg, isshown, height, option, xtras)
   local height = height or 240
-  local scd = kmod.confirmdialog
+  local confirmdlg = kmod.confirmdialog
 
-  if (not scd) then
+  if (not confirmdlg) then
     local arg = {
       x = "CENTER", y = "MIDDLE",
       name = "KKoreConfirmDialog",
@@ -75,13 +75,18 @@ function K.ConfirmationDialog(kmod, ttxt, msg, val, func, farg, isshown, height,
       okbutton = { text = K.OK_STR },
       cancelbutton = { text = K.CANCEL_STR },
     }
+    if (xtras and type(xtras) == "table") then
+      for k,v in pairs(xtras) do
+        arg[k] = v
+      end
+    end
 
     local ret = KUI:CreateDialogFrame(arg)
     arg = {}
 
     arg = {
       x = "CENTER", y = -4, height = 24, autosize = false,
-      font = "GameFontNormal", text = "",
+      font = "GameFontNormal", text = "", width = 375,
       color = {r = 1, g = 1, b = 1, a = 1 }, border = true,
       justifyh = "CENTER",
     }
@@ -122,41 +127,41 @@ function K.ConfirmationDialog(kmod, ttxt, msg, val, func, farg, isshown, height,
       if (tcd.isshown) then
         tcd.kmod.mainwin:Show()
       end
-      tcd.runfunction(tcd.arg, tcd.optval)
+      tcd.runfunction(this.kmod, tcd.arg, tcd.optval)
       tcd.isshown = nil
     end
 
     ret.kmod = kmod
     kmod.confirmdialog = ret
-    scd = kmod.confirmdialog
+    confirmdlg = kmod.confirmdialog
   end
 
-  scd:SetHeight(height)
-  scd.str2:SetHeight(height - 95 - (option and 24 or 0))
-  scd.opt:SetPoint("TOP", confirmdialog, "BOTTOM", 0, 56)
+  confirmdlg:SetHeight(height)
+  confirmdlg.str2:SetHeight(height - 95 - (option and 24 or 0))
+  confirmdlg.opt:SetPoint("TOP", confirmdlg, "BOTTOM", 0, 56)
   if (option) then
-    scd.opt:SetText(option)
-    scd.opt:Show()
-    scd.optval = false
-    scd.opt:SetChecked(false)
+    confirmdlg.opt:SetText(option)
+    confirmdlg.opt:Show()
+    confirmdlg.optval = false
+    confirmdlg.opt:SetChecked(false)
   else
-    scd.opt:Hide()
+    confirmdlg.opt:Hide()
   end
-  scd:SetTitleText(ttxt)
-  scd.str1:SetText(val)
-  scd.str2:SetText(msg)
-  scd.runfunction = func
-  scd.arg = farg
-  scd.isshown = isshown
+  confirmdlg:SetTitleText(ttxt)
+  confirmdlg.str1:SetText(val)
+  confirmdlg.str2:SetText(msg)
+  confirmdlg.runfunction = func
+  confirmdlg.arg = farg
+  confirmdlg.isshown = isshown
 
-  scd.kmod.mainwin:Hide()
-  scd:Show()
+  confirmdlg.kmod.mainwin:Hide()
+  confirmdlg:Show()
 end
 
-function K.RenameDialog(kmod, ttxt, oldlbl, oldval, newlbl, len, func, farg, shown)
-  local srd = kmod.renamedialog
+function K.RenameDialog(kmod, ttxt, oldlbl, oldval, newlbl, len, func, farg, shown, xtras)
+  local renamedlg = kmod.renamedialog
 
-  if (not srd) then
+  if (not renamedlg) then
     local arg = {
       x = "CENTER", y = "MIDDLE",
       name = "KKoreRenameDialog",
@@ -171,6 +176,11 @@ function K.RenameDialog(kmod, ttxt, oldlbl, oldval, newlbl, len, func, farg, sho
       okbutton = { text = K.OK_STR },
       cancelbutton = { text = K.CANCEL_STR },
     }
+    if (xtras and type(xtras) == "table") then
+      for k,v in pairs(xtras) do
+        arg[k] = v
+      end
+    end
 
     local ret = KUI:CreateDialogFrame(arg)
     arg = {}
@@ -240,25 +250,25 @@ function K.RenameDialog(kmod, ttxt, oldlbl, oldval, newlbl, len, func, farg, sho
 
     ret.kmod = kmod
     kmod.renamedialog = ret
-    srd = kmod.renamedialog
+    renamedlg = kmod.renamedialog
   end
 
-  srd:SetTitleText(ttxt)
-  srd.str1:SetText(oldlbl)
-  srd.str2:SetText(oldval)
-  srd.str3:SetText(newlbl)
-  srd.input:SetMaxLetters(len)
-  srd.runfunction = func
-  srd.arg = farg
-  srd.isshown = shown
+  renamedlg:SetTitleText(ttxt)
+  renamedlg.str1:SetText(oldlbl)
+  renamedlg.str2:SetText(oldval)
+  renamedlg.str3:SetText(newlbl)
+  renamedlg.input:SetMaxLetters(len)
+  renamedlg.runfunction = func
+  renamedlg.arg = farg
+  renamedlg.isshown = shown
 
-  srd.kmod.mainwin:Hide()
-  srd:Show()
-  srd.input:SetText("")
-  srd.input:SetFocus()
+  renamedlg.kmod.mainwin:Hide()
+  renamedlg:Show()
+  renamedlg.input:SetText("")
+  renamedlg.input:SetFocus()
 end
 
-function K.PopupSelectionList(kmod, name, list, title, width, height, parent, itemheight, func, topspace, botspace)
+function K.PopupSelectionList(kmod, name, list, title, width, height, parent, itemheight, func, topspace, botspace, xtras)
   if (kmod.popupwindow) then
     kmod.popupwindow:Hide()
     kmod.popupwindow = nil
@@ -289,6 +299,12 @@ function K.PopupSelectionList(kmod, name, list, title, width, height, parent, it
     end,
     timeout = 3,
   }
+  if (xtras and type(xtras) == "table") then
+    for k,v in pairs(xtras) do
+      arg[k] = v
+    end
+  end
+
   local rv = KUI:CreatePopupList(arg, parent)
   assert(rv)
   rv.kmod = kmod
@@ -299,7 +315,7 @@ function K.PopupSelectionList(kmod, name, list, title, width, height, parent, it
   return rv
 end
 
-function K.SingleStringInputDialog(kmod, name, title, text, width, height)
+function K.SingleStringInputDialog(kmod, name, title, text, width, height, xtras)
   local arg = {
     x = "CENTER", y = "MIDDLE",
     name = name,
@@ -315,6 +331,11 @@ function K.SingleStringInputDialog(kmod, name, title, text, width, height)
     okbutton = { text = K.ACCEPTSTR },
     cancelbutton = { text = K.CANCELSTR },
   }
+  if (xtras and type(xtras) == "table") then
+    for k,v in pairs(xtras) do
+      arg[k] = v
+    end
+  end
 
   local ret = KUI:CreateDialogFrame(arg)
   assert(ret)

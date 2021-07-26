@@ -654,22 +654,20 @@ throw:OnClick (button, down)
 
 5.7 KUI:CreateDropDown
 ----------------------
-Custom replacement for the notoriously confusing and badly implemented
-Blizzard dropdown menu code. Visually a KUI dropdown looks almost
-identical to the Blizzard one, but the internals are extremely different.
-This widget type must be given a name. Drop down menus can be either
-a simple single level drop down, or any of the items on the menu can
-be a submenu, with no restriction other than a practical one of how
-deep you can stack submenus. Submenus will automatically close the
-dropped down portion when the mouse leaves it for any length of time
-(which is configurable). This widget has two distinct portions. The
-first is the "static" portion that has the push button for displaying
-the drop down menu, and the string which has the current value or title,
-and the second portion is the actual menu that drops down below it
-when you press the drop down button. In this discussion, the first is
-refered to as the static portion and the second as the menu portion.
-This widget supports tooltips for the static portion, as well as
-individual tooltips for each item.
+Custom replacement for the notoriously confusing Blizzard dropdown menu code.
+Visually a KUI dropdown looks almost identical to the Blizzard one, but the
+internals are extremely different. This widget type must be given a name.
+Drop down menus can be either a simple single level drop down, or any of the
+items on the menu can be a submenu, with no restriction other than a practical
+one of how deep you can stack submenus. Submenus will automatically close the
+dropped down portion when the mouse leaves it for any length of time (which is
+configurable). This widget has two distinct portions. The first is the
+"static" portion that has the push button for displaying the drop down menu,
+and the string which has the current value or title, and the second portion
+is the actual menu that drops down below it when you press the drop down
+button. In this discussion, the first is refered to as the static portion
+and the second as the menu portion.  This widget supports tooltips for the
+static portion, as well as individual tooltips for each menu item.
 
 Note that if a given menu has too many items to fit in the specified
 or calculated minimum / maximum height and width of the menu, the code
@@ -710,7 +708,7 @@ cfg.mode [string]
   "keep" and "notcheckable" options See below for details.
 
 cfg.arg [anything]
-  Argument that is set for each item as its "tlarg" element.
+  Argument that is set for each menu item as its "tlarg" element.
 
 cfg.func [function (tbf, created)]
   Function that is called with the item being clicked or created,
@@ -1084,7 +1082,7 @@ an LDB launcher or a command line. Dropdown menus however are usually
 bound to some sort of dialog box for setting configuration options.
 Also the use of widget frames for menu items is far more common for
 popup menus than for dropdown menus. Strictly speaking a popup menu
-is not a widgeet but a container. However, since they are so similar
+is not a widget but a container. However, since they are so similar
 to a dropdown menu (they use the exact same code) they are lumped with
 widgets here.
 
