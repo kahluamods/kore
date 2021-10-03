@@ -44,6 +44,7 @@ local tinsert = table.insert
 local tremove = table.remove
 
 local ff = 0xffffffff
+
 local md5magic = {
   0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,
   0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
@@ -261,7 +262,7 @@ function H:MD5(s)
   return H:MD5Final(ctx)
 end
 
-local crcm = {
+local crc_mod = {
   0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419,
   0x706AF48F, 0xE963A535, 0x9E6495A3, 0x0EDB8832, 0x79DCB8A4,
   0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD, 0xE7B82D07,
@@ -315,25 +316,25 @@ local crcm = {
   0x5D681B02, 0x2A6F2B94, 0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B,
   0x2D02EF8D }
  
-function H:CRC32(s,c,f)
+function H:CRC32(data, current_crc, finalise)
   local crc
-  local l = strlen(s)
+  local l = strlen(data)
   local j
 
   if (c ~= nil) then
-    crc = c
+    crc = current_crc
   else
     crc = ff
   end
 
   for j = 1, l, 1 do
-    crc = bxor(rshift(crc, 8), crcm[band(bxor(crc, strbyte(s, j)), 0xFF) + 1])
+    crc = bxor(rshift(crc, 8), crc_mod[band(bxor(crc, strbyte(data, j)), 0xFF) + 1])
   end
 
-  if (f == false) then
+  if (finalise == false) then
     return crc
   end
 
-  return bxor(crc, -1)
+  return bxor(crc, ff)
 end
 

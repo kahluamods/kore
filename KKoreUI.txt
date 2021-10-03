@@ -179,7 +179,7 @@ These functions do not take the usual configuration table and parent
 as their arguments. They are simply useful functions used throughout
 the KKoreUI internals and useful outside too.
 
-width, height = KUI.MeasureStrWidth (str, font)
+width, height = KUI:MeasureStrWidth (str, font)
   Measures and returns the absolute width and height of the specified
   string when using the specified font. If no font is specified then
   this defaults to the last font used in a call to this or GetFontColor

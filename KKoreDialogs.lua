@@ -82,7 +82,6 @@ function K.ConfirmationDialog(kmod, ttxt, msg, val, func, farg, isshown, height,
     end
 
     local ret = KUI:CreateDialogFrame(arg)
-    arg = {}
 
     arg = {
       x = "CENTER", y = -4, height = 24, autosize = false,
@@ -91,7 +90,6 @@ function K.ConfirmationDialog(kmod, ttxt, msg, val, func, farg, isshown, height,
       justifyh = "CENTER",
     }
     ret.str1 = KUI:CreateStringLabel(arg, ret)
-    arg = {}
 
     arg = {
       x = 8, y = -35, width = 410, height = height - 95 - (option and 24 or 0),
@@ -100,7 +98,6 @@ function K.ConfirmationDialog(kmod, ttxt, msg, val, func, farg, isshown, height,
       font = "GameFontNormal", justifyv = "TOP",
     }
     ret.str2 = KUI:CreateStringLabel(arg, ret)
-    arg = {}
 
     arg = {
       x = "CENTER", y = -height + 85, label = { text = ""},
@@ -110,7 +107,6 @@ function K.ConfirmationDialog(kmod, ttxt, msg, val, func, farg, isshown, height,
     ret.opt:Catch("OnValueChanged", function(this, evt, val)
       ret.optval = val
     end)
-    arg = {}
 
     ret.OnCancel = function(this)
       local tcd = this.kmod.confirmdialog
@@ -183,14 +179,12 @@ function K.RenameDialog(kmod, ttxt, oldlbl, oldval, newlbl, len, func, farg, sho
     end
 
     local ret = KUI:CreateDialogFrame(arg)
-    arg = {}
 
     arg = {
       x = 0, y = 0, width = 150, height = 24, autosize = false,
       justifyh = "RIGHT", font = "GameFontNormal", text = "",
     }
     ret.str1 = KUI:CreateStringLabel(arg, ret)
-    arg = {}
 
     arg = {
       x = 0, y = 0, width = 200, height = 24, autosize = false,
@@ -198,7 +192,6 @@ function K.RenameDialog(kmod, ttxt, oldlbl, oldval, newlbl, len, func, farg, sho
       color = {r = 1, g = 1, b = 1, a = 1 }, border = true,
     }
     ret.str2 = KUI:CreateStringLabel(arg, ret)
-    arg = {}
 
     ret.str2:ClearAllPoints()
     ret.str2:SetPoint("TOPLEFT", ret.str1, "TOPRIGHT", 8, 0)
@@ -208,14 +201,12 @@ function K.RenameDialog(kmod, ttxt, oldlbl, oldval, newlbl, len, func, farg, sho
       justifyh = "RIGHT", font = "GameFontNormal", text = "",
     }
     ret.str3 = KUI:CreateStringLabel(arg, ret)
-    arg = {}
 
     arg = {
       x = 0, y = -30, width = 200, height = 20,
     }
     ret.input = KUI:CreateEditBox(arg, ret)
     ret.input:SetFocus()
-    arg = {}
 
     ret.input:ClearAllPoints()
     ret.input:SetPoint("TOPLEFT", ret.str3, "TOPRIGHT", 12, 0)

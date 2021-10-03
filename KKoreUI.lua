@@ -197,7 +197,6 @@ local function remove_escclose(fname)
   for k,v in pairs(UISpecialFrames) do
     if (v == fname) then
       tremove(UISpecialFrames, k)
-      return
     end
   end
 end
@@ -205,33 +204,35 @@ end
 --
 -- This invisible frame is used to measure text width.
 --
-local mframe = CreateFrame("Frame")
-mframe:Hide()
-mframe:SetHeight(64)
-mframe:SetWidth(4192)
-local mtt = mframe:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-mtt:ClearAllPoints()
-mtt:SetPoint("LEFT", mframe, "LEFT", 0, 0)
-mtt:SetPoint("RIGHT", mframe, "RIGHT", 0, 0)
+do
+  local mframe = CreateFrame("Frame")
+  mframe:Hide()
+  mframe:SetHeight(64)
+  mframe:SetWidth(4192)
+  local mtt = mframe:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  mtt:ClearAllPoints()
+  mtt:SetPoint("LEFT", mframe, "LEFT", 0, 0)
+  mtt:SetPoint("RIGHT", mframe, "RIGHT", 0, 0)
+  KUI.strwidth = mtt
+  KUI.lastfont = "GameFontNormal"
+end
 
-local lastfont = "GameFontNormal"
-
-function KUI.MeasureStrWidth(str, font)
-  if (font and font ~= lastfont) then
-    mtt:SetFontObject(font)
-    lastfont = font
+function KUI:MeasureStrWidth(str, font)
+  if (font and font ~= self.lastfont) then
+    self.strwidth:SetFontObject(font)
+    self.lastfont = font
   end
-  mtt:SetText(str or "")
-  local w, h = mtt:GetStringWidth(), mtt:GetStringHeight()
+  self.strwidth:SetText(str or "")
+  local w, h = self.strwidth:GetStringWidth(), self.strwidth:GetStringHeight()
   return w+4,h
 end
 
-function KUI.GetFontColor(font, rgbtab)
-  if (font and font ~= lastfont) then
-    mtt:SetFontObject(font)
-    lastfont = font
+function KUI:GetFontColor(font, rgbtab)
+  if (font and font ~= self.lastfont) then
+    self.strwidth:SetFontObject(font)
+    self.lastfont = font
   end
-  local r,g,b,a = mtt:GetTextColor()
+  local r,g,b,a = self.strwidth:GetTextColor()
   if (rgbtab) then
     return { r = r, g = g, b = b, a = a or 1 }
   else
@@ -247,7 +248,7 @@ function KUI:GetWidgetNum(wtype)
   return self.wcounters[wtype]
 end
 
-function KUI.GetFramePos(frame, tbl)
+function KUI:GetFramePos(frame, tbl)
   local w, h = frame:GetWidth() or 0, frame:GetHeight() or 0
   local t, b = frame:GetTop() or 0, frame:GetBottom() or 0
   local l, r = frame:GetLeft() or 0, frame:GetRight() or 0
@@ -376,6 +377,7 @@ function BC.SetShown(self, onoff)
   if (onoff == nil) then
     onoff = true
   end
+
   if (onoff) then
     self:Show()
   else
@@ -395,9 +397,11 @@ local function do_tooltip_onenter(this, enabled)
   if ((not this.tiptitle) and (not this.tiptext)) then
     return
   end
+
   if (not enabled) then
     return
   end
+
   local tf = GameTooltip.SetText
   local r, g, b
 
@@ -414,7 +418,7 @@ local function do_tooltip_onenter(this, enabled)
     r = NORMAL_FONT_COLOR.r
     g = NORMAL_FONT_COLOR.g
     b = NORMAL_FONT_COLOR.b
-    tf (GameTooltip, this.tiptext, r, g, b, 1)
+    tf(GameTooltip, this.tiptext, r, g, b, 1)
   end
 
   GameTooltip:Show()
@@ -510,6 +514,7 @@ local function newobj(cfg, kparent, defwt, defht, fname, ftype, template)
   if (width > 0) then
     frame:SetWidth(width)
   end
+
   if (height > 0) then
     frame:SetHeight(height)
   end
@@ -595,16 +600,12 @@ function KUI:CreateHSplit(cfg, kparent)
   local hst = frame.hstextures
   hst.inset = cfg.inset or 0
 
-  if (cfg.placeframe) then
-    cfg.placeframe(frame)
+  frame:SetPoint("LEFT", parent, "LEFT", hst.inset, 0)
+  frame:SetPoint("RIGHT", parent, "RIGHT", 0 - hst.inset, 0)
+  if (cfg.topanchor) then
+    frame:SetPoint("TOP", parent, "TOP", 0, 0 - hst.inset)
   else
-    frame:SetPoint("LEFT", parent, "LEFT", hst.inset, 0)
-    frame:SetPoint("RIGHT", parent, "RIGHT", 0 - hst.inset, 0)
-    if (cfg.topanchor) then
-      frame:SetPoint("TOP", parent, "TOP", 0, 0 - hst.inset)
-    else
-      frame:SetPoint("BOTTOM", parent, "BOTTOM", 0, hst.inset)
-    end
+    frame:SetPoint("BOTTOM", parent, "BOTTOM", 0, hst.inset)
   end
   frame:SetHeight(cfg.height or 24)
 
@@ -712,16 +713,12 @@ function KUI:CreateVSplit(cfg, kparent)
   local vst = frame.vstextures
   vst.inset = cfg.inset or 0
 
-  if (cfg.placeframe) then
-    cfg.placeframe(frame)
+  frame:SetPoint("TOP", parent, "TOP", 0, 0 - vst.inset)
+  frame:SetPoint("BOTTOM", parent, "BOTTOM", 0, vst.inset)
+  if (cfg.rightanchor) then
+    frame:SetPoint("RIGHT", parent, "RIGHT", 0 - vst.inset, 0)
   else
-    frame:SetPoint("TOP", parent, "TOP", 0, 0 - vst.inset)
-    frame:SetPoint("BOTTOM", parent, "BOTTOM", 0, vst.inset)
-    if (cfg.rightanchor) then
-      frame:SetPoint("RIGHT", parent, "RIGHT", 0 - vst.inset, 0)
-    else
-      frame:SetPoint("LEFT", parent, "LEFT", vst.inset, 0)
-    end
+    frame:SetPoint("LEFT", parent, "LEFT", vst.inset, 0)
   end
   frame:SetWidth(cfg.width or 24)
 
@@ -1152,7 +1149,7 @@ end
 
 local function sl_SetText(this, text)
   if (this.autosize) then
-    local sw, sh = KUI.MeasureStrWidth(text, this.font)
+    local sw, sh = KUI:MeasureStrWidth(text, this.font)
     this:SetWidth(sw + this.xtrawidth)
     this:SetHeight(sh + this.xtraheight)
     if (this.centerx) then
@@ -1292,7 +1289,7 @@ function KUI:CreateEditBox(cfg, kparent)
 
   if (cfg.label) then
     local lfont = cfg.label.font or "GameFontNormal"
-    local lw,lh = KUI.MeasureStrWidth(cfg.label.text or "", lfont)
+    local lw,lh = KUI:MeasureStrWidth(cfg.label.text or "", lfont)
     local label = frame:CreateFontString(nil, "ARTWORK", lfont)
     frame.label = label
     local r,g,b,a = label:GetTextColor()
@@ -1456,7 +1453,7 @@ local function kui_checkradio(cfg, kparent, size, dh)
     assert(cfg.label.pos == nil or cfg.label.pos == "LEFT" or cfg.label.pos == "RIGHT", "checkbox label position can only be LEFT or RIGHT (default)")
     local font = cfg.label.font or "GameFontHighlight"
     local text = frame:CreateFontString(nil, "OVERLAY", font)
-    frame.rgb = KUI.GetFontColor(font, true)
+    frame.rgb = KUI:GetFontColor(font, true)
     if (cfg.label.color) then
       frame.rgb.r = cfg.label.color.r
       frame.rgb.g = cfg.label.color.g
@@ -1619,16 +1616,14 @@ local function rb_SetValue(this, val, nothrow)
   if (this.checked and this.value and this.value == val) then
     return
   end
-  rb_getsetvalue(this, this.groupname, val, nothrow, true,
-    this.groupparent:GetChildren())
+  rb_getsetvalue(this, this.groupname, val, nothrow, true, this.groupparent:GetChildren())
 end
 
 local function rb_GetValue(this)
   if (this.checked) then
     return this.value
   end
-  return rb_getsetvalue(this, this.groupname, nil, nil, false,
-    this.groupparent:GetChildren())
+  return rb_getsetvalue(this, this.groupname, nil, nil, false, this.groupparent:GetChildren())
 end
 
 --
@@ -2448,12 +2443,6 @@ function KUI:CreateTabbedDialog(cfg, kparent)
 end
 
 --
--- Please note that this element type completely fills the parent frame,
--- and that the width and height config elements are ignored. If you require
--- a specific size, ensure that the parent specified is of the correct size.
---
-
---
 -- This function is used to set the current item in a list. It is called
 -- from several places. First, when a list is being updated with new items
 -- it is called with a nil offset to disable any current selection. This
@@ -2542,9 +2531,11 @@ end
 
 local function sl_setrem_highlight(objp, onoff)
   local onoff = onoff or false
+
   if (not objp.selecteditem) then
     return
   end
+
   local i, ro
   local sel = objp.selecteditem
   for i = 1, objp.visibleslots do
@@ -2678,6 +2669,100 @@ local function sl_updatevals(objp)
   return rslot, rbtn
 end
 
+local function item_widget(tbf)
+  local ti = tbf.iinfo
+  local cfg = {}
+  local ret
+
+  cfg.checked = tbf.checked
+  cfg.enabled = tbf.enabled
+  cfg.x = ti.x or 0
+  cfg.y = ti.y or 0
+  cfg.width = ti.width
+  cfg.height = ti.height
+  cfg.initialvalue = ti.initialvalue
+  if (ti.label) then
+    cfg.label = { text = ti.label, color = tbf.color, font = tbf.font }
+  end
+
+  if (ti.widget == "radio") then
+    assert(ti.group, "must provide group name for radio items")
+    cfg.group = ti.group
+    cfg.value = ti.value
+    cfg.groupparent = tbf.rparent
+    cfg.getbutton = get_radiowidget
+    tbf.checkable = false
+    cfg.checked = tbf.checked
+    ret = KUI:CreateRadioButton(cfg, tbf)
+  elseif (ti.widget == "slider") then
+    local dw, dh, xw, xh
+    cfg.orientation = ti.orientation or "VERTICAL"
+    if (cfg.orientation == "VERTICAL") then
+      dw = 16
+      dh = 100
+      xw = 50
+      xh = 0
+    else
+      dw = 100
+      dh = 16
+      xw = 0
+      xh = 16
+    end
+    cfg.editfont = ti.editfont
+    cfg.editcolor = ti.editcolor or {r = 1, g = 1, b = 0 }
+    cfg.minmaxfont = ti.minmaxfont
+    cfg.minmaxcolor = ti.minmaxcolor or {r = 0, g = 1, b = 0 }
+    cfg.minval = ti.minval
+    cfg.maxval = ti.maxval
+    cfg.step = ti.step
+    cfg.width = ti.width or dw
+    cfg.height = ti.height or dh
+    tbf.height = cfg.height + xh
+    tbf.width = cfg.width + xw
+    tbf.checkable = false
+    ret = KUI:CreateSlider(cfg, tbf)
+    ret.editbox.toplevel = tbf.toplevel
+    ret.editbox:HookScript("OnEnter", tl_OnEnter)
+    ret.editbox:HookScript("OnLeave", tl_OnLeave)
+  elseif (ti.widget == "editbox") then
+    cfg.len = ti.len
+    cfg.numeric = ti.numeric
+    cfg.font = ti.font and tbf.font or nil
+    cfg.color = tbf.color
+    cfg.label = nil
+    cfg.width = ti.width or 100
+    cfg.height = ti.height or 24
+    tbf.height = cfg.height
+    tbf.width = cfg.width
+    tbf.checkable = false
+    ret = KUI:CreateEditBox(cfg, tbf)
+    ret:SetTextInsets(0, 0, 5, 1)
+  elseif (ti.widget == "button") then
+    cfg.text = ti.label
+    cfg.width = ti.width or 100
+    cfg.height = ti.height or 24
+    cfg.template = ti.template
+    tbf.height = cfg.height
+    tbf.width = cfg.width
+    tbf.checkable = false
+    ret = KUI:CreateButton(cfg, tbf)
+  else
+    assert(false, "unknown or missing widget type")
+  end
+
+  ret.toplevel = tbf.toplevel
+  ret.parent = tbf.parent
+  ret:HookScript("OnEnter", tl_OnEnter)
+  ret:HookScript("OnLeave", tl_OnLeave)
+  return ret
+end
+
+--
+-- Please note that this element type completely fills the parent frame,
+-- and that the width and height config elements are ignored. If you require
+-- a specific size, ensure that the parent specified is of the correct size.
+--
+
 function KUI:CreateScrollList(cfg, kparent)
   local x = self:GetWidgetNum("scrolllist")
   local fname = cfg.name or ("KUIScrollList" .. x)
@@ -2786,7 +2871,6 @@ function KUI:CreateScrollList(cfg, kparent)
     return this.selecteditem
   end
 
-  -- sl_updatevals(frame)
   return frame
 end
 
@@ -2982,6 +3066,7 @@ local function nfr_OnEnter(this)
     this.parent.subopen:Close()
     this.parent.subopen = nil
   end
+
   if (this.menuframe and this.enabled) then
     local os = this.toplevel.offset
     local ls = this.parent.hasvscroll
@@ -2990,12 +3075,13 @@ local function nfr_OnEnter(this)
     local lastv = nl > 0 and this.toplevel.lastpos[nl][2] or nil
     local sw = this.toplevel.screenw
     local sh = this.toplevel.screenh
+
     this.menuframe:Show()
     this.parent.subopen = this.menuframe
-    local rpos = KUI.GetFramePos(this, true)
+    local rpos = KUI:GetFramePos(this, true)
     this.menuframe:ClearAllPoints()
     this.menuframe:SetPoint("TOPLEFT", this, "TOPRIGHT", 0, os)
-    local mpos = KUI.GetFramePos(this.menuframe, true)
+    local mpos = KUI:GetFramePos(this.menuframe, true)
     this.menuframe:ClearAllPoints()
     if (mpos.r > sw) then
       lasth = "LEFT"
@@ -3058,11 +3144,15 @@ end
 --
 -- This is only ever used by the individual line items in a dropdown or popup
 -- menu, which is reached via this.toplevel. The THIS parameter is the actual
--- button frame itself.
+-- button frame itself (i.e. the line item in a scroll list).
 --
-local function real_nfr_OnClick(this)
+local function nfr_OnClick(this)
   local tlf = this.toplevel
   local tlc = tlf.current
+
+  if ((not this.clickable) or (not this.enabled)) then
+    return
+  end
 
   if (tlf.mode == MODE_MULTI) then
     if (this.checkmark) then
@@ -3115,13 +3205,6 @@ local function real_nfr_OnClick(this)
   tlf:Throw("OnValueChanged", this.value, true, true)
 
   run_funcs(this, false)
-end
-
-local function nfr_OnClick(this)
-  if ((not this.clickable) or (not this.enabled)) then
-    return
-  end
-  real_nfr_OnClick(this)
 end
 
 local function nfr_OnHide(this)
@@ -3223,8 +3306,47 @@ local function tl_OnEvent(this, event)
   end
 end
 
+local function dd_item_init(item)
+  item.arg = nil
+  item.checkable = nil
+  item.checked = nil
+  item.checkmark = nil
+  item.clickable = nil
+  item.color = nil
+  item.enabled = nil
+  item.font = nil
+  item.frame = nil
+  item.func = nil
+  item.hasvscroll = nil
+  item.hasicons = nil
+  item.hassub = nil
+  item.hascheck = nil
+  item.height = nil
+  item.icon = nil
+  item.idx = nil
+  item.iinfo = nil
+  item.keep = nil
+  item.menuarg = nil
+  item.menuframe = nil
+  item.menuname = nil
+  item.name = nil
+  item.spacer = nil
+  item.subarrow = nil
+  item.text = nil
+  item.tipfunc = nil
+  item.tiptext = nil
+  item.tiptitle = nil
+  item.title = nil
+  item.tlarg = nil
+  item.tlname = nil
+  item.toplevel = nil
+  item.value = nil
+  item.width = nil
+end
+
 local function dd_create_cframe(fr, cfname, ftype)
   local nfr
+
   if (not ftype and fr.kframes[cfname]) then
     nfr = fr.kframes[cfname]
     nfr:SetParent(fr.cframe)
@@ -3234,6 +3356,7 @@ local function dd_create_cframe(fr, cfname, ftype)
       fr.kframes[cfname] = nfr
     end
   end
+  dd_item_init(nfr)
   nfr:SetFrameStrata(fr.cframe:GetFrameStrata())
   nfr:SetFrameLevel(fr.cframe:GetFrameLevel() + 1)
   nfr.toplevel = fr.toplevel or fr
@@ -3245,9 +3368,6 @@ local function dd_create_cframe(fr, cfname, ftype)
     nfr:SetScript("OnClick", nfr_OnClick)
   end
   nfr:SetScript("OnHide", nfr_OnHide)
-  nfr.tiptitle = nil
-  nfr.tiptext = nil
-  nfr.tipfunc = nil
   return nfr
 end
 
@@ -3257,6 +3377,47 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
   if (tlfr == fr) then
     -- If this is the top level frame, set it to nil
     tlfr = nil
+  end
+
+  --
+  -- The first step in the refresh is to go through the existing line items and see if they have any of the
+  -- "extra" bits displayed - the submenu check, the check item check etc. So we go through the current list
+  -- and hide any such markers.
+  --
+  if (fr.iframes) then
+    for k,v in ipairs(fr.iframes) do
+      if (v.p_checkmark) then
+        v.p_checkmark:Hide()
+      end
+      v.checked = nil
+      v.checkmark = nil
+
+      if (v.menuframe) then
+        v.menuframe:Hide()
+      end
+
+      if (v.p_spacer) then
+        v.p_spacer:Hide()
+      end
+      v.spacer = nil
+
+      if (v.p_subarrow) then
+        v.p_subarrow:Hide()
+      end
+      v.subarrow = nil
+
+      if (v.p_icon) then
+        v.p_icon:Hide()
+      end
+      v.icon = nil
+
+      if (v.p_text) then
+        v.p_text:Hide()
+      end
+      v.text = nil
+
+      v:Hide()
+    end
   end
 
   fr.itemcount = nilist
@@ -3280,18 +3441,33 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
   local hasicons = 0
   local hascheck = 0
 
+  local function set_element(which, tbf, v)
+    local is_which = "is_" .. which
+    if (v[which] ~= nil) then
+      if (type(v[which]) == "boolean") then
+        tbf[which] = v[which]
+      elseif (type(v[which]) == "function") then
+        tbf[which] = v[which](tbf)
+      else
+        assert(false, which .. " must be a boolean or a function")
+      end
+    elseif (tlfr[is_which] ~= nil) then
+      if (type(tlfr[is_which]) == "boolean") then
+        tbf[which] = tlfr[is_which]
+      elseif (type(tlfr[is_which]) == "function") then
+        tbf[which] = tlfr[is_which](tbf)
+      end
+    end
+  end
+
   for k,v in ipairs(fr.items) do
     local tbf, txt, w, h = nil, nil, nil, nil
 
     local cfname = cf:GetName() .. "Button" .. k
     tbf = dd_create_cframe(fr, cfname, v.frame and "Frame" or nil)
+    tbf:Show()
     tinsert(fr.iframes, tbf)
 
-    tbf.text = nil
-    tbf.frame = nil
-    tbf.spacer = nil
-    tbf.height = nil
-    tbf.width = nil
     tbf.iinfo = v
     tbf.idx = k
     tbf.arg = v.arg
@@ -3331,39 +3507,15 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
 
     -- See if it is a title element or not
     tbf.title = false
-    if (v.title ~= nil) then
-      if (type(v.title) == "boolean") then
-        tbf.title = v.title
-      elseif (type(v.title) == "function") then
-        tbf.title = v.title(tbf)
-      else
-        assert(false, "title must be a boolean or a function")
-      end
-    end
+    set_element("title", tbf, v)
 
     -- See if it is disabled or not
     tbf.enabled = true
-    if (v.enabled ~= nil) then
-      if (type(v.enabled) == "boolean") then
-        tbf.enabled = v.enabled
-      elseif (type(v.enabled) == "function") then
-        tbf.enabled = v.enabled(tbf)
-      else
-        assert(false, "enabled must be a boolean or a function")
-      end
-    end
+    set_element("enabled", tbf, v)
 
     -- Determine if it is checked or not
     tbf.checked = false
-    if (v.checked ~= nil) then
-      if (type(v.checked) == "boolean") then
-        tbf.checked = v.checked
-      elseif (type(v.checked) == "function") then
-        tbf.checked = v.checked(tbf)
-      else
-        assert(false, "checked must be a boolean or a function")
-      end
-    end
+    set_element("checked", tbf, v)
 
     -- Determine if we should keep the window open on click or not
     if (fr.mode == MODE_MULTI) then
@@ -3371,15 +3523,7 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
     else
       tbf.keep = false
     end
-    if (v.keep ~= nil) then
-      if (type(v.keep) == "boolean") then
-        tbf.keep = v.keep
-      elseif (type(v.keep) == "function") then
-        tbf.keep = v.keep(tbf)
-      else
-        assert(false, "keep must be a boolean or a function")
-      end
-    end
+    set_element("keep", tbf, v)
 
     -- Determine the item text
     tbf.spacer = nil
@@ -3411,27 +3555,11 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
 
     -- Determine if the item is clickable or not
     tbf.clickable = true
-    if (v.notclickable ~= nil) then
-      if (type(v.notclickable) == "boolean") then
-        tbf.clickable = not v.notclickable
-      elseif (type(v.notclickable) == "function") then
-        tbf.clickable = not v.notclickable(tbf)
-      else
-        assert(false, "notclickable must be a boolean or a function")
-      end
-    end
+    set_element("clickable", tbf, v)
 
     -- Determine if the item is checkable or not
     tbf.checkable = true
-    if (v.notcheckable ~= nil) then
-      if (type(v.notcheckable) == "boolean") then
-        tbf.checkable = not v.notcheckable
-      elseif (type(v.notcheckable) == "function") then
-        tbf.checkable = not v.notcheckable(tbf)
-      else
-        assert(false, "notcheckable must be a boolean or a function")
-      end
-    end
+    set_element("checkable", tbf, v)
 
     -- Set values that depend on the type
     if (tbf.title or tbf.spacer) then
@@ -3523,14 +3651,14 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
 
     -- See if this is the widest item yet
     if (txt) then
-      w = ceil(KUI.MeasureStrWidth(txt, tbf.font) + 8)
+      w = ceil(KUI:MeasureStrWidth(txt, tbf.font) + 8)
     elseif (not tbf.spacer) then
       if (type(v.frame) == "table") then
         tbf.frame = v.frame
       elseif (type(v.frame) == "function") then
         tbf.frame = v.frame(tbf)
       elseif (v.frame == true) then
-        tbf.frame = KUI.ItemWidget(tbf)
+        tbf.frame = item_widget(tbf)
       else
         assert(false, "frame must be a table, a function or true")
       end
@@ -3587,8 +3715,8 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
         tbf.p_checkmark:Hide()
       end
       tbf.checkmark = nil
-      tbf.checked = false
     end
+    tbf.checked = false
 
     if (w and w > widest) then
       widest = w
@@ -3626,7 +3754,7 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
       if (tbf.color) then
         text:SetTextColor(tbf.color.r, tbf.color.g, tbf.color.b, tbf.color.a)
       else
-        text:SetTextColor(KUI.GetFontColor(tbf.font))
+        text:SetTextColor(KUI:GetFontColor(tbf.font))
       end
       tbf.text = text
     else
@@ -3844,7 +3972,7 @@ local function dd_UpdateItems(this, newitems)
   end
 
   if (this.dropdown) then
-    local oldv
+    local oldv = nil
     if (this.current) then
       oldv = this.current.value
       if (this.current.checkmark) then
@@ -3860,6 +3988,7 @@ local function dd_UpdateItems(this, newitems)
       if ((this.mode ~= MODE_SINGLE) and this.titletext) then
         this.text:SetText(this.titletext)
       else
+        -- JKJ FIXME this is where we would set the title element if the first item is a title
         this.text:SetText("")
       end
     end
@@ -3899,7 +4028,7 @@ local function dd_SetValue(this, value, nothrow)
 
   local function recursive_set(tlf, frs, val)
     for k,v in ipairs(frs.iframes) do
-      if (v.value == val and v.clickable) then
+      if (val and v.value == val and v.clickable) then
         if (tlf.current) then
           tlf.current.checked = false
           if (tlf.current.checkmark) then
@@ -3968,10 +4097,12 @@ local function dd_OnEnable(this, event, onoff)
       end
     end
   end
+
   local d = onoff and 1 or 2
   if (this.label) then
     this.label:SetTextColor(this.labelcolor.r/d, this.labelcolor.g/d, this.labelcolor.b/d, this.labelcolor.a)
   end
+
   if (this.dropdown) then
     if (this.mode ~= MODE_SINGLE) then
       if (this.trgb) then
@@ -4000,6 +4131,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
   assert(cfg, "dropdown config must be provided")
   assert(cfg.name, "you must provide a frame name")
   assert(cfg.items, "dropdown items must be provided ("..cfg.name..")")
+
   if (toplevel) then
     assert(toplevel.StopTimeoutCounter, "toplevel specified incorrectly")
     assert(toplevel.StartTimeoutCounter, "toplevel specified incorrectly")
@@ -4013,6 +4145,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
   assert(nitems > 0, "must provide at least 1 item")
 
   local frame
+
   if (not toplevel and not ispopup) then
     assert(cfg.dwidth, "must provide dropdown width (dwidth)")
     --
@@ -4105,6 +4238,12 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     frame.UpdateItems = dd_UpdateItems
     frame.GetValue = dd_GetValue
     frame.SetValue = dd_SetValue
+    frame.SetText = function(this, ...) return this.text:SetText(...) end
+    frame.GetText = function(this, ...) return this.text:GetText(...) end
+    frame.SetTextColor = function(this, ...) return this.text:SetTextColor(...) end
+    frame.GetTextColor = function(this, ...) return this.text:GetTextColor(...) end
+    frame.SetFont = function(this, ...) return this.text:SetFont(...) end
+    frame.GetFont = function(this, ...) return this.text:GetFont(...) end
 
     button:SetScript("OnEnter", dd_OnEnter)
     button:SetScript("OnLeave", dd_OnLeave)
@@ -4117,10 +4256,10 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     --
     if (cfg.label) then
       local lfont = cfg.label.font or "GameFontNormal"
-      local lwidth = cfg.label.width or (KUI.MeasureStrWidth(cfg.label.text, lfont) + 4)
+      local lwidth = cfg.label.width or (KUI:MeasureStrWidth(cfg.label.text, lfont) + 4)
       local label = frame:CreateFontString(nil, "ARTWORK", lfont)
       frame.label = label
-      frame.labelcolor = KUI.GetFontColor(lfont, true)
+      frame.labelcolor = KUI:GetFontColor(lfont, true)
       if (cfg.label.color) then
         frame.labelcolor.r = cfg.label.color.r
         frame.labelcolor.g = cfg.label.color.g
@@ -4216,6 +4355,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
         frame.border = 2
       end
     end
+
     frame.lastpos = {}
     if (ispopup) then
       frame.mode = nil
@@ -4236,8 +4376,10 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
 
   frame.arg = cfg.arg
   frame.func = cfg.func
-  frame.itemheight = cfg.itemheight or frame.toplevel.itemheight
   frame.items = cfg.items
+  frame.itemheight = cfg.itemheight or frame.toplevel.itemheight
+  frame.is_enabled = cfg.is_enabled
+  frame.is_checked = cfg.is_checked
   frame.minheight = cfg.minheight or frame.toplevel.minheight
   frame.minwidth = cfg.minwidth or frame.toplevel.minwidth
   frame.maxheight = cfg.maxheight or frame.toplevel.maxheight
@@ -4281,7 +4423,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
       frame.text:SetFontObject(tfont)
       frame.text:SetText(cfg.title.text)
       frame.titletext = cfg.title.text
-      frame.trgb = KUI.GetFontColor(tfont, true)
+      frame.trgb = KUI:GetFontColor(tfont, true)
       if (cfg.title.color) then
         frame.trgb.r = cfg.title.color.r
         frame.trgb.g = cfg.title.color.g
@@ -4295,18 +4437,21 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
           frame.text:SetText(frame.current.text:GetText())
         else
           frame.text:Settext("")
+          -- JKJ FIXME possibly display title if first item is a title
         end
       end
     end
+
     if (cfg.initialvalue ~= nil) then
       frame:SetValue(cfg.initialvalue)
     end
+
     frame:SetEnabled(cfg.enabled)
     return frame
   end
 
   -- From this point on no longer deal with the dropdown container. We deal
-  -- with the actual menu items or dropdown items from hereon out.
+  -- with the actual menu items or dropdown items.
   frame.offset = borders[frame.border].offset
   frame:SetBackdrop( { bgFile = borders[frame.border].bgFile,
     edgeFile = borders[frame.border].edgeFile,
@@ -4331,6 +4476,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     sframe.toplevel = frame.toplevel
     sframe:HookScript("OnEnter", tl_OnEnter)
     sframe:HookScript("OnLeave", tl_OnLeave)
+    -- JKJ FIXME - is this really needed?
     local bdrop = {
       bgFile = KUI.TEXTURE_PATH .. "TDF-Fill",
       tile = true,
@@ -4350,6 +4496,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
 
   frame.headeroffset = 0
   frame.footeroffset = 0
+
   if (ispopup) then
     if (cfg.header) then
       frame.headeroffset = cfg.header
@@ -4365,6 +4512,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
       hframe:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -frame.offset, -frame.offset)
       hframe:SetHeight(cfg.header)
     end
+
     if (cfg.footer) then
       frame.footeroffset = cfg.footer
       if (not frame.footer) then
@@ -4514,94 +4662,6 @@ end
 --
 local function get_radiowidget(this)
   return this.frame or this
-end
-
-function KUI.ItemWidget(tbf)
-  local ti = tbf.iinfo
-  local cfg = {}
-  local ret
-
-  cfg.checked = tbf.checked
-  cfg.enabled = tbf.enabled
-  cfg.x = ti.x or 0
-  cfg.y = ti.y or 0
-  cfg.width = ti.width
-  cfg.height = ti.height
-  cfg.initialvalue = ti.initialvalue
-  if (ti.label) then
-    cfg.label = { text = ti.label, color = tbf.color, font = tbf.font }
-  end
-
-  if (ti.widget == "radio") then
-    assert(ti.group, "must provide group name for radio items")
-    cfg.group = ti.group
-    cfg.value = ti.value
-    cfg.groupparent = tbf.rparent
-    cfg.getbutton = get_radiowidget
-    tbf.checkable = false
-    cfg.checked = tbf.checked
-    ret = KUI:CreateRadioButton(cfg, tbf)
-  elseif (ti.widget == "slider") then
-    local dw, dh, xw, xh
-    cfg.orientation = ti.orientation or "VERTICAL"
-    if (cfg.orientation == "VERTICAL") then
-      dw = 16
-      dh = 100
-      xw = 50
-      xh = 0
-    else
-      dw = 100
-      dh = 16
-      xw = 0
-      xh = 16
-    end
-    cfg.editfont = ti.editfont
-    cfg.editcolor = ti.editcolor or {r = 1, g = 1, b = 0 }
-    cfg.minmaxfont = ti.minmaxfont
-    cfg.minmaxcolor = ti.minmaxcolor or {r = 0, g = 1, b = 0 }
-    cfg.minval = ti.minval
-    cfg.maxval = ti.maxval
-    cfg.step = ti.step
-    cfg.width = ti.width or dw
-    cfg.height = ti.height or dh
-    tbf.height = cfg.height + xh
-    tbf.width = cfg.width + xw
-    tbf.checkable = false
-    ret = KUI:CreateSlider(cfg, tbf)
-    ret.editbox.toplevel = tbf.toplevel
-    ret.editbox:HookScript("OnEnter", tl_OnEnter)
-    ret.editbox:HookScript("OnLeave", tl_OnLeave)
-  elseif (ti.widget == "editbox") then
-    cfg.len = ti.len
-    cfg.numeric = ti.numeric
-    cfg.font = ti.font and tbf.font or nil
-    cfg.color = tbf.color
-    cfg.label = nil
-    cfg.width = ti.width or 100
-    cfg.height = ti.height or 24
-    tbf.height = cfg.height
-    tbf.width = cfg.width
-    tbf.checkable = false
-    ret = KUI:CreateEditBox(cfg, tbf)
-    ret:SetTextInsets(0, 0, 5, 1)
-  elseif (ti.widget == "button") then
-    cfg.text = ti.label
-    cfg.width = ti.width or 100
-    cfg.height = ti.height or 24
-    cfg.template = ti.template
-    tbf.height = cfg.height
-    tbf.width = cfg.width
-    tbf.checkable = false
-    ret = KUI:CreateButton(cfg, tbf)
-  else
-    assert(false, "unknown or missing widget type")
-  end
-
-  ret.toplevel = tbf.toplevel
-  ret.parent = tbf.parent
-  ret:HookScript("OnEnter", tl_OnEnter)
-  ret:HookScript("OnLeave", tl_OnLeave)
-  return ret
 end
 
 --
