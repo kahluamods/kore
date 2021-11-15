@@ -3441,7 +3441,7 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
   local hasicons = 0
   local hascheck = 0
 
-  local function set_element(which, tbf, v)
+  local function set_element(which, tbf, v, tv)
     local is_which = "is_" .. which
     if (v[which] ~= nil) then
       if (type(v[which]) == "boolean") then
@@ -3451,11 +3451,11 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
       else
         assert(false, which .. " must be a boolean or a function")
       end
-    elseif (tlfr[is_which] ~= nil) then
-      if (type(tlfr[is_which]) == "boolean") then
-        tbf[which] = tlfr[is_which]
-      elseif (type(tlfr[is_which]) == "function") then
-        tbf[which] = tlfr[is_which](tbf)
+    elseif (tv[is_which] ~= nil) then
+      if (type(tv[is_which]) == "boolean") then
+        tbf[which] = tv[is_which]
+      elseif (type(tv[is_which]) == "function") then
+        tbf[which] = tv[is_which](tbf)
       end
     end
   end
@@ -3507,15 +3507,15 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
 
     -- See if it is a title element or not
     tbf.title = false
-    set_element("title", tbf, v)
+    set_element("title", tbf, v, tlfr or fr)
 
     -- See if it is disabled or not
     tbf.enabled = true
-    set_element("enabled", tbf, v)
+    set_element("enabled", tbf, v, tlfr or fr)
 
     -- Determine if it is checked or not
     tbf.checked = false
-    set_element("checked", tbf, v)
+    set_element("checked", tbf, v, tlfr or fr)
 
     -- Determine if we should keep the window open on click or not
     if (fr.mode == MODE_MULTI) then
@@ -3523,7 +3523,7 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
     else
       tbf.keep = false
     end
-    set_element("keep", tbf, v)
+    set_element("keep", tbf, v, tlfr or fr)
 
     -- Determine the item text
     tbf.spacer = nil
@@ -3545,7 +3545,13 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
           tbf.p_spacer = st
         end
         tbf.spacer = tbf.p_spacer
+        tbf.spacer:Show()
         txt = nil
+        if (tbf.enabled) then
+          SetDesaturation(tbf.spacer, false)
+        else
+          SetDesaturation(tbf.spacer, true)
+        end
       else
         if (tbf.p_spacer) then
           tbf.p_spacer:Hide()
@@ -3555,11 +3561,11 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
 
     -- Determine if the item is clickable or not
     tbf.clickable = true
-    set_element("clickable", tbf, v)
+    set_element("clickable", tbf, v, tlfr or fr)
 
     -- Determine if the item is checkable or not
     tbf.checkable = true
-    set_element("checkable", tbf, v)
+    set_element("checkable", tbf, v, tlfr or fr)
 
     -- Set values that depend on the type
     if (tbf.title or tbf.spacer) then
@@ -3585,10 +3591,10 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
         sm:SetWidth(16)
         sm:SetHeight(16)
         sm:SetPoint("LEFT", tbf, "RIGHT", -16, 0)
-        sm:Show()
         tbf.p_subarrow = sm
       end
       tbf.subarrow = tbf.p_subarrow
+      tbf.subarrow:Show()
       if (tbf.enabled) then
         SetDesaturation(tbf.subarrow, false)
         tbf.menuframe = create_dd_sa(v.submenu, fr, fr.toplevel, nil)
@@ -3700,7 +3706,6 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
         cm:SetHeight(16)
         cm:ClearAllPoints()
         cm:SetPoint("LEFT", tbf, "LEFT", 0, 0)
-        cm:Hide()
         tbf.p_checkmark = cm
       end
       tbf.checkmark = tbf.p_checkmark
@@ -3709,14 +3714,15 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
       else
         SetDesaturation(tbf.checkmark, false)
       end
-      tbf.checkmark:Hide()
     else
       if (tbf.p_checkmark) then
         tbf.p_checkmark:Hide()
       end
       tbf.checkmark = nil
     end
-    tbf.checked = false
+    if (tbf.checkmark) then
+      tbf.checkmark:SetShown(tbf.checked)
+    end
 
     if (w and w > widest) then
       widest = w
