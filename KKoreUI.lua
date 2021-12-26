@@ -3229,7 +3229,9 @@ end
 local global_dd_shown
 
 local function dd_OnClick(this, ...)
-  local pdf = this:GetParent().dropdown
+  local pp = this:GetParent()
+  local pdf = pp.dropdown
+  local isshown = false
   if (pdf:IsShown()) then
     pdf:Close()
     if (global_dd_shown == pdf) then
@@ -3240,13 +3242,13 @@ local function dd_OnClick(this, ...)
       global_dd_shown:Close()
       global_dd_shown = nil
     end
-    if (pdf.itemcount < 1) then
-      return
+    if (pdf.itemcount > 0) then
+      pdf:Show()
+      global_dd_shown = pdf
+      isshown = true
     end
-    pdf:Show()
-    global_dd_shown = pdf
   end
-  this:GetParent():Throw("OnClick", ...)
+  pp:Throw("OnClick", pp, isshown, ...)
 end
 
 local function dd_OnMouseWheel(this, value)
@@ -4349,7 +4351,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
       remove_escclose(cfg.name)
     end
 
-    frame.timeout = cfg.timeout or 3
+    frame.timeout = cfg.timeout or 0
     if (cfg.border == "THIN") then
       frame.border = 1
     elseif (cfg.border == "THICK") then
@@ -4866,7 +4868,7 @@ function KUI:CreatePopupList(cfg, parent)
   ret.arg = cfg.arg
   ret.textfunc = cfg.textfunc
   ret.func = cfg.func
-  ret.timeout = cfg.timeout or 3
+  ret.timeout = cfg.timeout or 0
   ret.itemheight = cfg.itemheight or 16
   ret.itemwidth = cfg.itemwidth or 160
   ret.uheight = cfg.height

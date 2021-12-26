@@ -231,7 +231,7 @@ local function create_konfer_dialogs()
 
   arg = {
     name = "KKonferModSelDD",
-    x = 35, y = -105, dwidth = 350, justifyh = "CENTER",
+    x = 35, y = -105, dwidth = 350, justifyh = "CENTER", border = "THIN",
     mode = "SINGLE", itemheight = 16, items = KUI.emptydropdown,
   }
   ksd.seldd = KUI:CreateDropDown(arg, ksd)
