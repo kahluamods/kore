@@ -25,7 +25,7 @@
 local CallbackHandler = LibStub("CallbackHandler-1.0")
 
 local KKORE_MAJOR = "KKore"
-local KKORE_MINOR = 5
+local KKORE_MINOR = 6
 
 local K = LibStub:NewLibrary(KKORE_MAJOR, KKORE_MINOR)
 
@@ -1664,6 +1664,84 @@ function K.GetItemClassFilter(ilink)
   else
     return K.classfilters.allclasses, boe
   end
+end
+
+-- K.Deformat compliments of ChatGPT
+-- For example: local plr, roll, minr, maxr = K.Deformat(arg1, RANDOM_ROLL_RESULT)
+
+local deformat_cache = {}
+
+local function escape_pattern(c)
+  return c:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
+end
+
+function K.Deformat(str, fmt)
+  local compiled = deformat_cache[fmt]
+
+  if not compiled then
+    local pat = { "^" }
+    local order, types = {}, {}
+    local nextarg, maxarg = 1, 0
+    local i = 1
+
+    while i <= #fmt do
+      local c = fmt:sub(i, i)
+
+      if c ~= "%" then
+        pat[#pat + 1] = escape_pattern(c)
+        i = i + 1
+      elseif fmt:sub(i + 1, i + 1) == "%" then
+        pat[#pat + 1] = "%%"
+        i = i + 2
+      else
+        local tail = fmt:sub(i)
+        local pos, typ = tail:match("^%%(%d+)%$([sdiu])")
+        local n
+
+        if pos then
+          n = tonumber(pos)
+          i = i + #pos + 3
+        else
+          typ = tail:match("^%%([sdiu])")
+          if not typ then
+            return nil
+          end
+          n = nextarg
+          nextarg = nextarg + 1
+          i = i + 2
+        end
+
+        order[#order + 1] = n
+        types[#types + 1] = typ
+        maxarg = math.max(maxarg, n)
+
+        if typ == "s" then
+          pat[#pat + 1] = "(.-)"
+        elseif typ == "u" then
+          pat[#pat + 1] = "(%d+)"
+        else
+          pat[#pat + 1] = "([+-]?%d+)"
+        end
+      end
+    end
+
+    pat[#pat + 1] = "$"
+    compiled = { table.concat(pat), order, types, maxarg }
+    deformat_cache[fmt] = compiled
+  end
+
+  local cap = { str:match(compiled[1]) }
+  if not cap[1] then
+    return nil
+  end
+
+  local ret = {}
+  for i, v in ipairs(cap) do
+    local n = compiled[2][i]
+    ret[n] = compiled[3][i] == "s" and v or tonumber(v)
+  end
+
+  return unpack(ret, 1, compiled[4])
 end
 
 --
