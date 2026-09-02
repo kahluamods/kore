@@ -145,15 +145,13 @@ KRP.raid = nil
 -- This is an array of 8 tables when it is non-nil.
 KRP.raidgroups = nil
 
-KRP.LOOT_METHOD_UNKNOWN     = 0
-KRP.LOOT_METHOD_FREEFORALL  = 1
-KRP.LOOT_METHOD_ROUNDROBIN  = 2
-KRP.LOOT_METHOD_MASTER      = 3
-KRP.LOOT_METHOD_GROUP       = 4
-KRP.LOOT_METHOD_NEEDB4GREED = 5
-KRP.LOOT_METHOD_PERSONAL    = 6
+KRP.LOOT_METHOD_FREEFORALL  = Enum.LootMethod.Freeforall
+KRP.LOOT_METHOD_ROUNDROBIN  = Enum.LootMethod.Roundrobin
+KRP.LOOT_METHOD_MASTER      = Enum.LootMethod.Masterlooter
+KRP.LOOT_METHOD_GROUP       = Enum.LootMethod.Group
+KRP.LOOT_METHOD_NEEDB4GREED = Enum.LootMethod.Needbeforegreed
+KRP.LOOT_METHOD_PERSONAL    = Enum.LootMethod.Personal
 
-local LOOT_METHOD_UNKNOWN     = KRP.LOOT_METHOD_UNKNWON
 local LOOT_METHOD_FREEFORALL  = KRP.LOOT_METHOD_FREEFORALL
 local LOOT_METHOD_ROUNDROBIN  = KRP.LOOT_METHOD_ROUNDROBIN
 local LOOT_METHOD_MASTER      = KRP.LOOT_METHOD_MASTER
@@ -161,18 +159,8 @@ local LOOT_METHOD_GROUP       = KRP.LOOT_METHOD_GROUP
 local LOOT_METHOD_NEEDB4GREED = KRP.LOOT_METHOD_NEEDB4GREED
 local LOOT_METHOD_PERSONAL    = KRP.LOOT_METHOD_PERSONAL
 
-local method_to_number = {
-  ["unknown"]         = LOOT_METHOD_UNKNOWN,
-  ["freeforall"]      = LOOT_METHOD_FREEFORALL,
-  ["roundrobin"]      = LOOT_METHOD_ROUNDROBIN,
-  ["master"]          = LOOT_METHOD_MASTER,
-  ["group"]           = LOOT_METHOD_GROUP,
-  ["needbeforegreed"] = LOOT_METHOD_NEEDB4GREED,
-  ["personalloot"]    = LOOT_METHOD_PERSONAL,
-}
-
 -- Party or raid loot method
-KRP.loot_method = LOOT_METHOD_UNKNOWN
+KRP.loot_method = LOOT_METHOD_FREEFORALL
 
 -- Loot threshold
 KRP.loot_threshold = 0
@@ -250,7 +238,7 @@ local function reset_loot_method()
   KRP.master_looter = nil
   KRP.party_mlid = nil
   KRP.raid_mlid = nil
-  KRP.loot_method = LOOT_METHOD_UNKNOWN
+  KRP.loot_method = nil
   KRP.loot_threshold = 0
 end
 
@@ -299,12 +287,12 @@ local function update_loot_method_internal()
     return
   end
 
-  local lm, pmlid, rmlid = GetLootMethod()
+  local lm, pmlid, rmlid = C_PartyInfo.GetLootMethod()
   local mlname = nil
 
   KRP.party_mlid = pmlid
   KRP.raid_mlid = rmlid
-  KRP.loot_method = method_to_number[lm or "unknown"] or LOOT_METHOD_UNKNOWN
+  KRP.loot_method = lm or LOOT_METHOD_FREEFORALL
 
   if (KRP.loot_method == LOOT_METHOD_MASTER) then
     if (pmlid ~= nil) then

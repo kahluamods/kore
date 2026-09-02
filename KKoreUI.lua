@@ -979,8 +979,7 @@ function KUI:CreateDialogFrame(cfg, kparent)
   frame:SetBackdropColor(0, 0, 0, 1)
 
   if (frame:IsResizable()) then
-    frame:SetMinResize(cfg.minwidth or width, cfg.minheight or height)
-    frame:SetMaxResize(cfg.maxwidth or width, cfg.maxheight or height)
+    frame:SetResizeBounds(cfg.minwidth or width, cfg.minheight or height, cfg.maxwidth or width, cfg.maxheight or height)
   end
 
   if (cfg.xbutton) then
@@ -4770,11 +4769,9 @@ local function ksl_updatelist(this, nlist)
   local ga = this.headerspace + this.footerspace + (2 * this.borderoffset)
   local mh = ((x + 1) * this.itemheight) + ga
   local h = min(mh, this.uheight)
-  local mnw, _ = this:GetMinResize()
-  local mxw, _ = this:GetMaxResize()
+  local mnw, _, mxw, _ = this:GetResizeBounds()
   this.height = h
-  this:SetMinResize(mnw, (2 * this.itemheight) + ga + 48)
-  this:SetMaxResize(mxw, mh)
+  this:SetResizeBounds(mnw, (2 * this.itemheight) + ga + 48, mxw, mh)
   this:SetHeight(h)
   this.slist.itemcount = x
   this.slist:UpdateList()
