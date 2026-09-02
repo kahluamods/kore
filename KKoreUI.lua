@@ -2200,8 +2200,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
 
   local seframe, swframe, soframe = make_resizeable(frame, 25, cfg.canresize)
   if (seframe) then
-    frame:SetMinResize(cfg.minwidth or 192, cfg.minheight or 192)
-    frame:SetMaxResize(cfg.maxwidth or 1024, cfg.maxheight or 1024)
+    frame:SetResizeBounds(cfg.minwidth or 192, cfg.minheight or 192, cfg.maxwidth or 1024, cfg.maxwidth or 1024)
 
     -- This "draws" the little chevron at the bottom right corner that the user
     -- can drag to resize.
@@ -2969,7 +2968,10 @@ function KUI.HighlightItemHelper(objp, idx, slot, btn, onoff, onfn, offfn)
     end
     return
   else
-    btn:SetNormalTexture(nil)
+    local normal_texture = btn:GetNormalTexture()
+    if (normal_texture) then
+      normal_texture:SetTexture(nil)
+    end
     if (offfn) then
       return offfn(objp, idx, slot, btn, false)
     end
@@ -3780,7 +3782,10 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
     --
     if (not tbf.frame) then
       if ((not tbf.enabled) or (not tbf.clickable)) then
-        tbf:SetHighlightTexture(nil)
+        local hlt = tbf:GetHighlightTexture()
+        if hlt then
+          hlt:SetTexture(nil)
+        end
       else
         tbf:SetHighlightTexture("Interface/QuestFrame/UI-QuestTitleHighlight", "ADD")
       end
@@ -3844,8 +3849,7 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
   fr.widest = widest
   fr.extrawidth = xtra
 
-  fr:SetMinResize(fr.minwidth or wwidth, fr.minheight or wheight)
-  fr:SetMaxResize(fr.maxwidth or maxwidth, fr.maxheight or maxheight)
+  fr:SetResizeBounds(fr.minwidth or wwidth, fr.minheight or wheight, fr.maxwidth or maxwidth, fr.maxheight or maxheight)
 
   --
   -- Now we need to loop through all of the item frames one last time and
@@ -3939,8 +3943,7 @@ local function dd_refresh_frame(fr, tlfr, ilist, nilist)
   -- Check to see if the window is currently larger than the min/maximum. This
   -- can happen when items are refreshed and the maximum size changes.
   --
-  local mxwidth, mxheight = fr:GetMaxResize()
-  local mnwidth, mnheight = fr:GetMinResize()
+  local mnwidth, mnheight, mxwidth, mxheight = fr:GetResizeBounds()
   local cw, ch = fr:GetWidth(), fr:GetHeight()
   local sbx, sby = fr.scrollbar:GetMinMaxValues()
   if (cw < mnwidth) then

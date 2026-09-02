@@ -603,21 +603,12 @@ K.CLASS_PALADIN     = "02"
 K.CLASS_HUNTER      = "03"
 K.CLASS_ROGUE       = "04"
 K.CLASS_PRIEST      = "05"
-K.CLASS_DEATHKNIGHT = "06"
-K.CLASS_SHAMAN      = "07"
-K.CLASS_MAGE        = "08"
-K.CLASS_WARLOCK     = "09"
-K.CLASS_MONK        = "10"
-K.CLASS_DRUID       = "11"
-K.CLASS_DEMONHUNTER = "12"
+K.CLASS_SHAMAN      = "06"
+K.CLASS_MAGE        = "07"
+K.CLASS_WARLOCK     = "08"
+K.CLASS_DRUID       = "09"
 
-K.UnsupClasses = {
-  K.CLASS_DEATHKNIGHT,
-  K.CLASS_MONK,
-  K.CLASS_DEMONHUNTER,
-}
-
-K.EmptyClassFilter = "000000000000"
+K.EmptyClassFilter = "000000000"
 
 K.ClassIndex = {
   ["WARRIOR"]     = K.CLASS_WARRIOR,
@@ -633,9 +624,6 @@ K.ClassIndex = {
 
 local kClassTable = {}
 FillLocalizedClassList(kClassTable, false)
---kClassTable["DEATHKNIGHT"] = "Death Knight"
---kClassTable["MONK"] = "Monk"
---kClassTable["DEMONHUNTER"] = "Demon Hunter"
 
 local warrior = kClassTable["WARRIOR"]
 local paladin = kClassTable["PALADIN"]
@@ -1543,37 +1531,38 @@ end
 -- strategy will need to be re-thought.
 --
 K.classfilters = {}
-K.classfilters.weapon = LE_ITEM_CLASS_WEAPON   -- 2
-K.classfilters.armor  = LE_ITEM_CLASS_ARMOR    -- 4
+K.classfilters.weapon = Enum.ItemClass.Weapon   -- 2
+K.classfilters.armor  = Enum.ItemClass.Armor    -- 4
 
-local ohaxe    = LE_ITEM_WEAPON_AXE1H            -- 0
-local thaxe    = LE_ITEM_WEAPON_AXE2H            -- 1
-local bows     = LE_ITEM_WEAPON_BOWS             -- 2
-local guns     = LE_ITEM_WEAPON_GUNS             -- 3
-local ohmace   = LE_ITEM_WEAPON_MACE1H           -- 4
-local thmace   = LE_ITEM_WEAPON_MACE2H           -- 5
-local poles    = LE_ITEM_WEAPON_POLEARM          -- 6
-local ohsword  = LE_ITEM_WEAPON_SWORD1H          -- 7
-local thsword  = LE_ITEM_WEAPON_SWORD2H          -- 8
-local staves   = LE_ITEM_WEAPON_STAFF            -- 10
-local fist     = LE_ITEM_WEAPON_UNARMED          -- 13
-local miscw    = LE_ITEM_WEAPON_GENERIC          -- 14
-local daggers  = LE_ITEM_WEAPON_DAGGER           -- 15
-local thrown   = LE_ITEM_WEAPON_THROWN           -- 16
-local xbows    = LE_ITEM_WEAPON_CROSSBOW         -- 18
-local wands    = LE_ITEM_WEAPON_WAND             -- 19
-local fish     = LE_ITEM_WEAPON_FISHINGPOLE      -- 20
+local ohaxe    = Enum.ItemWeaponSubclass.Axe1H          -- 0
+local thaxe    = Enum.ItemWeaponSubclass.Axe2H          -- 1
+local bows     = Enum.ItemWeaponSubclass.Bows           -- 2
+local guns     = Enum.ItemWeaponSubclass.Guns           -- 3
+local ohmace   = Enum.ItemWeaponSubclass.Mace1H         -- 4
+local thmace   = Enum.ItemWeaponSubclass.Mace2H         -- 5
+local poles    = Enum.ItemWeaponSubclass.Polearm        -- 6
+local ohsword  = Enum.ItemWeaponSubclass.Sword1H        -- 7
+local thsword  = Enum.ItemWeaponSubclass.Sword2H        -- 8
+local thsword  = Enum.ItemWeaponSubclass.Warglaive      -- 9
+local staves   = Enum.ItemWeaponSubclass.Staff          -- 10
+local fist     = Enum.ItemWeaponSubclass.Unarmed        -- 13
+local miscw    = Enum.ItemWeaponSubclass.Generic        -- 14
+local daggers  = Enum.ItemWeaponSubclass.Dagger         -- 15
+local thrown   = Enum.ItemWeaponSubclass.Thrown         -- 16
+local xbows    = Enum.ItemWeaponSubclass.Crossbow       -- 18
+local wands    = Enum.ItemWeaponSubclass.Wand           -- 19
+local fish     = Enum.ItemWeaponSubclass.Fishingpole	-- 20
 
-local amisc    = LE_ITEM_ARMOR_GENERIC           -- 0
-local cloth    = LE_ITEM_ARMOR_CLOTH             -- 1
-local leather  = LE_ITEM_ARMOR_LEATHER           -- 2
-local mail     = LE_ITEM_ARMOR_MAIL              -- 3
-local plate    = LE_ITEM_ARMOR_PLATE             -- 4
-local cosmetic = LE_ITEM_ARMOR_COSMETIC          -- 5
-local shields  = LE_ITEM_ARMOR_SHIELD            -- 6
-local libram   = LE_ITEM_ARMOR_LIBRAM            -- 7
-local idols    = LE_ITEM_ARMOR_IDOL              -- 8
-local totems   = LE_ITEM_ARMOR_TOTEM             -- 9
+local amisc    = Enum.ItemArmorSubclass.Generic           -- 0
+local cloth    = Enum.ItemArmorSubclass.Cloth             -- 1
+local leather  = Enum.ItemArmorSubclass.Leather           -- 2
+local mail     = Enum.ItemArmorSubclass.Mail              -- 3
+local plate    = Enum.ItemArmorSubclass.Plate             -- 4
+local cosmetic = Enum.ItemArmorSubclass.Cosmetic          -- 5
+local shields  = Enum.ItemArmorSubclass.Shield            -- 6
+local libram   = Enum.ItemArmorSubclass.Libram            -- 7
+local idols    = Enum.ItemArmorSubclass.Idol              -- 8
+local totems   = Enum.ItemArmorSubclass.Totem             -- 9
 
 K.classfilters.strict = {}
 K.classfilters.relaxed = {}
@@ -1583,53 +1572,51 @@ K.classfilters.weapons = {}
 --                                 ||+----------- Hunters             3
 --                                 |||+---------- Rogues              4
 --                                 ||||+--------- Priests             5
---                                 |||||+-------- Death Knights       6
---                                 ||||||+------- Shaman              7
---                                 |||||||+------ Mages               8
---                                 ||||||||+----- Warlocks            9
---                                 |||||||||+---- Monks               10
---                                 ||||||||||+--- Druids              11
---                                 |||||||||||+-- Demon Hunter        12
-K.classfilters.strict[amisc]    = "111111111111"
-K.classfilters.strict[cloth]    = "000010011000"
-K.classfilters.strict[leather]  = "000100000111"
-K.classfilters.strict[mail]     = "001000100000"
-K.classfilters.strict[plate]    = "110001000000"
-K.classfilters.strict[cosmetic] = "111111111111"
-K.classfilters.strict[shields]  = "110000100000"
-K.classfilters.strict[libram]   = "010000000000"
-K.classfilters.strict[idols]    = "000000000010"
-K.classfilters.strict[totems]   = "000000010000"
-K.classfilters.relaxed[amisc]   = "111111111111"
-K.classfilters.relaxed[cloth]   = "111111111111"
-K.classfilters.relaxed[leather] = "111101100111"
-K.classfilters.relaxed[mail]    = "111001100000"
-K.classfilters.relaxed[plate]   = "110001000000"
-K.classfilters.relaxed[cosmetic]= "111111111111"
-K.classfilters.relaxed[shields] = "110000100000"
-K.classfilters.relaxed[libram]  = "010000000000"
-K.classfilters.relaxed[idols]   = "000000000010"
-K.classfilters.relaxed[totems]  = "000000010000"
-K.classfilters.weapons[ohaxe]   = "111101100101"
-K.classfilters.weapons[thaxe]   = "111001100000"
-K.classfilters.weapons[bows]    = "101100000000"
-K.classfilters.weapons[guns]    = "101100000000"
-K.classfilters.weapons[ohmace]  = "110111100110"
-K.classfilters.weapons[thmace]  = "110001100010"
-K.classfilters.weapons[poles]   = "111001000110"
-K.classfilters.weapons[ohsword] = "111101011101"
-K.classfilters.weapons[thsword] = "111001000000"
-K.classfilters.weapons[staves]  = "101010111110"
-K.classfilters.weapons[fist]    = "101100100111"
-K.classfilters.weapons[miscw]   = "111111111111"
-K.classfilters.weapons[daggers] = "101110111011"
-K.classfilters.weapons[thrown]  = "101100000000"
-K.classfilters.weapons[xbows]   = "101100000000"
-K.classfilters.weapons[wands]   = "000010011000"
--- K.classfilters.weapons[glaives] = "100101000101"
-K.classfilters.weapons[fish]    = "111111111111"
+--                                 ||||||+------- Shaman              6
+--                                 |||||||+------ Mages               7
+--                                 ||||||||+----- Warlocks            8
+--                                 ||||||||||+--- Druids              9
+K.classfilters.strict[amisc]    = "111111111"
+K.classfilters.strict[cloth]    = "000010110"
+K.classfilters.strict[leather]  = "000100001"
+K.classfilters.strict[mail]     = "001001000"
+K.classfilters.strict[plate]    = "110000000"
+K.classfilters.strict[cosmetic] = "111111111"
+K.classfilters.strict[shields]  = "110001000"
+K.classfilters.strict[libram]   = "010000000"
+K.classfilters.strict[idols]    = "000000001"
+K.classfilters.strict[totems]   = "000000100"
 
-K.classfilters.allclasses       = "111111111111"
+K.classfilters.relaxed[amisc]   = "111111111"
+K.classfilters.relaxed[cloth]   = "111111111"
+K.classfilters.relaxed[leather] = "111101001"
+K.classfilters.relaxed[mail]    = "111001000"
+K.classfilters.relaxed[plate]   = "110000000"
+K.classfilters.relaxed[cosmetic]= "111111111"
+K.classfilters.relaxed[shields] = "110001000"
+K.classfilters.relaxed[libram]  = "010000000"
+K.classfilters.relaxed[idols]   = "000000001"
+K.classfilters.relaxed[totems]  = "000000100"
+
+K.classfilters.weapons[ohaxe]   = "111101000"
+K.classfilters.weapons[thaxe]   = "111001000"
+K.classfilters.weapons[bows]    = "101100000"
+K.classfilters.weapons[guns]    = "101100000"
+K.classfilters.weapons[ohmace]  = "110111001"
+K.classfilters.weapons[thmace]  = "110001001"
+K.classfilters.weapons[poles]   = "111000001"
+K.classfilters.weapons[ohsword] = "111100110"
+K.classfilters.weapons[thsword] = "111000000"
+K.classfilters.weapons[staves]  = "101011111"
+K.classfilters.weapons[fist]    = "101101001"
+K.classfilters.weapons[miscw]   = "111111111"
+K.classfilters.weapons[daggers] = "101111111"
+K.classfilters.weapons[thrown]  = "101100000"
+K.classfilters.weapons[xbows]   = "101100000"
+K.classfilters.weapons[wands]   = "000010110"
+K.classfilters.weapons[fish]    = "111111111"
+
+K.classfilters.allclasses       = "111111111"
 
 --
 -- This function will take a given itemlink and examine its tooltip looking
