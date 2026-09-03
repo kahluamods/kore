@@ -1,8 +1,6 @@
 --[[
    KahLua Kore - loot distribution handling.
-     WWW: http://kahluamod.com/kore
      Git: https://github.com/kahluamods/kore
-     IRC: #KahLua on irc.freenode.net
      E-mail: me@cruciformer.com
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
@@ -31,6 +29,39 @@ if (not KK) then
 end
 
 KK.debug_id = KKOREKONFER_MAJOR
+
+--
+-- The KKore wire protocol version. This versions the message envelope only:
+-- the framing, the checksum and the serialisation. It is shared by every
+-- KKore based addon and is entirely separate from any addon's own protocol
+-- number, which versions that addon's events and their arguments.
+--
+--   1 - original envelope; the CRC32 covered the payload alone
+--   2 - the CRC32 covers the header (protocol, command, config) as well
+--
+-- We always send the current version. On receipt we accept anything from
+-- KKORE_WIRE_MIN upwards, falling back through the older checksum rules, so
+-- that a newer client can still read an older one's messages.
+--
+KK.WIRE_VERSION = 2
+KK.WIRE_VERSION_MIN = 1
+
+--
+-- VCHEK and VCACK are always sent at protocol 2 rather than at the sending
+-- addon's current protocol, because the version check has to work between two
+-- mismatched versions -- it is how anyone finds out they are out of date. On
+-- receipt the only protocol test is "is this newer than I understand", so a
+-- message pinned at 2 is always accepted.
+--
+-- That relies on an invariant every Konfer addon must hold: its protocol
+-- number starts at 2 and only ever increases. Protocol 1 means "predates the
+-- version check". Never give an addon a protocol below 2, or its own version
+-- check will trip the OldProtoDialog.
+--
+KK.VCHECK_PROTOCOL = 2
+
+local KKORE_WIRE = KK.WIRE_VERSION
+local KKORE_WIRE_MIN = KK.WIRE_VERSION_MIN
 
 local K, KM = LibStub:GetLibrary("KKore")
 assert(K, "KKoreKonfer requires KKore")
@@ -360,7 +391,7 @@ function KK:OldProtoDialog()
     name = self.konfer.handle .. "OldProtoDialog",
     x = "CENTER", y = "MIDDLE", border = true, blackbg = true,
     okbutton = { text = K.OK_STR }, canmove = false, canresize = false,
-    escclose = false, width = 450, height = 100, title = self.title,
+    escclose = false, width = 450, height = 100, title = self.konfer.title,
   }
   local dlg = KUI:CreateDialogFrame(arg)
   dlg.OnAccept = function(this)
@@ -401,6 +432,17 @@ end
 --
 -- Each handler is called with the command, config ID, protocol version and
 -- then any other data.
+--
+-- Two independent things are versioned here, and they must not be confused:
+--
+--   KKORE_WIRE (below) versions this envelope -- the framing, the checksum and
+--   the serialisation. It belongs to KKore, is the same for every addon built
+--   on it, and changes only when this file or KKoreHash changes.
+--
+--   self.protocol is the *addon's* protocol: the set of events it sends and
+--   understands, and their arguments. It says nothing about the wire format.
+--
+-- A change to one must never require a bump of the other.
 --
 local function send_addon_msg(self, cfg, cmd, prio, dist, target, ...)
   local proto = self.protocol
@@ -443,6 +485,21 @@ local function send_addon_msg(self, cfg, cmd, prio, dist, target, ...)
   K:SendCommMessage(self.CHAT_MSG_PREFIX, fs, dist, target, prio)
 end
 
+-- Complain about a given sender at most once every ten minutes.
+local userwarn = {}
+
+local function warn_once(sender, fmt, ...)
+  local t = K.time()
+  local n = userwarn[sender]
+
+  if (n and (t - n) < 600) then
+    return
+  end
+
+  userwarn[sender] = t
+  printf(K.ecolor, fmt, ...)
+end
+
 -- Designed to process host addon's OnCommReceived with a dispatcher.
 local function comm_received(self, prefix, msg, dist, snd, dispatcher)
   local sender = K.CanonicalName(snd)
@@ -468,8 +525,13 @@ local function comm_received(self, prefix, msg, dist, snd, dispatcher)
 
   local proto = tonumber(ps, 16)
 
+  if (not proto) then
+    self.debug(4, "unparseable protocol from %q", sender)
+    return
+  end
+
   if (proto > self.protocol) then
-    KK.OldProtoDialog(keg)
+    KK.OldProtoDialog(self)
     return
   end
 
@@ -501,26 +563,42 @@ local function comm_received(self, prefix, msg, dist, snd, dispatcher)
     return
   end
 
-  local fs = strfmt("%02x:%s:%s:", proto, cmd, cfg)
-  local crc = H:CRC32(fs, nil, false)
-  crc = H:CRC32(data, crc, true)
+  --
+  -- Work out which envelope version this came from by which checksum rule it
+  -- satisfies. The envelope carries no version field of its own, but each
+  -- version computes the CRC over a different span, so the checksum that
+  -- matches identifies the sender's wire version.
+  --
+  local wire = nil
+  local mf = nil
 
-  local mf = K.hexstr(crc)
+  for w = KKORE_WIRE, KKORE_WIRE_MIN, -1 do
+    local crc
 
-  if (mf ~= msum) then
-    local t = K.time()
-    local n = userwarn[sender]
-    if (n and ((n - t) >= 600)) then
-      userwarn[sender] = nil
+    if (w >= 2) then
+      -- Header and payload.
+      crc = H:CRC32(strfmt("%02x:%s:%s:", proto, cmd, cfg), nil, false)
+      crc = H:CRC32(data, crc, true)
+    else
+      -- Payload alone.
+      crc = H:CRC32(data)
     end
 
+    mf = K.hexstr(crc)
+    if (mf == msum) then
+      wire = w
+      break
+    end
+  end
+
+  if (not wire) then
     self.debug(1, "mismatch: cmd=%q mysum=%q theirsum=%q", tostring(cmd), tostring(mf), tostring(msum))
-
-    if (not userwarn[sender]) then
-      printf(K.ecolor, "WARNING: addon message from %q was truncated!", sender)
-      userwarn[sender] = t
-    end
+    warn_once(sender, "WARNING: addon message from %q was truncated!", tostring(sender))
     return
+  end
+
+  if (wire < KKORE_WIRE) then
+    self.debug(2, "recv: wire version %d from %q", wire, tostring(sender))
   end
 
   local decoded = ZL:DecodeForWoWAddonChannel(data)
@@ -528,6 +606,7 @@ local function comm_received(self, prefix, msg, dist, snd, dispatcher)
     self.debug(4, "recv: decode failed for %q from %q", cmd, sender)
     return
   end
+
 
   local inflated = ZL:DecompressDeflate(decoded)
   if (not inflated) then
@@ -626,8 +705,6 @@ local function send_raid_warning(self, text)
     SendChatMessage("{skull}{skull} " .. text .. " {skull}{skull}", "PARTY")
   end
 end
-
-local userwarn = userwarn or {}
 
 --
 -- Shared dialog for version checks.
@@ -828,9 +905,9 @@ local function kk_version_check(self)
   self.mainwin:Hide()
   vcdlg:Show()
 
-  self:SendAM({proto = 2, cmd = "VCHEK"}, nil)
+  self:SendAM({proto = KK.VCHECK_PROTOCOL, cmd = "VCHEK"}, nil)
   if (K.player.is_guilded) then
-    self:SendGuildAM({proto = 2, cmd = "VCHEK"}, nil)
+    self:SendGuildAM({proto = KK.VCHECK_PROTOCOL, cmd = "VCHEK"}, nil)
   end
 end
 
@@ -865,6 +942,7 @@ function KK.RegisterKonfer(kmod)
   end
 
   assert(kmod.protocol)
+  assert(kmod.protocol >= KK.VCHECK_PROTOCOL)
 
   kmod.konfer = targ
   kmod.CSendAM = send_to_raid_or_party_am_c

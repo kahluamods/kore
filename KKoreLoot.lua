@@ -1,8 +1,6 @@
 --[[
    KahLua Kore - loot distribution handling.
-     WWW: http://kahluamod.com/kore
      Git: https://github.com/kahluamods/kore
-     IRC: #KahLua on irc.freenode.net
      E-mail: me@cruciformer.com
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
@@ -125,6 +123,7 @@ KLD.valid_callbacks = {
   ["start_loot_info"] = true,
   ["end_loot_info"] = true,
   ["looting_ready"] = true,
+  ["looting_ended"] = true,
   ["loot_assigned"] = true,
 }
 
@@ -302,7 +301,7 @@ end
 -- Fires   : ITEMS_UPDATED
 --
 function KLD.RefreshLoot()
-  if (KLD.initialised) then
+  if (not KLD.initialised) then
     return
   end
 
@@ -311,6 +310,28 @@ function KLD.RefreshLoot()
 
   populate_loot_target()
   populate_items()
+end
+
+--
+-- Function: KLD.RefreshCandidates()
+-- Purpose : Re-read the master loot candidate list for every item we already
+--           know about, in place. The item list has not changed, only who is
+--           eligible to receive it.
+--
+--           Deliberately does NOT fire start_loot_info / loot_item /
+--           end_loot_info: those tell a consumer to rebuild its loot list,
+--           which cancels any bid or roll in progress. UPDATE_MASTER_LOOT_LIST
+--           can fire repeatedly while bidding is open.
+-- Callback: Calls ml_candidate for each candidate.
+--
+function KLD.RefreshCandidates()
+  if (not KLD.initialised or not KLD.items) then
+    return
+  end
+
+  for slot, item in pairs(KLD.items) do
+    item.candidates = get_ml_candidates(slot) or {}
+  end
 end
 
 --
@@ -373,17 +394,31 @@ local function loot_closed_evt()
   KLD:DoCallbacks("looting_ended")
 end
 
-local function unit_spellcast_succeeded(evt, caster, sname, rank, tgt)
-  if (caster == "player") then
-    if (sname == OPENING) then
-      KLD.chest_name = tgt
-      return
-    end
+local function unit_spellcast_succeeded(evt, unitid, castguid, spellid)
+  if (unitid ~= "player" or not spellid) then
+    return
+  end
 
-    if ((sname == disenchant_name) or (sname == herbalism_name) or
-        (sname == mining_name)) then
-      KLD.skip_loot = true
+  local sname = GetSpellInfo(spellid)
+  if (not sname) then
+    return
+  end
+
+  if (sname == OPENING) then
+    --
+    -- The event carries no target name, so use our own target if we have one.
+    -- populate_loot_target() falls back to the localised "Chest" if not.
+    --
+    local tgt = UnitName("target")
+    if (tgt and tgt ~= "") then
+      KLD.chest_name = tgt
     end
+    return
+  end
+
+  if ((sname == disenchant_name) or (sname == herbalism_name) or
+      (sname == mining_name)) then
+    KLD.skip_loot = true
   end
 end
 
@@ -414,7 +449,7 @@ function KLD:OnLateInit()
   KLD:RegisterEvent("LOOT_READY", loot_ready_evt)
   KLD:RegisterEvent("LOOT_CLOSED", loot_closed_evt)
   KLD:RegisterEvent("UPDATE_MASTER_LOOT_LIST", function()
-    KLD:RefreshLoot()
+    KLD.RefreshCandidates()
   end)
   KLD:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", unit_spellcast_succeeded)
 

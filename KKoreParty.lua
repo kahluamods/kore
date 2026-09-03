@@ -1,8 +1,6 @@
 --[[
    KahLua Kore - party and raid monitoring.
-     WWW: http://kahluamod.com/kore
      Git: https://github.com/kahluamods/kore
-     IRC: #KahLua on irc.freenode.net
      E-mail: me@cruciformer.com
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
@@ -43,6 +41,7 @@ K:RegisterExtension(KRP, KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
 
 local printf = K.printf
 local tinsert = table.insert
+local strfmt = string.format
 
 local function debug(lvl,...)
   K.debug("kore", lvl, ...)
@@ -153,11 +152,7 @@ KRP.LOOT_METHOD_NEEDB4GREED = Enum.LootMethod.Needbeforegreed
 KRP.LOOT_METHOD_PERSONAL    = Enum.LootMethod.Personal
 
 local LOOT_METHOD_FREEFORALL  = KRP.LOOT_METHOD_FREEFORALL
-local LOOT_METHOD_ROUNDROBIN  = KRP.LOOT_METHOD_ROUNDROBIN
 local LOOT_METHOD_MASTER      = KRP.LOOT_METHOD_MASTER
-local LOOT_METHOD_GROUP       = KRP.LOOT_METHOD_GROUP
-local LOOT_METHOD_NEEDB4GREED = KRP.LOOT_METHOD_NEEDB4GREED
-local LOOT_METHOD_PERSONAL    = KRP.LOOT_METHOD_PERSONAL
 
 -- Party or raid loot method
 KRP.loot_method = LOOT_METHOD_FREEFORALL
@@ -600,6 +595,12 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
 
   KRP:DoCallbacks("update_group_start", old_inparty, old_inraid, old_inbg)
 
+  -- Every exit path from here owes listeners the matching update_group_end.
+  local function bail()
+    KRP:DoCallbacks("update_group_end", KRP.in_party, KRP.in_raid, KRP.in_bg)
+    return false
+  end
+
   if (IsInGroup()) then
     in_party = true
   end
@@ -686,7 +687,7 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
   -- Always add ourselves to the players list
   populate_unit(player, "player")
   if (not player.name) then
-    return false
+    return bail()
   end
   player.unitid = "player"
   player.is_ml = KRP.is_ml
@@ -729,7 +730,7 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
           KRP:DoCallbacks("new_player", players[player.name])
           party[i] = player.name
         else
-          return false
+          return bail()
         end
       end
     end
@@ -783,7 +784,7 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
             raid[i] = player.name
             tinsert(raidgroups[subgrp], player.name)
           else
-            return false
+            return bail()
           end
         end
       end
@@ -980,9 +981,6 @@ function KRP:OnLateInit()
     KRP.UpdateRole(false)
   end)
   K:RegisterEvent("GROUP_ROSTER_UPDATE", function(evt)
-    KRP.UpdateGroup(false, false, false)
-  end)
-  K:RegisterEvent("RAID_ROSTER_UPDATE", function(evt)
     KRP.UpdateGroup(false, false, false)
   end)
   K:RegisterEvent("READY_CHECK", ready_check_start)

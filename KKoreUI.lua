@@ -1,8 +1,6 @@
 --[[
    KahLua Kore - core library functions for KahLua addons.
-     WWW: http://kahluamod.com/kore
      Git: https://github.com/kahluamods/kore
-     IRC: #KahLua on irc.freenode.net
      E-mail: me@cruciformer.com
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
@@ -184,6 +182,9 @@ local MakeFrame = KUI.MakeFrame
 
 KUI.wcounters = KUI.wcounters or {}
 
+-- Defined further down; needed by the menu widget factory before that point.
+local tl_OnEnter, tl_OnLeave, get_radiowidget
+
 local function add_escclose(fname)
   for k,v in pairs(UISpecialFrames) do
     if (v == fname) then
@@ -196,7 +197,9 @@ end
 local function remove_escclose(fname)
   for k,v in pairs(UISpecialFrames) do
     if (v == fname) then
+      -- tremove invalidates the pairs() iterator, and names are unique here.
       tremove(UISpecialFrames, k)
+      return
     end
   end
 end
@@ -287,7 +290,7 @@ end
 -- second is a user-defined hander that they install with Catch().
 --
 function BC.Throw(self, event, ...)
-  local ok,rv
+  local ok,rv,fail
 
   if (self[event] and type(self[event]) == "function") then
     ok, fail = safecall(self[event], self, event, ...)
@@ -2199,7 +2202,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
 
   local seframe, swframe, soframe = make_resizeable(frame, 25, cfg.canresize)
   if (seframe) then
-    frame:SetResizeBounds(cfg.minwidth or 192, cfg.minheight or 192, cfg.maxwidth or 1024, cfg.maxwidth or 1024)
+    frame:SetResizeBounds(cfg.minwidth or 192, cfg.minheight or 192, cfg.maxwidth or 1024, cfg.maxheight or 1024)
 
     -- This "draws" the little chevron at the bottom right corner that the user
     -- can drag to resize.
@@ -2479,7 +2482,7 @@ local function sl_setsel(objp, offset, force)
         cslot = i
         cbtn = objp.slots[i]
       end
-      if (offset and ro == ofset) then
+      if (offset and ro == offset) then
         nslot = i
         nbtn = objp.slots[i]
       end
@@ -3024,12 +3027,13 @@ local function tl_OnHide(this)
   end
 end
 
-local function tl_OnEnter(this)
+-- Forward declared at the top of this file.
+function tl_OnEnter(this)
   this.toplevel:StopTimeoutCounter()
   do_tooltip_onenter(this, this.enabled or false)
 end
 
-local function tl_OnLeave(this)
+function tl_OnLeave(this)
   this.toplevel:StartTimeoutCounter()
   GameTooltip:Hide()
 end
@@ -4670,7 +4674,8 @@ end
 --
 -- Helper function for creating custom frames as popup item widgets.
 --
-local function get_radiowidget(this)
+-- Forward declared at the top of this file.
+function get_radiowidget(this)
   return this.frame or this
 end
 

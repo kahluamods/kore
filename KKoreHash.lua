@@ -184,7 +184,7 @@ function H:MD5Update(ctx, buf, len)
   t = band(rshift(ctx.bits[0], 3), 0x3f)
 
   if ((ctx.bits[0] + lshift(len, 3)) < ctx.bits[0]) then
-    cts.bits[1] = ctx.bits[1] + 1
+    ctx.bits[1] = ctx.bits[1] + 1
   end
   ctx.bits[0] = ctx.bits[0] + lshift(len, 3)
   ctx.bits[1] = ctx.bits[1] + rshift(len, 29)
@@ -321,7 +321,7 @@ function H:CRC32(data, current_crc, finalise)
   local l = strlen(data)
   local j
 
-  if (c ~= nil) then
+  if (current_crc ~= nil) then
     crc = current_crc
   else
     crc = ff

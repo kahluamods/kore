@@ -1,8 +1,6 @@
 --[[
    KahLua Kore - core library functions for KahLua addons.
-     WWW: http://kahluamod.com/kore
      Git: https://github.com/kahluamods/kore
-     IRC: #KahLua on irc.freenode.net
      E-mail: me@cruciformer.com
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
@@ -446,7 +444,16 @@ local function update_player_and_guild(nofire)
 
     for i = 1, K.guild.numroster do
       local nm, _, ri, lvl, _, _, _, _, ol, _, cl = GetGuildRosterInfo(i)
-      nm = K.CanonicalName(nm)
+      nm = nm and K.CanonicalName(nm)
+      --
+      -- GetNumGuildMembers() counts the whole guild but GetGuildRosterInfo()
+      -- indexes the filtered roster, so with "show offline" off everything
+      -- past the online count is nil.
+      --
+      if (not nm) then
+        K.guild.numroster = i - 1
+        break
+      end
       local iv = { name = nm, rank = ri + 1, level = lvl, class = K.ClassIndex[cl], online = ol and true or false }
       tinsert(K.guild.roster.id, iv)
       K.guild.roster.name[nm] = i
@@ -608,7 +615,8 @@ K.CLASS_MAGE        = "07"
 K.CLASS_WARLOCK     = "08"
 K.CLASS_DRUID       = "09"
 
-K.EmptyClassFilter = "000000000"
+-- K.EmptyClassFilter and K.classfilters.allclasses are built further down,
+-- from K.ClassIndex, so that their width follows the class list.
 
 K.ClassIndex = {
   ["WARRIOR"]     = K.CLASS_WARRIOR,
@@ -782,16 +790,22 @@ end
 
 K.safecall = safecall
 
--- Utility function to copy one table to another
-function K.CopyTable(src, dest)
+--
+-- Utility function to copy one table to another. SEEN is internal: it maps a
+-- source table to its copy, so cycles terminate and shared sub-tables stay
+-- shared in the result.
+--
+function K.CopyTable(src, dest, seen)
   if (type(dest) ~= "table") then
     dest = {}
   end
 
   if (type(src) == "table") then
+    seen = seen or {}
+    seen[src] = dest
     for k, v in pairs(src) do
       if (type(v) == "table") then
-        v = K.CopyTable(v, dest[k])
+        v = seen[v] or K.CopyTable(v, dest[k], seen)
       end
       dest[k] = v
     end
@@ -972,7 +986,7 @@ local function kahlua(input)
     for k,v in pairs(K.extensions) do
       K.printf(K.ucolor, "    |cffffff00%s|r %s", k, strfmt(L["KAHLUA_VER"], v.version))
     end
-    K.printf(K.ucolor, "This is open source software, distributed under the terms of the Apache license. For the latest version, other KahLua modules and discussion forums, visit |cffffffffhttp://www.kahluamod.com|r.")
+    K.printf(K.ucolor, "This is open source software, distributed under the terms of the Apache license. For the latest version and other KahLua modules, visit |cffffffffhttps://www.curseforge.com/wow/addons/ksk-classic|r.")
     return
   end
 
@@ -991,7 +1005,7 @@ local function kahlua(input)
     kahlua_usage()
     return
   end
-  strlower(cmd)
+  cmd = strlower(cmd)
 
   if (not K.slashtable[cmd]) then
     K.printf(K.ecolor, L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."], cmd, "|cffffffff", L["CMD_KAHLUA"], L["CMD_LIST"], "|r")
@@ -1032,7 +1046,7 @@ local function kcmdfunc(input)
     kcmdfunc()
     return
   end
-  strlower(cmd)
+  cmd = strlower(cmd)
 
   if (cmd == L["CMD_DEBUG"] or cmd == "debug") then
     local md, lvl, npos = K.GetArgs(input, 2, pos)
@@ -1078,7 +1092,7 @@ local function RegisterSlashCommand(name, func, desc, version, ...)
     error ("KahLua Kore: I18N initialization did not complete.", 2)
   end
 
-  strlower(name)
+  name = strlower(name)
 
   if (not K.slashtable) then
     K.slashtable = {}
@@ -1133,7 +1147,7 @@ local function RegisterSlashCommand(name, func, desc, version, ...)
         ds = "SLASH_" .. sn .. tostring(c)
         _G[ds] = "/" .. kk:lower()
       else
-        asn = sn .. "_" .. kk:upper()
+        local asn = sn .. "_" .. kk:upper()
         SlashCmdList[asn] = vv
         ds = "SLASH_" .. asn .. "1"
         _G[ds] = "/" .. kk
@@ -1312,6 +1326,7 @@ end
 local function addonOnUpdate(this, event)
   this:SetScript("OnUpdate", nil)
   update_player_and_guild()
+
   if (kore_ready == 1) then
     kore_ready = 2
     -- For each extension or addon that is using us let them know that basic
@@ -1334,8 +1349,6 @@ K.addonframe:SetScript("OnEvent", addonOnEvent)
 K.addonframe:SetScript("OnUpdate", addonOnUpdate)
 K.addonframe:RegisterEvent("PLAYER_LOGIN")
 K.addonframe:RegisterEvent("PLAYER_ENTERING_WORLD")
-
-K.addons = {}
 
 local addonembeds = {
   "DoCallbacks", "RegisterAddon", "SuspendAddon", "ResumeAddon",
@@ -1531,92 +1544,163 @@ end
 -- strategy will need to be re-thought.
 --
 K.classfilters = {}
-K.classfilters.weapon = Enum.ItemClass.Weapon   -- 2
-K.classfilters.armor  = Enum.ItemClass.Armor    -- 4
 
-local ohaxe    = Enum.ItemWeaponSubclass.Axe1H          -- 0
-local thaxe    = Enum.ItemWeaponSubclass.Axe2H          -- 1
-local bows     = Enum.ItemWeaponSubclass.Bows           -- 2
-local guns     = Enum.ItemWeaponSubclass.Guns           -- 3
-local ohmace   = Enum.ItemWeaponSubclass.Mace1H         -- 4
-local thmace   = Enum.ItemWeaponSubclass.Mace2H         -- 5
-local poles    = Enum.ItemWeaponSubclass.Polearm        -- 6
-local ohsword  = Enum.ItemWeaponSubclass.Sword1H        -- 7
-local thsword  = Enum.ItemWeaponSubclass.Sword2H        -- 8
-local thsword  = Enum.ItemWeaponSubclass.Warglaive      -- 9
-local staves   = Enum.ItemWeaponSubclass.Staff          -- 10
-local fist     = Enum.ItemWeaponSubclass.Unarmed        -- 13
-local miscw    = Enum.ItemWeaponSubclass.Generic        -- 14
-local daggers  = Enum.ItemWeaponSubclass.Dagger         -- 15
-local thrown   = Enum.ItemWeaponSubclass.Thrown         -- 16
-local xbows    = Enum.ItemWeaponSubclass.Crossbow       -- 18
-local wands    = Enum.ItemWeaponSubclass.Wand           -- 19
-local fish     = Enum.ItemWeaponSubclass.Fishingpole	-- 20
+K.classfilters.weapon = Enum.ItemClass.Weapon
+K.classfilters.armor  = Enum.ItemClass.Armor
 
-local amisc    = Enum.ItemArmorSubclass.Generic           -- 0
-local cloth    = Enum.ItemArmorSubclass.Cloth             -- 1
-local leather  = Enum.ItemArmorSubclass.Leather           -- 2
-local mail     = Enum.ItemArmorSubclass.Mail              -- 3
-local plate    = Enum.ItemArmorSubclass.Plate             -- 4
-local cosmetic = Enum.ItemArmorSubclass.Cosmetic          -- 5
-local shields  = Enum.ItemArmorSubclass.Shield            -- 6
-local libram   = Enum.ItemArmorSubclass.Libram            -- 7
-local idols    = Enum.ItemArmorSubclass.Idol              -- 8
-local totems   = Enum.ItemArmorSubclass.Totem             -- 9
+--
+-- The item subclasses we filter on. Every name here must have an entry in the
+-- filter tables below or we assert at load, rather than handing out a nil mask
+-- at loot time.
+--
+-- Iterate these to walk the filter tables without touching Enum yourself:
+--   K.classfilters.weapons[K.WeaponSubclass[name]]
+K.WeaponSubclasses = {
+  "Axe1H", "Axe2H", "Bows", "Guns", "Mace1H", "Mace2H", "Polearm",
+  "Sword1H", "Sword2H", "Warglaive", "Staff", "Unarmed", "Generic",
+  "Dagger", "Thrown", "Crossbow", "Wand", "Fishingpole",
+}
 
-K.classfilters.strict = {}
-K.classfilters.relaxed = {}
-K.classfilters.weapons = {}
---                                 +------------- Warriors            1
---                                 |+------------ Paladins            2
---                                 ||+----------- Hunters             3
---                                 |||+---------- Rogues              4
---                                 ||||+--------- Priests             5
---                                 ||||||+------- Shaman              6
---                                 |||||||+------ Mages               7
---                                 ||||||||+----- Warlocks            8
---                                 ||||||||||+--- Druids              9
-K.classfilters.strict[amisc]    = "111111111"
-K.classfilters.strict[cloth]    = "000010110"
-K.classfilters.strict[leather]  = "000100001"
-K.classfilters.strict[mail]     = "001001000"
-K.classfilters.strict[plate]    = "110000000"
-K.classfilters.strict[cosmetic] = "111111111"
-K.classfilters.strict[shields]  = "110001000"
-K.classfilters.strict[libram]   = "010000000"
-K.classfilters.strict[idols]    = "000000001"
-K.classfilters.strict[totems]   = "000000100"
+K.ArmorSubclasses = {
+  "Generic", "Cloth", "Leather", "Mail", "Plate", "Cosmetic",
+  "Shield", "Libram", "Idol", "Totem",
+}
 
-K.classfilters.relaxed[amisc]   = "111111111"
-K.classfilters.relaxed[cloth]   = "111111111"
-K.classfilters.relaxed[leather] = "111101001"
-K.classfilters.relaxed[mail]    = "111001000"
-K.classfilters.relaxed[plate]   = "110000000"
-K.classfilters.relaxed[cosmetic]= "111111111"
-K.classfilters.relaxed[shields] = "110001000"
-K.classfilters.relaxed[libram]  = "010000000"
-K.classfilters.relaxed[idols]   = "000000001"
-K.classfilters.relaxed[totems]  = "000000100"
+--
+-- Name to numeric subclass value, and the reverse. Populated by build() below
+-- as it resolves each name, so a consumer never has to reach into Enum to
+-- index the filter tables or to name a subclass for display.
+--
+K.WeaponSubclass = {}
+K.ArmorSubclass = {}
+K.WeaponSubclassName = {}
+K.ArmorSubclassName = {}
 
-K.classfilters.weapons[ohaxe]   = "111101000"
-K.classfilters.weapons[thaxe]   = "111001000"
-K.classfilters.weapons[bows]    = "101100000"
-K.classfilters.weapons[guns]    = "101100000"
-K.classfilters.weapons[ohmace]  = "110111001"
-K.classfilters.weapons[thmace]  = "110001001"
-K.classfilters.weapons[poles]   = "111000001"
-K.classfilters.weapons[ohsword] = "111100110"
-K.classfilters.weapons[thsword] = "111000000"
-K.classfilters.weapons[staves]  = "101011111"
-K.classfilters.weapons[fist]    = "101101001"
-K.classfilters.weapons[miscw]   = "111111111"
-K.classfilters.weapons[daggers] = "101111111"
-K.classfilters.weapons[thrown]  = "101100000"
-K.classfilters.weapons[xbows]   = "101100000"
-K.classfilters.weapons[wands]   = "000010110"
-K.classfilters.weapons[fish]    = "111111111"
+--
+-- Class filters are stored and transmitted as a string of "0" and "1", one
+-- character per class, indexed by the numeric part of K.CLASS_xxx. They are
+-- authored below as sets of classes and the strings built at load, so the
+-- width follows K.ClassIndex: adding a class means adding it to K.ClassIndex
+-- and to the sets, with no re-indexing of anything by hand.
+--
+local WARRIOR, PALADIN, HUNTER = K.CLASS_WARRIOR, K.CLASS_PALADIN, K.CLASS_HUNTER
+local ROGUE,   PRIEST,  SHAMAN = K.CLASS_ROGUE,   K.CLASS_PRIEST,  K.CLASS_SHAMAN
+local MAGE,    WARLOCK, DRUID  = K.CLASS_MAGE,    K.CLASS_WARLOCK, K.CLASS_DRUID
 
-K.classfilters.allclasses       = "111111111"
+K.NUM_CLASSES = 0
+for _ in pairs(K.ClassIndex) do
+  K.NUM_CLASSES = K.NUM_CLASSES + 1
+end
+
+--
+-- Turn a list of K.CLASS_xxx constants into a filter string.
+--
+local function mask(classes)
+  local m = {}
+  for i = 1, K.NUM_CLASSES do
+    m[i] = "0"
+  end
+  for i = 1, #classes do
+    local cp = tonumber(classes[i])
+    assert(cp and cp >= 1 and cp <= K.NUM_CLASSES,
+      "KKore: bad class constant in a classfilters table")
+    m[cp] = "1"
+  end
+  return tconcat(m, "")
+end
+
+--
+-- Build a subclass-keyed table of filter strings from a name-keyed spec,
+-- asserting that every known subclass has been accounted for.
+--
+local function build(subclasses, ename, etbl, byname, byvalue, spec)
+  local out = {}
+  for i = 1, #subclasses do
+    local name = subclasses[i]
+    local v = etbl[name]
+    assert(v, "KKore: Enum." .. ename .. "." .. name .. " is missing")
+    local classes = spec[name]
+    assert(classes, "KKore: no class filter defined for " .. ename .. "." .. name)
+    byname[name] = v
+    byvalue[v] = name
+    out[v] = mask(classes)
+  end
+  return out
+end
+
+local ALL = { WARRIOR, PALADIN, HUNTER, ROGUE, PRIEST, SHAMAN, MAGE, WARLOCK, DRUID }
+
+K.classfilters.allclasses = mask(ALL)
+K.EmptyClassFilter        = mask({})
+
+--
+-- Strict armour filtering: only classes that actually wear this armour type.
+--
+K.classfilters.strict = build(K.ArmorSubclasses, "ItemArmorSubclass",
+  Enum.ItemArmorSubclass, K.ArmorSubclass, K.ArmorSubclassName, {
+  Generic  = ALL,
+  Cosmetic = ALL,
+  Cloth    = { PRIEST, MAGE, WARLOCK },
+  Leather  = { ROGUE, DRUID },
+  Mail     = { HUNTER, SHAMAN },
+  Plate    = { WARRIOR, PALADIN },
+  Shield   = { WARRIOR, PALADIN, SHAMAN },
+  Libram   = { PALADIN },
+  Idol     = { DRUID },
+  Totem    = { SHAMAN },
+})
+
+--
+-- Relaxed armour filtering: classes that may legitimately want this armour
+-- type even if it isn't their top proficiency.
+--
+K.classfilters.relaxed = build(K.ArmorSubclasses, "ItemArmorSubclass",
+  Enum.ItemArmorSubclass, K.ArmorSubclass, K.ArmorSubclassName, {
+  Generic  = ALL,
+  Cosmetic = ALL,
+  Cloth    = ALL,
+  Leather  = { WARRIOR, PALADIN, HUNTER, ROGUE, SHAMAN, DRUID },
+  Mail     = { WARRIOR, PALADIN, HUNTER, SHAMAN },
+  Plate    = { WARRIOR, PALADIN },
+  Shield   = { WARRIOR, PALADIN, SHAMAN },
+  Libram   = { PALADIN },
+  Idol     = { DRUID },
+  Totem    = { SHAMAN },
+})
+
+K.classfilters.weapons = build(K.WeaponSubclasses, "ItemWeaponSubclass",
+  Enum.ItemWeaponSubclass, K.WeaponSubclass, K.WeaponSubclassName, {
+  Axe1H       = { WARRIOR, PALADIN, HUNTER, ROGUE, SHAMAN },
+  Axe2H       = { WARRIOR, PALADIN, HUNTER, SHAMAN },
+  Bows        = { WARRIOR, HUNTER, ROGUE },
+  Guns        = { WARRIOR, HUNTER, ROGUE },
+  Crossbow    = { WARRIOR, HUNTER, ROGUE },
+  Thrown      = { WARRIOR, HUNTER, ROGUE },
+  Mace1H      = { WARRIOR, PALADIN, ROGUE, PRIEST, SHAMAN, DRUID },
+  Mace2H      = { WARRIOR, PALADIN, SHAMAN, DRUID },
+  Polearm     = { WARRIOR, PALADIN, HUNTER, DRUID },
+  Sword1H     = { WARRIOR, PALADIN, HUNTER, ROGUE, MAGE, WARLOCK },
+  Sword2H     = { WARRIOR, PALADIN, HUNTER },
+  Warglaive   = ALL,
+  Staff       = { WARRIOR, HUNTER, PRIEST, SHAMAN, MAGE, WARLOCK, DRUID },
+  Unarmed     = { WARRIOR, HUNTER, ROGUE, SHAMAN, DRUID },
+  Dagger      = { WARRIOR, HUNTER, ROGUE, PRIEST, SHAMAN, MAGE, WARLOCK, DRUID },
+  Wand        = { PRIEST, MAGE, WARLOCK },
+  Generic     = ALL,
+  Fishingpole = ALL,
+})
+
+--
+-- Returns equip location, item class and item subclass for an item.
+--
+-- GetItemInfoInstant reads the client's own item data and so cannot miss,
+-- where GetItemInfo returns nil until the server has answered for an item this
+-- client has not seen before.
+--
+function K.GetItemClassInfo(ilink)
+  local _, _, _, slot, _, icls, isubcls = GetItemInfoInstant(ilink)
+  return slot, icls, isubcls
+end
 
 --
 -- This function will take a given itemlink and examine its tooltip looking
@@ -1624,10 +1708,16 @@ K.classfilters.allclasses       = "111111111"
 -- use in a loot system. If no class restriction was found, return the
 -- all-inclusive mask.
 --
+-- Returns: filter, boe, cached
+--
+-- The tooltip can only be scanned once the client has the item data. Until
+-- then CACHED is false and the filter is provisional, so the caller should ask
+-- again on GET_ITEM_INFO_RECEIVED rather than persisting it.
+--
 function K.GetItemClassFilter(ilink)
   local tnm = GetItemInfo(ilink)
   if (not tnm or tnm == "") then
-    return K.classfilters.allclasses, nil
+    return K.classfilters.allclasses, nil, false
   end
 
   local tt = K.ScanTooltip(ilink)
@@ -1642,14 +1732,25 @@ function K.GetItemClassFilter(ilink)
 
   if (foo) then
     foo = gsub(foo, " ", "")
-    local clist = { "0","0","0","0","0","0","0","0","0","0","0", "0" }
+    local clist = {}
+    for i = 1, K.NUM_CLASSES do
+      clist[i] = "0"
+    end
     for k,v in pairs( { string.split(",", foo) } ) do
-      local cp = tonumber(K.LClassIndexNSP[v]) or 10
+      local cp = tonumber(K.LClassIndexNSP[v])
+      if (not cp or cp < 1 or cp > K.NUM_CLASSES) then
+        --
+        -- Refuse to filter rather than guess. Too many candidates is a
+        -- recoverable annoyance; hiding the only eligible one is not.
+        --
+        debug(1, "unknown class %q in class restriction for %s", tostring(v), tostring(ilink))
+        return K.classfilters.allclasses, boe, true
+      end
       clist[cp] = "1"
     end
-    return tconcat(clist, ""), boe
+    return tconcat(clist, ""), boe, true
   else
-    return K.classfilters.allclasses, boe
+    return K.classfilters.allclasses, boe, true
   end
 end
 
