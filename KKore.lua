@@ -1155,7 +1155,7 @@ local function guild_update(evt, arg1)
 
   if (evt == "GUILD_ROSTER_UPDATE") then
     if (arg1) then
-      GuildRoster()
+      C_GuildInfo.GuildRoster()
       return
     end
 

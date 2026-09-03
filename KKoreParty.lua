@@ -548,7 +548,11 @@ local function update_unit_flags(unm, pt, in_party, in_raid, players)
     local _, powertype = UnitPowerType(unm)
     ptbl.powertype = powertype or "MANA" -- Fall back to mana as a default
     ptbl.maxpower = UnitPowerMax(unm) or 0
-    ptbl.cantrade = CheckInteractDistance(unm, 2) or false
+    if InCombatLockdown() then
+      ptbl.cantrade = false
+    else
+      ptbl.cantrade = CheckInteractDistance(unm, 2) or false
+    end
     local irange, rced = UnitInRange(unm)
     if (rced and not irange) then
       ptbl.inrange = false
