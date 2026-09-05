@@ -317,8 +317,8 @@ function K.SingleStringInputDialog(kmod, name, title, text, width, height, xtras
     escclose = true,
     xbutton = false,
     blackbg = true,
-    okbutton = { text = K.ACCEPTSTR },
-    cancelbutton = { text = K.CANCELSTR },
+    okbutton = { text = K.ACCEPT_STR },
+    cancelbutton = { text = K.CANCEL_STR },
   }
   if (xtras and type(xtras) == "table") then
     for k,v in pairs(xtras) do
