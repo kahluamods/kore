@@ -24,7 +24,7 @@
 <Script file="UI.lua"/>
 <Script file="Party.lua"/>
 <Script file="Loot.lua"/>
-<Script file="Konfer.lua"/>
+<Script file="Comms.lua"/>
 <Script file="Dialogs.lua"/>
 
 </Ui>

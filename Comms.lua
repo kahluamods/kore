@@ -20,15 +20,15 @@
    limitations under the License.
 ]]
 
-local KOREKONFER_MAJOR = "KoreKonfer"
-local KOREKONFER_MINOR = 1
-local KK, oldminor = LibStub:NewLibrary(KOREKONFER_MAJOR, KOREKONFER_MINOR)
+local KORECOMMS_MAJOR = "KoreComms"
+local KORECOMMS_MINOR = 1
+local KC, oldminor = LibStub:NewLibrary(KORECOMMS_MAJOR, KORECOMMS_MINOR)
 
-if (not KK) then
+if (not KC) then
   return
 end
 
-KK.debug_id = KOREKONFER_MAJOR
+KC.debug_id = KORECOMMS_MAJOR
 
 --
 -- The Kore wire protocol version. This versions the message envelope only:
@@ -44,44 +44,45 @@ KK.debug_id = KOREKONFER_MAJOR
 -- second version is added, comm_received() below is where the receiver has to
 -- learn how to recognise the older one.
 --
-KK.WIRE_VERSION = 1
+KC.WIRE_VERSION = 1
 
 --
--- VCHEK and VCACK are always sent at protocol 1 rather than at the sending
--- addon's current protocol, because the version check has to work between two
--- mismatched versions -- it is how anyone finds out they are out of date. On
--- receipt the only protocol test is "is this newer than I understand", so a
--- message pinned at 1 is always accepted.
+-- The channels a caller's config can talk on. This is the only field
+-- KoreComms interprets in a config table, and it has just two meaningful
+-- values: the guild addon channel, or the group the player is currently in.
+-- Anything absent or unrecognised is treated as CHANNEL_OTHER, so a caller
+-- that knows nothing about channels still gets sensible group-local delivery.
 --
-KK.VCHECK_PROTOCOL = 1
+KC.CHANNEL_GUILD = 1
+KC.CHANNEL_OTHER = 2
 
 local K, KM = LibStub:GetLibrary("Kore")
-assert(K, "KoreKonfer requires Kore")
-assert(tonumber(KM) >= 1, "KoreKonfer requires Kore r1 or later")
-K:RegisterExtension(KK, KOREKONFER_MAJOR, KOREKONFER_MINOR)
+assert(K, "KoreComms requires Kore")
+assert(tonumber(KM) >= 1, "KoreComms requires Kore r1 or later")
+K:RegisterExtension(KC, KORECOMMS_MAJOR, KORECOMMS_MINOR)
 
 local KUI, KM = LibStub:GetLibrary("KoreUI")
-assert(KUI, "KoreKonfer requires KoreUI")
-assert(tonumber(KM) >= 1, "KoreKonfer requires KoreUI r1 or later")
+assert(KUI, "KoreComms requires KoreUI")
+assert(tonumber(KM) >= 1, "KoreComms requires KoreUI r1 or later")
 
 local H, KM = LibStub:GetLibrary("KoreHash")
-assert(H, "KoreKonfer requires KoreHash")
-assert(tonumber(KM) >= 1, "KoreKonfer requires KoreHash r1 or later")
+assert(H, "KoreComms requires KoreHash")
+assert(tonumber(KM) >= 1, "KoreComms requires KoreHash r1 or later")
 
 local KRP, KM = LibStub:GetLibrary("KoreParty")
-assert(KRP, "KoreKonfer requires KoreParty")
-assert(tonumber(KM) >= 1, "KoreKonfer requires KoreParty r1 or later")
+assert(KRP, "KoreComms requires KoreParty")
+assert(tonumber(KM) >= 1, "KoreComms requires KoreParty r1 or later")
 
 local ZL = LibStub:GetLibrary("LibDeflate")
-assert(ZL, "KoreKonfer requires LibDeflate")
+assert(ZL, "KoreComms requires LibDeflate")
 
 local LS = LibStub:GetLibrary("LibSerialize")
-assert(LS, "KoreKonfer requires LibSerialize")
+assert(LS, "KoreComms requires LibSerialize")
 
 local L = LibStub("AceLocale-3.0"):GetLocale("Kore")
 
-KK.addons = {}
-KK.valid_callbacks = {
+KC.addons = {}
+KC.valid_callbacks = {
 }
 
 local printf = K.printf
@@ -90,6 +91,8 @@ local tinsert = table.insert
 local strfmt = string.format
 local strlen = string.len
 local strsub = string.sub
+local strlower = string.lower
+local gmatch = string.gmatch
 local bor = bit.bor
 local band = bit.band
 local bxor = bit.bxor
@@ -97,267 +100,36 @@ local lshift = bit.lshift
 local rshift = bit.rshift
 local MakeFrame= KUI.MakeFrame
 
--- A static table with the list of possible player roles (from a konfer point
--- of view - not to be confused with the in-game raid or player roles). This
--- is used to restrict certain items to a particular type of raider. We also
--- define constants for each role name.
-KK.ROLE_UNSET  = 0
-KK.ROLE_HEALER = 1
-KK.ROLE_MELEE  = 2
-KK.ROLE_RANGED = 3
-KK.ROLE_CASTER = 4
-KK.ROLE_TANK   = 5
-KK.rolenames = {
- [KK.ROLE_UNSET]  = L["Not Set"],
- [KK.ROLE_HEALER] = L["Healer"],
- [KK.ROLE_MELEE]  = L["Melee DPS"],
- [KK.ROLE_RANGED] = L["Ranged DPS"],
- [KK.ROLE_CASTER] = L["Spellcaster"],
- [KK.ROLE_TANK]   = L["Tank"],
-}
-
--- The different configuration types supported, mainly for intra-mod comms.
--- Currently there is only need for two types: guild and PUG.
-KK.CFGTYPE_GUILD = 1
-KK.CFGTYPE_PUG   = 2
-
 --
 -- Every Konfer-family *addon* that has registered with Kore, keyed by its
--- addon handle, plus the "..." entry holding the shared selection dialogs.
--- This exists to arbitrate between separately installed addons that would
--- both auto-open on loot; see check_duplicate_modules() below.
+-- addon handle. RegisterComms() records the addon here, and uses it to
+-- recognise a repeat registration.
 --
--- Do not confuse this with the loot distribution modules -- Suicide Kings,
+-- Do not confuse this with the loot distribution policies -- Suicide Kings,
 -- EP/GP, DKP, PUG. Those are not addons and they do not appear here: they
--- register with the Konfer addon itself, which is the system that knows about
--- distribution policy. Kore deliberately does not, so that the looting
--- mechanics it provides stay policy-agnostic.
+-- register with the Konfer addon itself, through its konfer:RegisterPolicy(),
+-- because Konfer is the system that knows about distribution policy. Kore
+-- deliberately does not, so that the looting mechanics it provides stay
+-- policy-agnostic.
 --
--- Kept on KK rather than in _G so that the name "Konfer" in the global
+-- Kept on KC rather than in _G so that the name "Konfer" in the global
 -- namespace belongs to the Konfer addon alone. LibStub hands back the same
--- KK table across a library upgrade, so this survives one just as a global
+-- KC table across a library upgrade, so this survives one just as a global
 -- would.
 --
-KK.registry = KK.registry or {}
-KK.registry["..."] = KK.registry["..."] or {}
+KC.registry = KC.registry or {}
 
-local registry = KK.registry
+local registry = KC.registry
 
-local function opens_on_loot(handle)
-  if (not handle or handle == "") then
-    return false
-  end
-
-  local me = registry[handle]
-  if (not me) then
-    return false
-  end
-
-  return me.open_on_loot(handle) or false
-end
-
-local function check_duplicate_modules(me, insusp)
-  local kchoice = registry["..."]
-  local tstr = strfmt("%s (v%s) - %s", me.title, me.version, me.desc)
-
-  if (not insusp and kchoice.selected and kchoice.selected ~= me.handle) then
-    KK.SetSuspended(me.handle, true)
-    return
-  end
-
-  local nactive = 0
-  for k,v in pairs(registry) do
-    if (k ~= "...") then
-      if (not KK.IsSuspended(k)) then
-        if (opens_on_loot(k)) then
-          nactive = nactive + 1
-        end
-      end
-    end
-  end
-
-  if (nactive <= 1) then
-    return
-  end
-
-  --
-  -- We have more than one KahLua Konfer module that is active for raids
-  -- and set to auto-open on loot. We need to select which one is going to
-  -- be the active one. Pop up the Konfer selection dialog.
-  --
-  if (insusp) then
-    kchoice.actdialog.which:SetText(tstr)
-    kchoice.actdialog.mod = me.handle
-    kchoice.seldialog:Hide()
-    kchoice.actdialog:Show()
-  else
-    kchoice.seldialog.RefreshList(me.party, me.raid)
-    kchoice.actdialog:Hide()
-    kchoice.seldialog:Show()
-  end
-end
-
-function KK.IsSuspended(handle)
-  if (not handle or handle == "") then
-    return true
-  end
-
-  local me = registry[handle]
-  if (not me) then
-    return true
-  end
-
-  return me.is_suspended(handle) or false
-end
-
-function KK.SetSuspended(handle, onoff)
-  if (not handle or handle == "") then
-    return
-  end
-
-  local me = registry[handle]
-  if (not me) then
-    return
-  end
-
-  local cs = me.is_suspended(handle) or false
-  local ts = onoff or false
-
-  if (cs == ts) then
-    return
-  end
-
-  me.set_suspended(handle, ts)
-
-  local ds = L["KONFER_SUSPENDED"]
-  if (not ts) then
-    ds = L["KONFER_ACTIVE"]
-    check_duplicate_modules(me, true)
-  end
-  K.printf(K.icolor, "%s: |cffffffff%s|r.", me.title, ds)
-end
-
-local function create_konfer_dialogs()
-  local kchoice = registry["..."]
-  assert(kchoice)
-  local ks = "|cffff2222<" .. K.KAHLUA ..">|r"
-
-  local arg = {
-    x = "CENTER", y = "MIDDLE", name = "KonferModuleSelector",
-    title = strfmt(L["KONFER_SEL_TITLE"], ks),
-    canmove = true,
-    canresize = false,
-    escclose = true,
-    xbutton = false,
-    width = 450,
-    height = 180,
-    framelevel = 64,
-    titlewidth = 300,
-    border = true,
-    blackbg = true,
-  }
-  kchoice.seldialog = KUI:CreateDialogFrame(arg)
-
-  local ksd = kchoice.seldialog
-
-  arg = {
-    x = "CENTER", y = 0, width = 400, height = 96, autosize = false,
-    font = "GameFontNormal",
-    text = strfmt(L["KONFER_SEL_HEADER"], ks),
-  }
-  ksd.header = KUI:CreateStringLabel(arg, ksd)
-
-  arg = {
-    name = "KonferModSelDD",
-    x = 35, y = -105, dwidth = 350, justifyh = "CENTER", border = "THIN",
-    mode = "SINGLE", itemheight = 16, items = KUI.emptydropdown,
-  }
-  ksd.seldd = KUI:CreateDropDown(arg, ksd)
-  ksd.seldd:Catch("OnValueChanged", function(this, evt, val, usr)
-    if (not usr) then
-      return
-    end
-    for k,v in pairs(registry) do
-      if (k ~= "..." and k ~= val) then
-        KK.SetSuspended(k, true)
-      end
-    end
-    KK.SetSuspended(val, false)
-    registry["..."].seldialog:Hide()
-    ksd.selected = val
-  end)
-
-  ksd.RefreshList = function(party, raid)
-    local items = {}
-    local kd = registry["..."].seldialog.seldd
-
-    tinsert(items, {
-      text = L["KONFER_SEL_DDTITLE"], value = "", title = true,
-    })
-    for k,v in pairs(registry) do
-      if (k ~= "...") then
-        if ((party and v.party) or (raid and v.raid)) then
-          local item = {
-            text = strfmt("%s (v%s) - %s", v.title, v.version, v.desc),
-            value = k, checked = false,
-          }
-          tinsert(items, item)
-        end
-      end
-    end
-    kd:UpdateItems(items)
-    kd:SetValue("", true)
-  end
-
-  arg = {
-    x = "CENTER", y = "MIDDLE", name = "KonferModuleDisable",
-    title = strfmt(L["KONFER_SEL_TITLE"], ks),
-    canmove = true,
-    canresize = false,
-    escclose = false,
-    xbutton = false,
-    width = 450,
-    height = 240,
-    framelevel = 64,
-    titlewidth = 300,
-    border = true,
-    blackbg = true,
-    okbutton = {},
-    cancelbutton = {},
-  }
-  kchoice.actdialog = KUI:CreateDialogFrame(arg)
-  kchoice.actdialog:Catch("OnAccept", function(this, evt)
-    for k,v in pairs(registry) do
-      if (k ~= "..." and k ~= this.mod) then
-        KK.SetSuspended(k, true)
-      end
-    end
-  end)
-
-  arg = {
-    x = "CENTER", y = 0, autosize = false, border = true,
-    width = 400, font = "GameFontHighlight", justifyh = "CENTER",
-  }
-  kchoice.actdialog.which = KUI:CreateStringLabel(arg, kchoice.actdialog)
-
-  arg = {
-    x = "CENTER", y = -24, width = 400, height = 128, autosize = false,
-    font = "GameFontNormal",
-    text = strfmt(L["KONFER_SUSPEND_OTHERS"], ks),
-  }
-  kchoice.actdialog.msg = KUI:CreateStringLabel(arg, kchoice.actdialog)
-end
-
-function KK:OnLateInit()
+function KC:OnLateInit()
   if (self.initialised) then
     return
   end
 
-  create_konfer_dialogs()
   self.initialised = true
 end
 
-function KK.TimeStamp()
+function KC.TimeStamp()
   local tDate = date("*t")
   local mo = tDate["month"]
   local dy = tDate["day"]
@@ -366,8 +138,8 @@ function KK.TimeStamp()
   return strfmt("%04d%02d%02d%02d%02d", yr, mo, dy, hh, mm), yr, mo, dy, hh, mm
 end
 
-function KK.CreateNewID(strtohash)
-  local _, y, mo, d, h, m = KK.TimeStamp()
+function KC.CreateNewID(strtohash)
+  local _, y, mo, d, h, m = KC.TimeStamp()
   local ts = strfmt("%02d%02d%02d", y-2000, mo, d)
   local crc = H:CRC32(ts, nil, false)
   crc = H:CRC32(tostring(h), crc, false)
@@ -377,14 +149,7 @@ function KK.CreateNewID(strtohash)
   return ts
 end
 
-function KK.IsSenderMasterLooter(sender)
-  if (KRP.in_party and KRP.master_looter and KRP.master_looter == sender) then
-    return true
-  end
-  return false
-end
-
-function KK:OldProtoDialog()
+function KC:OldProtoDialog()
   if (self.old_proto) then
     return
   end
@@ -392,10 +157,10 @@ function KK:OldProtoDialog()
   self.old_proto = true
 
   local arg = {
-    name = self.konfer.handle .. "OldProtoDialog",
+    name = self.comms.handle .. "OldProtoDialog",
     x = "CENTER", y = "MIDDLE", border = true, blackbg = true,
     okbutton = { text = K.OK_STR }, canmove = false, canresize = false,
-    escclose = false, width = 450, height = 100, title = self.konfer.title,
+    escclose = false, width = 450, height = 100, title = self.comms.title,
   }
   local dlg = KUI:CreateDialogFrame(arg)
   dlg.OnAccept = function(this)
@@ -408,7 +173,7 @@ function KK:OldProtoDialog()
   arg = {
     x = 8, y = -10, width = 410, height = 64, autosize = false,
     color = { r = 1, g = 0, b = 0, a = 1},
-    text = self.konfer.title .. ": " .. strfmt(L["your version of %s is out of date. Please update it."], self.konfer.title),
+    text = self.comms.title .. ": " .. strfmt(L["your version of %s is out of date. Please update it."], self.comms.title),
     font = "GameFontNormal", justifyv = "TOP",
   }
   dlg.str1 = KUI:CreateStringLabel(arg, dlg)
@@ -439,7 +204,7 @@ end
 --
 -- Two independent things are versioned here, and they must not be confused:
 --
---   KK.WIRE_VERSION (above) versions this envelope -- the framing, the
+--   KC.WIRE_VERSION (above) versions this envelope -- the framing, the
 --   checksum and the serialisation. It belongs to Kore, is the same for every
 --   addon built on it, and changes only when this file or KoreHash changes.
 --
@@ -535,7 +300,7 @@ local function comm_received(self, prefix, msg, dist, snd, dispatcher)
   end
 
   if (proto > self.protocol) then
-    KK.OldProtoDialog(self)
+    KC.OldProtoDialog(self)
     return
   end
 
@@ -599,24 +364,29 @@ local function comm_received(self, prefix, msg, dist, snd, dispatcher)
   dispatcher(self, sender, proto, cmd, cfg, LS:Deserialize(inflated))
 end
 
+--
+-- Send to whichever channel the config named by CFG asks for. Which of RAID
+-- or PARTY CHANNEL_OTHER resolves to comes from KoreParty, and is further
+-- constrained by the raid and party flags in the caller's descriptor.
+--
 local function send_to_raid_or_party_am_c(self, cfg, cmd, prio, ...)
-  local cfgt = KK.CFGTYPE_PUG
   local cfg = cfg or self.currentid
+  local channel = KC.CHANNEL_OTHER
 
   if (cfg and self.configs and self.configs[cfg]) then
-    cfgt = self.configs[cfg].cfgtype or KK.CFGTYPE_PUG
+    channel = self.configs[cfg].channel or KC.CHANNEL_OTHER
   end
 
   local dist = nil
 
-  if (cfgt == KK.CFGTYPE_GUILD and K.player.is_guilded) then
+  if (channel == KC.CHANNEL_GUILD and K.player.is_guilded) then
     dist = "GUILD"
   else
-    if (KRP.in_party and self.konfer.party) then
+    if (KRP.in_party and self.comms.party) then
       dist = "PARTY"
     end
 
-    if (KRP.in_raid and self.konfer.raid) then
+    if (KRP.in_raid and self.comms.raid) then
       dist = "RAID"
     end
   end
@@ -692,8 +462,8 @@ end
 -- Shared dialog for version checks.
 --
 local function vlist_newitem(objp, num)
-  local kk = objp:GetParent():GetParent():GetParent().kkmod
-  local bname = kk.konfer.handle .. "KKVCheckListButton" .. tostring(num)
+  local kc = objp:GetParent():GetParent():GetParent().kcmod
+  local bname = kc.comms.handle .. "KCVCheckListButton" .. tostring(num)
   local rf = MakeFrame("Button", bname, objp.content)
   local nfn = "GameFontNormalSmallLeft"
   local hfn = "GameFontHighlightSmallLeft"
@@ -744,20 +514,20 @@ local function vlist_newitem(objp, num)
 end
 
 local function vlist_setitem(objp, idx, slot, btn)
-  local kk = objp:GetParent():GetParent():GetParent().kkmod
-  if (not kk or not kk.vcdlg or not kk.vcdlg.vcreplies) then
+  local kc = objp:GetParent():GetParent():GetParent().kcmod
+  if (not kc or not kc.vcdlg or not kc.vcdlg.vcreplies) then
     return
   end
 
-  local vcent = kk.vcdlg.vcreplies[idx]
+  local vcent = kc.vcdlg.vcreplies[idx]
   if (not vcent) then
     return
   end
-  local name = kk.shortaclass(vcent)
+  local name = kc.shortaclass(vcent)
   local vers = tonumber(vcent.version)
-  local fn = kk.green
-  if (vers < kk.version) then
-    fn = kk.red
+  local fn = kc.green
+  if (vers < kc.version) then
+    fn = kc.red
   end
 
   btn:SetText(name, fn(tostring(vers)), vcent.raid)
@@ -791,8 +561,8 @@ local function kk_version_check(self)
     local ks = "|cffff2222<" .. K.KAHLUA ..">|r"
     local arg = {
       x = "CENTER", y = "MIDDLE",
-      name = self.konfer.handle .. "KKVersionCheck",
-      title = strfmt(L["VCTITLE"], ks, self.konfer.title),
+      name = self.comms.handle .. "KCVersionCheck",
+      title = strfmt(L["VCTITLE"], ks, self.comms.title),
       canmove = true,
       canresize = false,
       escclose = true,
@@ -806,12 +576,12 @@ local function kk_version_check(self)
       okbutton = { text = K.OK_STR },
     }
     vcdlg = KUI:CreateDialogFrame(arg)
-    vcdlg.kkmod = self
+    vcdlg.kcmod = self
 
     vcdlg.OnAccept = function(this)
       this:Hide()
       if (this.mainshown) then
-        this.kkmod.mainwin:Show()
+        this.kcmod.mainwin:Show()
       end
       this.mainshown = nil
       this.vcreplies = nil
@@ -838,7 +608,7 @@ local function kk_version_check(self)
 
 
     arg = {
-      name = self.konfer.handle .. "KKVersionScrollList",
+      name = self.comms.handle .. "KCVersionScrollList",
       itemheight = 16, newitem = vlist_newitem, setitem = vlist_setitem,
       selectitem = function(objp, idx, slot, btn, onoff) return end,
       highlightitem = function(objp, idx, slot, btn, onoff)
@@ -887,9 +657,9 @@ local function kk_version_check(self)
   self.mainwin:Hide()
   vcdlg:Show()
 
-  self:SendAM({proto = KK.VCHECK_PROTOCOL, cmd = "VCHEK"}, nil)
+  self:SendAM({cmd = "VCHEK"}, nil)
   if (K.player.is_guilded) then
-    self:SendGuildAM({proto = KK.VCHECK_PROTOCOL, cmd = "VCHEK"}, nil)
+    self:SendGuildAM({cmd = "VCHEK"}, nil)
   end
 end
 
@@ -912,10 +682,10 @@ end
 -- argument to this function is a table with various parameters, as described
 -- below. Returns a handle to the mod, which is a table.
 --
-function KK.RegisterKonfer(kmod)
-  local targ = kmod.konfer
+function KC.RegisterComms(kmod)
+  local targ = kmod.comms
   if (not targ or type(targ) ~= "table") then
-    error("Invalid call to RegisterKonfer.", 2)
+    error("Invalid call to RegisterComms.", 2)
   end
 
   local me = registry[targ.handle]
@@ -924,9 +694,8 @@ function KK.RegisterKonfer(kmod)
   end
 
   assert(kmod.protocol)
-  assert(kmod.protocol >= KK.VCHECK_PROTOCOL)
 
-  kmod.konfer = targ
+  kmod.comms = targ
   kmod.CSendAM = send_to_raid_or_party_am_c
   kmod.SendAM = send_to_raid_or_party_am
   kmod.CSendGuildAM = send_to_guild_am_c
@@ -942,6 +711,4 @@ function KK.RegisterKonfer(kmod)
   kmod.KonferCommReceived = comm_received
 
   registry[targ.handle] = targ
-
-  check_duplicate_modules(targ, false)
 end

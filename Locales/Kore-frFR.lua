@@ -70,22 +70,9 @@ L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."]
 L["Kore extensions loaded:"] = "Extensions Kore chargées :"
 L["Chest"] = "Coffre"
 
-L["Not Set"] = "Non d\195\169fini"
-L["Tank"] = "Tank"
-L["Ranged DPS"] = "DPS distant"
-L["Melee DPS"] = "DPS CaC"
-L["Healer"] = "Heal"
-L["Spellcaster"] = "DPS magique"
 L["your version of %s is out of date. Please update it."] = "Votre version de %s n'est pas \195\160 jour. T\195\169l\195\169chargez-la sur le site des GDO."
 L["VCTITLE"] = "%s %s Version Check"
 L["Version"] = "Version"
 L["In Raid"] = "In Raid"
 L["Who"] = "Qui"
 L["Shield"] = true
-
-L["KONFER_SEL_TITLE"] = "S\195\169lectionner le module Konfer %s actif"
-L["KONFER_SEL_HEADER"] = "Vous avez plusieurs add-ons Konfer %s install\195\169s, et plus d'un est actif et configur\195\169 pour s'ouvrir automatiquement lors du loot d'un corps ou d'un coffre. Ceci peut provoquer des conflits, vous devez donc choisir lequel activer, tous les autres seront d\195\169sactiv\195\169s."
-L["KONFER_SEL_DDTITLE"] = "Choisir le module \195\160 activer"
-L["KONFER_ACTIVE"] = "activ\195\169"
-L["KONFER_SUSPENDED"] = "d\195\169sactiv\195\169"
-L["KONFER_SUSPEND_OTHERS"] = "Vous venez d'activer le module Konfer %s ci-dessus, mais d'autres modules Konfer sont \195\169galement activ\195\169s. Avoir plusieurs modules Konfer actifs en m\195\170me temps peut g\195\169n\195\169rer des probl\195\168mes, notamment si plus d'un est configur\195\169 pour s'ouvrir automatiquement lors d'un loot. Nous vous conseillons de d\195\169sactiver tous les autres add-ons Konfer. Pour suivre ce conseil et faire de ce module le seul actif, cliquez sur 'Ok'. Si vous \195\170tes certain de vouloir laisser plusieurs add-ons Konfer actifs, cliquez sur 'Annuler'."

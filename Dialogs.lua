@@ -20,12 +20,12 @@
 ]]
 
 local K, KM = LibStub:GetLibrary("Kore")
-assert(K, "KoreKonfer requires Kore")
-assert(tonumber(KM) >= 1, "KoreKonfer requires Kore r1 or later")
+assert(K, "Kore Dialogs requires Kore")
+assert(tonumber(KM) >= 1, "Kore Dialogs requires Kore r1 or later")
 
 local KUI, KM = LibStub:GetLibrary("KoreUI")
-assert(KUI, "KoreKonfer requires KoreUI")
-assert(tonumber(KM) >= 1, "KoreKonfer requires KoreUI r1 or later")
+assert(KUI, "Kore Dialogs requires KoreUI")
+assert(tonumber(KM) >= 1, "Kore Dialogs requires KoreUI r1 or later")
 
 local L = LibStub("AceLocale-3.0"):GetLocale("Kore")
 
