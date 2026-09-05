@@ -20,26 +20,26 @@
    limitations under the License.
 ]]
 
-local KKORELOOT_MAJOR = "KKoreLoot"
-local KKORELOOT_MINOR = 4
-local KLD, oldminor = LibStub:NewLibrary(KKORELOOT_MAJOR, KKORELOOT_MINOR)
+local KORELOOT_MAJOR = "KoreLoot"
+local KORELOOT_MINOR = 1
+local KLD, oldminor = LibStub:NewLibrary(KORELOOT_MAJOR, KORELOOT_MINOR)
 
 if (not KLD) then
   return
 end
 
-KLD.debug_id = KKORELOOT_MAJOR
+KLD.debug_id = KORELOOT_MAJOR
 
-local K, KM = LibStub:GetLibrary("KKore")
-assert (K, "KKoreLoot requires KKore")
-assert (tonumber(KM) >= 4, "KKoreLoot requires KKore r4 or later")
-K:RegisterExtension (KLD, KKORELOOT_MAJOR, KKORELOOT_MINOR)
+local K, KM = LibStub:GetLibrary("Kore")
+assert (K, "KoreLoot requires Kore")
+assert (tonumber(KM) >= 1, "KoreLoot requires Kore r4 or later")
+K:RegisterExtension (KLD, KORELOOT_MAJOR, KORELOOT_MINOR)
 
-local KRP, KM = LibStub:GetLibrary("KKoreParty")
-assert (KRP, "KKoreLoot requires KKoreParty")
-assert (tonumber(KM) >= 4, "KKoreLoot requires KKoreParty r4 or later")
+local KRP, KM = LibStub:GetLibrary("KoreParty")
+assert (KRP, "KoreLoot requires KoreParty")
+assert (tonumber(KM) >= 1, "KoreLoot requires KoreParty r1 or later")
 
-local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
+local L = LibStub("AceLocale-3.0"):GetLocale("Kore")
 
 --
 -- Constants for easy representation of the various armor and weapon types

@@ -20,73 +20,67 @@
    limitations under the License.
 ]]
 
-local KKOREKONFER_MAJOR = "KKoreKonfer"
-local KKOREKONFER_MINOR = 4
-local KK, oldminor = LibStub:NewLibrary(KKOREKONFER_MAJOR, KKOREKONFER_MINOR)
+local KOREKONFER_MAJOR = "KoreKonfer"
+local KOREKONFER_MINOR = 4
+local KK, oldminor = LibStub:NewLibrary(KOREKONFER_MAJOR, KOREKONFER_MINOR)
 
 if (not KK) then
   return
 end
 
-KK.debug_id = KKOREKONFER_MAJOR
+KK.debug_id = KOREKONFER_MAJOR
 
 --
--- The KKore wire protocol version. This versions the message envelope only:
+-- The Kore wire protocol version. This versions the message envelope only:
 -- the framing, the checksum and the serialisation. It is shared by every
--- KKore based addon and is entirely separate from any addon's own protocol
+-- Kore-based addon and is entirely separate from any addon's own protocol
 -- number, which versions that addon's events and their arguments.
 --
---   1 - original envelope; the CRC32 covered the payload alone
---   2 - the CRC32 covers the header (protocol, command, config) as well
+--   1 - the CRC32 covers the header (protocol, command, config) as well
 --
 -- We always send the current version. On receipt we accept anything from
--- KKORE_WIRE_MIN upwards, falling back through the older checksum rules, so
+-- KORE_WIRE_MIN upwards, falling back through the older checksum rules, so
 -- that a newer client can still read an older one's messages.
 --
-KK.WIRE_VERSION = 2
+KK.WIRE_VERSION = 1
 KK.WIRE_VERSION_MIN = 1
 
 --
--- VCHEK and VCACK are always sent at protocol 2 rather than at the sending
+-- VCHEK and VCACK are always sent at protocol 1 rather than at the sending
 -- addon's current protocol, because the version check has to work between two
 -- mismatched versions -- it is how anyone finds out they are out of date. On
 -- receipt the only protocol test is "is this newer than I understand", so a
--- message pinned at 2 is always accepted.
+-- message pinned at 1 is always accepted.
 --
--- That relies on an invariant every Konfer addon must hold: its protocol
--- number starts at 2 and only ever increases. Protocol 1 means "predates the
--- version check". Never give an addon a protocol below 2, or its own version
--- check will trip the OldProtoDialog.
---
-KK.VCHECK_PROTOCOL = 2
+KK.VCHECK_PROTOCOL = 1
 
-local KKORE_WIRE = KK.WIRE_VERSION
-local KKORE_WIRE_MIN = KK.WIRE_VERSION_MIN
+local KORE_WIRE = KK.WIRE_VERSION
+local KORE_WIRE_MIN = KK.WIRE_VERSION_MIN
 
-local K, KM = LibStub:GetLibrary("KKore")
-assert(K, "KKoreKonfer requires KKore")
-assert(tonumber(KM) >= 4, "KKoreKonfer requires KKore r4 or later")
-K:RegisterExtension(KK, KKOREKONFER_MAJOR, KKOREKONFER_MINOR)
+local K, KM = LibStub:GetLibrary("Kore")
+assert(K, "KoreKonfer requires Kore")
+assert(tonumber(KM) >= 1, "KoreKonfer requires Kore r4 or later")
+K:RegisterExtension(KK, KOREKONFER_MAJOR, KOREKONFER_MINOR)
 
-local KUI, KM = LibStub:GetLibrary("KKoreUI")
-assert(KUI, "KKoreKonfer requires KKoreUI")
-assert(tonumber(KM) >= 4, "KKoreKonfer requires KKoreUI r4 or later")
+local KUI, KM = LibStub:GetLibrary("KoreUI")
+assert(KUI, "KoreKonfer requires KoreUI")
+assert(tonumber(KM) >= 1, "KoreKonfer requires KoreUI r1 or later")
 
-local H, KM = LibStub:GetLibrary("KKoreHash")
-assert(H, "KKoreKonfer requires KKoreHash")
-assert(tonumber(KM) >= 4, "KKoreKonfer requires KKoreHash r4 or later")
+local H, KM = LibStub:GetLibrary("KoreHash")
+assert(H, "KoreKonfer requires KoreHash")
+assert(tonumber(KM) >= 1, "KoreKonfer requires KoreHash r1 or later")
 
-local KRP, KM = LibStub:GetLibrary("KKoreParty")
-assert(KRP, "KKoreKonfer requires KKoreParty")
-assert(tonumber(KM) >= 4, "KKoreKonfer requires KKoreParty r4 or later")
+local KRP, KM = LibStub:GetLibrary("KoreParty")
+assert(KRP, "KoreKonfer requires KoreParty")
+assert(tonumber(KM) >= 1, "KoreKonfer requires KoreParty r1 or later")
 
 local ZL = LibStub:GetLibrary("LibDeflate")
-assert(ZL, "KKoreKonfer requires LibDeflate")
+assert(ZL, "KoreKonfer requires LibDeflate")
 
 local LS = LibStub:GetLibrary("LibSerialize")
-assert(LS, "KKoreKonfer requires LibSerialize")
+assert(LS, "KoreKonfer requires LibSerialize")
 
-local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
+local L = LibStub("AceLocale-3.0"):GetLocale("Kore")
 
 KK.addons = {}
 KK.valid_callbacks = {
@@ -435,9 +429,9 @@ end
 --
 -- Two independent things are versioned here, and they must not be confused:
 --
---   KKORE_WIRE (below) versions this envelope -- the framing, the checksum and
---   the serialisation. It belongs to KKore, is the same for every addon built
---   on it, and changes only when this file or KKoreHash changes.
+--   KORE_WIRE (below) versions this envelope -- the framing, the checksum and
+--   the serialisation. It belongs to Kore, is the same for every addon built
+--   on it, and changes only when this file or KoreHash changes.
 --
 --   self.protocol is the *addon's* protocol: the set of events it sends and
 --   understands, and their arguments. It says nothing about the wire format.
@@ -572,7 +566,7 @@ local function comm_received(self, prefix, msg, dist, snd, dispatcher)
   local wire = nil
   local mf = nil
 
-  for w = KKORE_WIRE, KKORE_WIRE_MIN, -1 do
+  for w = KORE_WIRE, KORE_WIRE_MIN, -1 do
     local crc
 
     if (w >= 2) then
@@ -597,7 +591,7 @@ local function comm_received(self, prefix, msg, dist, snd, dispatcher)
     return
   end
 
-  if (wire < KKORE_WIRE) then
+  if (wire < KORE_WIRE) then
     self.debug(2, "recv: wire version %d from %q", wire, tostring(sender))
   end
 

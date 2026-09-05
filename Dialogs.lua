@@ -19,15 +19,15 @@
    limitations under the License.
 ]]
 
-local K, KM = LibStub:GetLibrary("KKore")
-assert(K, "KKoreKonfer requires KKore")
-assert(tonumber(KM) >= 4, "KKoreKonfer requires KKore r4 or later")
+local K, KM = LibStub:GetLibrary("Kore")
+assert(K, "KoreKonfer requires Kore")
+assert(tonumber(KM) >= 1, "KoreKonfer requires Kore r1 or later")
 
-local KUI, KM = LibStub:GetLibrary("KKoreUI")
-assert(KUI, "KKoreKonfer requires KKoreUI")
-assert(tonumber(KM) >= 4, "KKoreKonfer requires KKoreUI r4 or later")
+local KUI, KM = LibStub:GetLibrary("KoreUI")
+assert(KUI, "KoreKonfer requires KoreUI")
+assert(tonumber(KM) >= 1, "KoreKonfer requires KoreUI r1 or later")
 
-local L = LibStub("AceLocale-3.0"):GetLocale("KKore")
+local L = LibStub("AceLocale-3.0"):GetLocale("Kore")
 
 -- Local aliases for global or LUA library functions
 local _G = _G
@@ -61,7 +61,7 @@ function K.ConfirmationDialog(kmod, ttxt, msg, val, func, farg, isshown, height,
   if (not confirmdlg) then
     local arg = {
       x = "CENTER", y = "MIDDLE",
-      name = "KKoreConfirmDialog",
+      name = "KoreConfirmDialog",
       title = "",
       border = true,
       width = 450,
@@ -158,7 +158,7 @@ function K.RenameDialog(kmod, ttxt, oldlbl, oldval, newlbl, len, func, farg, sho
   if (not renamedlg) then
     local arg = {
       x = "CENTER", y = "MIDDLE",
-      name = "KKoreRenameDialog",
+      name = "KoreRenameDialog",
       title = "",
       border = true,
       width = 450,

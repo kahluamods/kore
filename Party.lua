@@ -20,9 +20,9 @@
    limitations under the License.
 ]]
 
-local KKOREPARTY_MAJOR = "KoreParty"
-local KKOREPARTY_MINOR = 4
-local KRP, oldminor = LibStub:NewLibrary(KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
+local KOREPARTY_MAJOR = "KoreParty"
+local KOREPARTY_MINOR = 1
+local KRP, oldminor = LibStub:NewLibrary(KOREPARTY_MAJOR, KOREPARTY_MINOR)
 
 if (not KRP) then
   return
@@ -32,12 +32,12 @@ local assert = assert
 local GetNumRaidMembers = GetNumGroupMembers or GetNumRaidMembers
 local GetNumPartyMembers = GetNumSubgroupMembers or GetNumPartyMembers
 
-KRP.debug_id = KKOREPARTY_MAJOR
+KRP.debug_id = KOREPARTY_MAJOR
 
 local K, KM = LibStub:GetLibrary("Kore")
 assert(K, "KoreParty requires Kore")
-assert(tonumber(KM) >= 4, "KoreParty requires Kore r4 or later")
-K:RegisterExtension(KRP, KKOREPARTY_MAJOR, KKOREPARTY_MINOR)
+assert(tonumber(KM) >= 1, "KoreParty requires Kore r1 or later")
+K:RegisterExtension(KRP, KOREPARTY_MAJOR, KOREPARTY_MINOR)
 
 local printf = K.printf
 local tinsert = table.insert

@@ -22,35 +22,35 @@
 
 local CallbackHandler = LibStub("CallbackHandler-1.0")
 
-local KKORE_MAJOR = "KKore"
-local KKORE_MINOR = 6
+local KORE_MAJOR = "Kore"
+local KORE_MINOR = 1
 
-local K = LibStub:NewLibrary(KKORE_MAJOR, KKORE_MINOR)
+local K = LibStub:NewLibrary(KORE_MAJOR, KORE_MINOR)
 
 if (not K) then
   return
 end
 
 local kaoname = ...
-if (string.lower(kaoname) == "kkore") then
-  K.KORE_PATH = "Interface\\Addons\\KKore\\"
+if (string.lower(kaoname) == "kore") then
+  K.KORE_PATH = "Interface\\Addons\\Kore\\"
 else
-  K.KORE_PATH = "Interface\\Addons\\" .. kaoname .. "\\KKore\\"
+  K.KORE_PATH = "Interface\\Addons\\" .. kaoname .. "\\Kore\\"
 end
 
-_G["KKore"] = K
+_G["Kore"] = K
 
 --
--- KKore is a superset of a bunch of Ace3 plugins. In the past we used to
--- embed slightly tweaked versions of those plugins directly in KKore.
+-- Kore is a superset of a bunch of Ace3 plugins. In the past we used to
+-- embed slightly tweaked versions of those plugins directly in Kore.
 -- That turned out to be a maintenance mightmare. So now we use them the
 -- way they were intended, as replaceable libraries. However, we still want
--- KKore to provide the actual "API" that Kahlua mods can use, which means
+-- Kore to provide the actual "API" that Kahlua mods can use, which means
 -- that these select few basic Ace3 mods must be present in every Kahlua
 -- addon. This function centralises the location of that list of Ace3 libraries
 -- and embeds them into the object passed as a parameter. This is called for
--- KKore itself (so it too has access to the same APIs) as well as each
--- Kahlua mod when it registers with KKore.
+-- Kore itself (so it too has access to the same APIs) as well as each
+-- Kahlua mod when it registers with Kore.
 --
 
 function K:AceKore(obj)
@@ -960,9 +960,9 @@ local function listall()
 end
 
 local function kahlua_usage()
-  local L = LibStub("AceLocale-3.0"):GetLocale(KKORE_MAJOR)
+  local L = LibStub("AceLocale-3.0"):GetLocale(KORE_MAJOR)
   K.printf(K.ucolor, "|cffff2222<%s>|r %s - %s", K.KAHLUA,
-    strfmt(L["KAHLUA_VER"], KKORE_MINOR), L["KAHLUA_DESC"])
+    strfmt(L["KAHLUA_VER"], KORE_MINOR), L["KAHLUA_DESC"])
   K.printf(K.ucolor, L["Usage: %s/%s module [arg [arg...]]%s"],
     "|cffffffff", L["CMD_KAHLUA"], "|r")
   K.printf(K.ucolor, L["    Where module is one of the following modules:"])
@@ -976,13 +976,13 @@ local function kahlua(input)
     return
   end
 
-  local L = LibStub("AceLocale-3.0"):GetLocale(KKORE_MAJOR)
+  local L = LibStub("AceLocale-3.0"):GetLocale(KORE_MAJOR)
 
   if (input:lower() == L["CMD_VERSION"] or input:lower() == "version" or input:lower() == "ver") then
     K.printf(K.ucolor, "|cffff2222<%s>|r %s - %s", K.KAHLUA,
-      strfmt(L["KAHLUA_VER"], KKORE_MINOR), L["KAHLUA_DESC"])
+      strfmt(L["KAHLUA_VER"], KORE_MINOR), L["KAHLUA_DESC"])
     K.printf(K.ucolor, "(C) Copyright 2008-2019 J. Kean Johnston (Cruciformer). All rights reserved.")
-    K.printf(K.ucolor, L["KKore extensions loaded:"])
+    K.printf(K.ucolor, L["Kore extensions loaded:"])
     for k,v in pairs(K.extensions) do
       K.printf(K.ucolor, "    |cffffff00%s|r %s", k, strfmt(L["KAHLUA_VER"], v.version))
     end
@@ -1023,14 +1023,14 @@ local function kahlua(input)
 end
 
 local function kcmdfunc(input)
-  local L = LibStub("AceLocale-3.0"):GetLocale(KKORE_MAJOR)
+  local L = LibStub("AceLocale-3.0"):GetLocale(KORE_MAJOR)
 
   if (not input or input:lower() == L["CMD_HELP"] or input == "?" or input == "") then
-    K.printf(K.ucolor,L["KahLua Kore usage: %s/%s command [arg [arg...]]%s"], "|cffffffff", L["CMD_KKORE"], "|r")
-    K.printf(K.ucolor,L["%s/%s %s module level%s"], "|cffffffff", L["CMD_KKORE"], L["CMD_DEBUG"], "|r")
+    K.printf(K.ucolor,L["KahLua Kore usage: %s/%s command [arg [arg...]]%s"], "|cffffffff", L["CMD_KORE"], "|r")
+    K.printf(K.ucolor,L["%s/%s %s module level%s"], "|cffffffff", L["CMD_KORE"], L["CMD_DEBUG"], "|r")
     K.printf(K.ucolor,L["  Sets the debug level for a module. 0 disables."])
     K.printf(K.ucolor,L["  The higher the number the more verbose the output."])
-    K.printf(K.ucolor,"%s/%s %s%s", "|cffffffff", L["CMD_KKORE"], L["CMD_LIST"], "|r")
+    K.printf(K.ucolor,"%s/%s %s%s", "|cffffffff", L["CMD_KORE"], L["CMD_LIST"], "|r")
     K.printf(K.ucolor,L["  Lists all modules registered with KahLua."])
     return
   end
@@ -1087,7 +1087,7 @@ local function kcmdfunc(input)
 end
 
 local function RegisterSlashCommand(name, func, desc, version, ...)
-  local L = LibStub("AceLocale-3.0"):GetLocale(KKORE_MAJOR)
+  local L = LibStub("AceLocale-3.0"):GetLocale(KORE_MAJOR)
   if (not L) then
     error ("KahLua Kore: I18N initialization did not complete.", 2)
   end
@@ -1098,9 +1098,9 @@ local function RegisterSlashCommand(name, func, desc, version, ...)
     K.slashtable = {}
     K.slashtable["kore"] = { fn = kcmdfunc,
       desc = strfmt(L["KORE_DESC"], K.KAHLUA),
-      version = KKORE_MINOR }
+      version = KORE_MINOR }
     K.slashtable["kore"].alts = {}
-    K.slashtable["kore"].alts["kkore"] = kcmdfunc
+    K.slashtable["kore"].alts["kore"] = kcmdfunc
   end
 
   K.slashtable[name] = K.slashtable[name] or {}
@@ -1120,7 +1120,7 @@ local function RegisterSlashCommand(name, func, desc, version, ...)
     elseif (type(aname) == "table") then
       st.alts[strlower(aname.name)] = aname.func
     else
-      error("KKore:NewAddon: invalid alternate name.", 2)
+      error("Kore:NewAddon: invalid alternate name.", 2)
     end
   end
 
@@ -1206,7 +1206,7 @@ K:RegisterEvent("UPDATE_INSTANCE_INFO", instance_update)
 
 --
 -- Deal with Kore addon initialisation. We maintain a table of all Kore
--- addons, each of which announces itself to Kore by calling KKore:NewAddon(), 
+-- addons, each of which announces itself to Kore by calling Kore:NewAddon(), 
 -- defined below. Each addon calls this very early on in its life in order
 -- to create the addon object. That call also embeds various Kore functions
 -- into the returned object. It also sets up the slash command handler for
@@ -1238,20 +1238,20 @@ end
 -- cmdname - the primary command name for accessing the addon
 -- ...     - additional alternate commands for accessing the addon
 function K:NewAddon(obj, name, ver, desc, cmdname, ...)
-  assert(obj == nil or type(obj) == "table", "KKore: first argument must be nil or an object table.")
-  assert(name, "KKore: addon name must be provided.")
-  assert(ver, "KKore: addon version must be provided.")
-  assert(desc, "KKore: addon description must be provided.")
+  assert(obj == nil or type(obj) == "table", "Kore: first argument must be nil or an object table.")
+  assert(name, "Kore: addon name must be provided.")
+  assert(ver, "Kore: addon version must be provided.")
+  assert(desc, "Kore: addon description must be provided.")
 
   if (self.addons[name]) then
-    error(("KKore: addon %q already exists."):format(name), 2)
+    error(("Kore: addon %q already exists."):format(name), 2)
   end
 
   local obj = obj or {}
   obj.kore_name = name
   obj.kore_desc = desc
   obj.kore_ver = ver
-  obj.kore_minor = KKORE_MINOR
+  obj.kore_minor = KORE_MINOR
 
   local addonmeta = {}
   local oldmeta = getmetatable(obj)
@@ -1292,7 +1292,7 @@ end
 
 function K:GetAddon(name, opt)
   if (not opt and not self.addons[name]) then
-    error(("KKore:GetAddon: cannot find addon %q"):format(tostring(name)), 2)
+    error(("Kore:GetAddon: cannot find addon %q"):format(tostring(name)), 2)
   end
   return self.addons[name]
 end
@@ -1343,7 +1343,7 @@ local function addonOnUpdate(this, event)
   end
 end
 
-K.addonframe = K.addonframe or CreateFrame("Frame", "KKoreAddonFrame")
+K.addonframe = K.addonframe or CreateFrame("Frame", "KoreAddonFrame")
 K.addonframe:UnregisterAllEvents()
 K.addonframe:SetScript("OnEvent", addonOnEvent)
 K.addonframe:SetScript("OnUpdate", addonOnUpdate)
@@ -1502,13 +1502,13 @@ function K:AddonCallback(name, callback, handler)
 end
 
 --
--- This is for extensions to KKore itself, such as KKoreParty or KKoreLoot.
+-- This is for extensions to Kore itself, such as KoreParty or KoreLoot.
 -- Those extensions register with the Kore via this function. Addons that
 -- use either the Kore or its extensions can register themselves with the
 -- component(s) they need, which they do using the various Addon functions
 -- above, each of which is added to the list of elements in the extension.
--- So for example, an addon that wants to use both KKoreParty(KRP) and
--- KKoreLoot(KLD) would call: KRP:RegisterAddon() and KLD:RegisterAddon.
+-- So for example, an addon that wants to use both KoreParty(KRP) and
+-- KoreLoot(KLD) would call: KRP:RegisterAddon() and KLD:RegisterAddon.
 --
 function K:RegisterExtension(kext, major, minor)
   local ext = {}
@@ -1603,7 +1603,7 @@ local function mask(classes)
   for i = 1, #classes do
     local cp = tonumber(classes[i])
     assert(cp and cp >= 1 and cp <= K.NUM_CLASSES,
-      "KKore: bad class constant in a classfilters table")
+      "Kore: bad class constant in a classfilters table")
     m[cp] = "1"
   end
   return tconcat(m, "")
@@ -1618,9 +1618,9 @@ local function build(subclasses, ename, etbl, byname, byvalue, spec)
   for i = 1, #subclasses do
     local name = subclasses[i]
     local v = etbl[name]
-    assert(v, "KKore: Enum." .. ename .. "." .. name .. " is missing")
+    assert(v, "Kore: Enum." .. ename .. "." .. name .. " is missing")
     local classes = spec[name]
-    assert(classes, "KKore: no class filter defined for " .. ename .. "." .. name)
+    assert(classes, "Kore: no class filter defined for " .. ename .. "." .. name)
     byname[name] = v
     byvalue[v] = name
     out[v] = mask(classes)
@@ -1866,32 +1866,32 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --]]
 
-local kkorett = CreateFrame("GameTooltip", "KKoreUTooltip", UIParent, "GameTooltipTemplate")
-kkorett:SetOwner(UIParent, "ANCHOR_PRESERVE")
-kkorett:SetPoint("CENTER", "UIParent")
-kkorett:Hide()
+local korett = CreateFrame("GameTooltip", "KoreUTooltip", UIParent, "GameTooltipTemplate")
+korett:SetOwner(UIParent, "ANCHOR_PRESERVE")
+korett:SetPoint("CENTER", "UIParent")
+korett:Hide()
 
 local function SetTooltipHack(link)
-  kkorett:SetOwner(UIParent, "ANCHOR_PRESERVE")
-  kkorett:SetHyperlink("spell:1")
-  kkorett:Show()
-  kkorett:SetHyperlink(link)
+  korett:SetOwner(UIParent, "ANCHOR_PRESERVE")
+  korett:SetHyperlink("spell:1")
+  korett:Show()
+  korett:SetHyperlink(link)
 end
 
 local function UnsetTooltipHack()
-  kkorett:SetOwner(UIParent, "ANCHOR_PRESERVE")
-  kkorett:Hide()
+  korett:SetOwner(UIParent, "ANCHOR_PRESERVE")
+  korett:Hide()
 end
 
 function K.ScanTooltip(link)
   SetTooltipHack(link)
 
-  local lines = kkorett:NumLines()
+  local lines = korett:NumLines()
   local tooltiptxt = ""
 
   for i = 1, lines do
-    local left = _G["KKoreUTooltipTextLeft"..i]:GetText()
-    local right = _G["KKoreUTooltipTextRight"..i]:GetText()
+    local left = _G["KoreUTooltipTextLeft"..i]:GetText()
+    local right = _G["KoreUTooltipTextRight"..i]:GetText()
 
     if (left) then
       tooltiptxt = tooltiptxt .. left
@@ -1914,7 +1914,7 @@ function K.GetTooltipLine(link, line, side)
   side = side or "Left"
   SetTooltipHack(link)
 
-  local lines = kkorett:NumLines()
+  local lines = korett:NumLines()
   if (line > lines) then
     return UnsetTooltipHack()
   end

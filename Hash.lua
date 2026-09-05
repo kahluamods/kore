@@ -13,20 +13,20 @@
 -- that code to allow for a running calculation.
 --
 
-local KKOREHASH_MAJOR = "KKoreHash"
-local KKOREHASH_MINOR = 4
-local H, oldminor = LibStub:NewLibrary(KKOREHASH_MAJOR, KKOREHASH_MINOR)
+local KOREHASH_MAJOR = "KoreHash"
+local KOREHASH_MINOR = 4
+local H, oldminor = LibStub:NewLibrary(KOREHASH_MAJOR, KOREHASH_MINOR)
 
 if (not H) then
   return
 end
 
-H.debug_id = KKOREHASH_MAJOR
+H.debug_id = KOREHASH_MAJOR
 
-local K, KM = LibStub:GetLibrary("KKore")
-assert (K, "KKoreHash requires KKore")
-assert (tonumber(KM) >= 4, "KKoreHash requires KKore r4 or later")
-K:RegisterExtension (H, KKOREHASH_MAJOR, KKOREHASH_MINOR)
+local K, KM = LibStub:GetLibrary("Kore")
+assert (K, "KoreHash requires Kore")
+assert (tonumber(KM) >= 1, "KoreHash requires Kore r1 or later")
+K:RegisterExtension (H, KOREHASH_MAJOR, KOREHASH_MINOR)
 
 local bor = bit.bor
 local band = bit.band

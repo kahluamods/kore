@@ -1,60 +1,60 @@
-KahLua Kore - User Interface (KKoreUI)
+KahLua Kore - User Interface (KoreUI)
 ======================================
 
-KKoreUI is a library of useful user interface management functions used
+KoreUI is a library of useful user interface management functions used
 by all KahLua modules. While it was originally designed to be tightly
-coupled with the rest of KahLua Kore (KKore), it provides functionality
+coupled with the rest of KahLua Kore (Kore), it provides functionality
 that is useful and traditionally fairly difficult to work with using the
 standard Blizzard code. Therefore, I have made it possible for this
-portion of KKore to be packaged as a stand-alone library so that other
+portion of Kore to be packaged as a stand-alone library so that other
 addon authors can more easily create their won user interfaces. The
 parts that are most likely to interest other users is the tabbed dialog
 code, the dropdown menu code and the popup menu code. That is the vast
-majority of the KKoreUI code anyway, the rest of it is mostly just a
+majority of the KoreUI code anyway, the rest of it is mostly just a
 thin wrapper on top of normal Blizzard frame types.
 
-KKoreUI functions are divided into three main groups:
+KoreUI functions are divided into three main groups:
 1.  Individual widgets (buttons, edit boxes etc).
 2.  Container widgets (dialogs and tabbed dialogs).
 3.  Utilities (string measurement etc).
 
-1.  Using KKoreUI in your code.
+1.  Using KoreUI in your code.
 ===============================
-KKoreUI's heritage shows in its directory placement requirement. To use
-this (or other KKore libraries such as KKoreHash) simply copy the KKore
+KoreUI's heritage shows in its directory placement requirement. To use
+this (or other Kore libraries such as KoreHash) simply copy the Kore
 folder into your addon directory and add the following line to your
 addon's TOC file, right after all of the ## directives:
-     KKore\KKore.xml
-Then edit that file (KKore\KKore.xml) and ensure that KKoreUI has been
-uncommented. If you are using any other KKore libraries in your addon,
+     Kore\Kore.xml
+Then edit that file (Kore\Kore.xml) and ensure that KoreUI has been
+uncommented. If you are using any other Kore libraries in your addon,
 they should be uncommented too.
 
 Once this has been done, somewhere at the top of your module code where
-it initializes itself, you need to get a "handle" to KKoreUI. KKoreUI
+it initializes itself, you need to get a "handle" to KoreUI. KoreUI
 has an embedded version of LibStub, so if you were using that for any
 other reason, such as loading Ace3 libraries, you can remove the
 LibStub.lua file from your addon and its TOC file. This is why you want
-KKore to be loaded as early as possible in your TOC. To get a handle
-for KKoreUI, simply add the following lines to your addon:
+Kore to be loaded as early as possible in your TOC. To get a handle
+for KoreUI, simply add the following lines to your addon:
 
-  local KUI = LibStub:GetLibrary ("KKoreUI")
-  assert (KUI, "YourModuleName requires KKoreUI, which was not loaded")
+  local KUI = LibStub:GetLibrary ("KoreUI")
+  assert (KUI, "YourModuleName requires KoreUI, which was not loaded")
 
-That's it. Your addon is now ready to use KKoreUI.
+That's it. Your addon is now ready to use KoreUI.
 
 2.  Basic Usage
 ===============
 
-Almost all KKoreUI functions take two and only two arguments: a configuration
+Almost all KoreUI functions take two and only two arguments: a configuration
 table and the parent frame to which the widget is to be attached, which if
 not specified defaults to UIParent. For example, to create a button, you
 could use:
 
   local button = KUI:CreateButton ({text = "Push me!"})
 
-All options to KKoreUI widgets and functions are passed through the first
+All options to KoreUI widgets and functions are passed through the first
 argument, which is a Lua table with a number of named elements that
-control what KKoreUI does. There are some elements common to all or most
+control what KoreUI does. There are some elements common to all or most
 widgets, and some widgets have extra elements to control their behaviour.
 The common elements all widgets share are:
 
@@ -64,7 +64,7 @@ cfg.name [string]
   the widget type.
 
 cfg.x, cfg.y [number or string]
-  Where to position this object relative to its parent. Internally KKoreUI
+  Where to position this object relative to its parent. Internally KoreUI
   performs the following actions:
 
     frame:SetPoint ("LEFT", parent, "LEFT", x, 0)
@@ -74,7 +74,7 @@ cfg.x, cfg.y [number or string]
   centered horizontally withing the parent, and y can be the string
   "MIDDLE" to be centered vertically. If either x or y are not specified
   then that particular point ("LEFT" for x, "TOP" for y) are not set by
-  KKoreUI and you will need to place the returned frame yourself.
+  KoreUI and you will need to place the returned frame yourself.
 
 cfg.width, cfg.height [number]
   Override the default widget width and height. Each widget type has a
@@ -116,7 +116,7 @@ cfg.label [table]
 cfg.parent [table]
   If you need the widget to have a specific parent, set it here. Otherwise
   the parent passed as the argument to the widget creation function is
-  used. If the parent frame passed to the creation function is a KKoreUI
+  used. If the parent frame passed to the creation function is a KoreUI
   container widget and it has a member called "content", then this is set
   as the actual parent.
 
@@ -177,7 +177,7 @@ cfg.tooltip [table]
 =====================
 These functions do not take the usual configuration table and parent
 as their arguments. They are simply useful functions used throughout
-the KKoreUI internals and useful outside too.
+the KoreUI internals and useful outside too.
 
 width, height = KUI:MeasureStrWidth (str, font)
   Measures and returns the absolute width and height of the specified
@@ -270,11 +270,11 @@ ret:SetShown (onoff)
 
 5.  Widgets
 ===========
-This section discusses the basic KKoreUI widgets that are usually placed
+This section discusses the basic KoreUI widgets that are usually placed
 within containers or your own frames. These are the basic "building
 blocks" of a user interface. All of these widgets take the same two
 parameters: the config table and the parent, which defaults to UIParent
-if not specified. If the parent specified is a KKoreUI container object
+if not specified. If the parent specified is a KoreUI container object
 and that container has a "content" member, then the actual low level
 frame parent is set to that content frame, not to the outer containing
 frame of the container widget. If the widget throws any extra events
@@ -502,7 +502,7 @@ cfg.getbutton [function]
   This function must return a pointer to the parent that contains the
   radio group. This really is very rarely used, and the best way to
   understand why it is necessary is to look at the internals of
-  KKoreUI. Not for the weak of heart.
+  KoreUI. Not for the weak of heart.
 
 ret:SetChecked ()
   Sets this specific radio button to the one and only one in the group
@@ -952,13 +952,13 @@ menu.frame [table or function]
   There may be times when you need a custom frame for a menu item to
   represent something in the menu other than a simple checkbox choice.
   For these situations, you can provide your own frame that is
-  placed in the menu by the KKoreUI code. This is rarely used for
+  placed in the menu by the KoreUI code. This is rarely used for
   dropdown menus, but more commonly used for popup menus. This element
   must either be a frame or a function that returns a frame. It is the
   responsibility of these custom frames to call the StartTimeoutCounter
   and StopTimeoutCounter when the mouse leaves or enters the frame. In
   order to make it easier to insert custom frames, if you set this
-  element to be boolean true, then this will call an internal KKoreUI
+  element to be boolean true, then this will call an internal KoreUI
   function that allows you to place one of a number of widgets on the
   menu. If you use this facility, then you must set the menu.widget
   element below to one of the supported widget names, and provide any
@@ -967,18 +967,18 @@ menu.frame [table or function]
   frame yourself.
 
 menu.widget [string]
-  If you are using a custom frame and you are using the internal KKoreUI
+  If you are using a custom frame and you are using the internal KoreUI
   custom frame creation function (by setting menu.frame to true), then this
-  element tells KKoreUI which widget type to create for the custom frame.
+  element tells KoreUI which widget type to create for the custom frame.
   For each of these widget types, you may need to set extra elements in
   the menu item table to provide configuration options for the widget.
   Where this is the case is is described along with the widget type.
-  Note that using this feature requires the full KKoreUI library. If
+  Note that using this feature requires the full KoreUI library. If
   you have stripped out just the dropdown portion, you may not be able to
   use this feature. However, this document assumes you are using the
-  full KKoreUI, so please note that these widget types use the widgets
+  full KoreUI, so please note that these widget types use the widgets
   described above, so the purpose of the extra values is not discussed here.
-  Refer to the individual widget types above for details. The KKoreUI
+  Refer to the individual widget types above for details. The KoreUI
   widget type is displayed in parentheses.
 
   "radio" (KUI:CreateRadioButton)
@@ -1225,7 +1225,7 @@ ret.rightframe [table]
 
 6.  Containers
 ==============
-So now you know what widget types KKoreUI offers. As useful as these
+So now you know what widget types KoreUI offers. As useful as these
 widgets are, they are meaningless unless you actually put them somewhere
 a user can interact with them. That is what the container types are for.
 These container types provide a "canvas" onto which you can place your
@@ -1314,7 +1314,7 @@ ret.content [frame]
   This is set to a frame that covers the usable portion of the dialog,
   inside the borders and above the buttons and status bar. Note that
   if you use the return value from KUI:CreateDialogFrame() as the
-  parent argument to any of the KKoreUI widgets, then the widgets
+  parent argument to any of the KoreUI widgets, then the widgets
   will automatically become children of ret.content, not the outer
   containing frame.
 
@@ -1346,7 +1346,7 @@ Example:
 --------------------------
 A tabbed dialog is a dialog frame that can have a number of "tabs" along
 the bottom which change the content above it. A good example of a tabbed
-dialog is the social panel (press 'O' in game). KKoreUI also allows you
+dialog is the social panel (press 'O' in game). KoreUI also allows you
 to create sub-tabs (which are presented at the top of the dialog) and
 it provides a header area that can either be tab or sub-tab specific,
 as you choose.
@@ -1401,7 +1401,7 @@ cfg.tabs [table]
     configured. The intended usage for this is for subtabs that
     may have common content on one side of the split, and content
     that changes with the subtab selection on the other side of the
-    split. This element tells KKoreUI which side of the split changes
+    split. This element tells KoreUI which side of the split changes
     when a subtab is selected. If you have a vertical split then
     this value can be either "LEFT" or "RIGHT" to have the left or
     right hand side of the vertical split change as subtabs are
@@ -1435,7 +1435,7 @@ ret.content [frame]
   This is set to a frame that covers the usable portion of the dialog,
   inside the borders and above the buttons and tab bar. Note that
   if you use the return value from KUI:CreateTabbedDialog() as the
-  parent argument to any of the KKoreUI widgets, then the widgets
+  parent argument to any of the KoreUI widgets, then the widgets
   will automatically become children of ret.content, not the outer
   containing frame. However, this is almost certainly not what you
   want to do, as this top level .content frame sits "behind" all tabs,
@@ -1479,7 +1479,7 @@ frame is a view or window onto a much larger child frame canvas. These
 frames are generally used for larger dialogs. However, they are unsuited
 to displaying very long lists, for example, all guild members in a guild
 with 500 members. While it is true that a scroll frame could be used
-for such a purpose, it is very inefficient. The KKoreUI scroll list
+for such a purpose, it is very inefficient. The KoreUI scroll list
 solves this problem in much the same way as the internal Blizzard
 FrameXML code does with its FauxScrollFrame API - by creating a frame
 that can have a number of child elements whose content is scrolled,
@@ -1489,7 +1489,7 @@ represents a list of 1000 users. The scroll bars scroll through the list
 and re-populate each of the 10 visual elements from a list, rather than
 creating a single scroll frame whose child is big enough to hold all
 1000 elements. This is vastly more efficient, but it does require
-a bit of extra coding. KKoreUI tries to reduce the amount of code you
+a bit of extra coding. KoreUI tries to reduce the amount of code you
 have to write to the barest minimum.
 
 Scroll lists work on the basic principle that there are a finite number
@@ -1501,7 +1501,7 @@ scrolled, but in fact it is not, only the content of the visual elements
 are changed as the user scrolls through the list. In this implementation,
 each visual element must be of the same height.
 
-When you create or resize a scroll list, KKoreUI determines how many
+When you create or resize a scroll list, KoreUI determines how many
 visual elements of the specified height will fit in the scroll list
 frame. If there are too many visual elements (the frame was made smaller)
 it hides the extra ones, and if there are too few, it calls a user
@@ -1516,18 +1516,18 @@ be displayed. When an entry in the list is selected, a third function,
 called selectitem, is called. These functions are discussed in more
 detail below.
 
-Armed with these three functions, KKoreUI can efficiently manage the
+Armed with these three functions, KoreUI can efficiently manage the
 display of the large list of items using the available number of
 visual items. It manages the positioning of the scroll bars, filling
 each visual element with the required info etc.
 
 Each visual element, as stated above, must be a uniform height, but
-KKoreUI places no other restrictions on the visual elements. They can
+KoreUI places no other restrictions on the visual elements. They can
 be as simple or as complex as you need. The KahLua Konfer Suicide Kings
 addon makes extensive use of some rather complex scroll lists if you
 want to see these in action.
 
-IMPORTANT: this container is different from other KKoreUI containers
+IMPORTANT: this container is different from other KoreUI containers
 in that it does not actually create a container frame, rather it
 fully occupies the parent frame given as an argument to the function.
 The most typical use for a scroll list is to fill the content frame
@@ -1644,7 +1644,7 @@ ret.slots [table]
   A table of the visible slots.
 
 In order to try and reduce the code that users have to write to support
-scroll lists, KKoreUI provides three "helper" functions you may want to
+scroll lists, KoreUI provides three "helper" functions you may want to
 use in your newitem, setitem and selectitem functions. These helper
 functions are discussed here.
 
@@ -1659,7 +1659,7 @@ KUI.NewItemHelper (objp, num, name, w, h, stf, och, ocs, pch)
   within the default OnClick handler. stf receives 2 arguments, which
   are objp and a text string. och receives to arguments, which are objp
   and the event name (always OnClick), and ocs receives 2 arguments,
-  objp and the item index. If ocs returns true, KKoreUI will not call
+  objp and the item index. If ocs returns true, KoreUI will not call
   SetSelected() on the item, otherwise it does. This function creates
   a button based frame and sets the highlight texture so that it
   highlights when the mouse goes over it. Supports a single SetText

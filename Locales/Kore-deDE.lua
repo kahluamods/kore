@@ -46,7 +46,7 @@ K.NO_STR = "Nein"
 K.KAHLUA = "KahLua"
 
 L["CMD_KAHLUA"] = "kahlua"
-L["CMD_KKORE"] = "kkore"
+L["CMD_KORE"] = "kore"
 L["CMD_HELP"] = "hilfe"
 L["CMD_LIST"] = "list"
 L["CMD_DEBUG"] = "debig"
