@@ -5,7 +5,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2021 James Kean Johnston. All rights reserved.
+   Copyright 2008-2026 Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ KLD.debug_id = KORELOOT_MAJOR
 
 local K, KM = LibStub:GetLibrary("Kore")
 assert (K, "KoreLoot requires Kore")
-assert (tonumber(KM) >= 1, "KoreLoot requires Kore r4 or later")
+assert (tonumber(KM) >= 1, "KoreLoot requires Kore r1 or later")
 K:RegisterExtension (KLD, KORELOOT_MAJOR, KORELOOT_MINOR)
 
 local KRP, KM = LibStub:GetLibrary("KoreParty")

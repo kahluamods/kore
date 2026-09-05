@@ -5,7 +5,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2021 James Kean Johnston. All rights reserved.
+   Copyright 2008-2026 Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -635,7 +635,7 @@ local function update_group_internal(fire_party, fire_raid, fire_bg)
   -- to each player entry via the "new_player" callback. The callback is
   -- passed the player table we are adding and if it needs to add any members
   -- to the table the member names should begin with an addon-specific prefix.
-  -- For example, KSK may add a variable "ksk_userid" to the player.
+  -- For example, Konfer may add a variable "konfer_userid" to the player.
   --
   -- After all this had been done the players table will contain the full list
   -- of players in the party or raid. Other tables such as the party or raid

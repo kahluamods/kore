@@ -1,11 +1,11 @@
 --[[
-   KahLua Kore - loot distribution handling.
+   KahLua Kore - Konfer module registration and inter-mod communication.
      Git: https://github.com/kahluamods/kore
      E-mail: me@cruciformer.com
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2021 James Kean Johnston. All rights reserved.
+   Copyright 2008-2026 Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 ]]
 
 local KOREKONFER_MAJOR = "KoreKonfer"
-local KOREKONFER_MINOR = 4
+local KOREKONFER_MINOR = 1
 local KK, oldminor = LibStub:NewLibrary(KOREKONFER_MAJOR, KOREKONFER_MINOR)
 
 if (not KK) then
@@ -36,14 +36,15 @@ KK.debug_id = KOREKONFER_MAJOR
 -- Kore-based addon and is entirely separate from any addon's own protocol
 -- number, which versions that addon's events and their arguments.
 --
---   1 - the CRC32 covers the header (protocol, command, config) as well
+--   1 - initial version. The CRC32 covers the header (protocol, command and
+--       config) as well as the payload.
 --
--- We always send the current version. On receipt we accept anything from
--- KORE_WIRE_MIN upwards, falling back through the older checksum rules, so
--- that a newer client can still read an older one's messages.
+-- There is only one envelope version, so there is nothing to fall back to on
+-- receipt: a message either checksums as version 1 or it is rejected. When a
+-- second version is added, comm_received() below is where the receiver has to
+-- learn how to recognise the older one.
 --
 KK.WIRE_VERSION = 1
-KK.WIRE_VERSION_MIN = 1
 
 --
 -- VCHEK and VCACK are always sent at protocol 1 rather than at the sending
@@ -54,12 +55,9 @@ KK.WIRE_VERSION_MIN = 1
 --
 KK.VCHECK_PROTOCOL = 1
 
-local KORE_WIRE = KK.WIRE_VERSION
-local KORE_WIRE_MIN = KK.WIRE_VERSION_MIN
-
 local K, KM = LibStub:GetLibrary("Kore")
 assert(K, "KoreKonfer requires Kore")
-assert(tonumber(KM) >= 1, "KoreKonfer requires Kore r4 or later")
+assert(tonumber(KM) >= 1, "KoreKonfer requires Kore r1 or later")
 K:RegisterExtension(KK, KOREKONFER_MAJOR, KOREKONFER_MINOR)
 
 local KUI, KM = LibStub:GetLibrary("KoreUI")
@@ -124,18 +122,33 @@ KK.CFGTYPE_GUILD = 1
 KK.CFGTYPE_PUG   = 2
 
 --
--- Global list of all Konfer modules.
+-- Every Konfer-family *addon* that has registered with Kore, keyed by its
+-- addon handle, plus the "..." entry holding the shared selection dialogs.
+-- This exists to arbitrate between separately installed addons that would
+-- both auto-open on loot; see check_duplicate_modules() below.
 --
-_G["KKonfer"] = _G["KKonfer"] or {}
-local KKonfer = _G["KKonfer"]
-KKonfer["..."] = KKonfer["..."] or {}
+-- Do not confuse this with the loot distribution modules -- Suicide Kings,
+-- EP/GP, DKP, PUG. Those are not addons and they do not appear here: they
+-- register with the Konfer addon itself, which is the system that knows about
+-- distribution policy. Kore deliberately does not, so that the looting
+-- mechanics it provides stay policy-agnostic.
+--
+-- Kept on KK rather than in _G so that the name "Konfer" in the global
+-- namespace belongs to the Konfer addon alone. LibStub hands back the same
+-- KK table across a library upgrade, so this survives one just as a global
+-- would.
+--
+KK.registry = KK.registry or {}
+KK.registry["..."] = KK.registry["..."] or {}
+
+local registry = KK.registry
 
 local function opens_on_loot(handle)
   if (not handle or handle == "") then
     return false
   end
 
-  local me = KKonfer[handle]
+  local me = registry[handle]
   if (not me) then
     return false
   end
@@ -144,7 +157,7 @@ local function opens_on_loot(handle)
 end
 
 local function check_duplicate_modules(me, insusp)
-  local kchoice = KKonfer["..."]
+  local kchoice = registry["..."]
   local tstr = strfmt("%s (v%s) - %s", me.title, me.version, me.desc)
 
   if (not insusp and kchoice.selected and kchoice.selected ~= me.handle) then
@@ -153,7 +166,7 @@ local function check_duplicate_modules(me, insusp)
   end
 
   local nactive = 0
-  for k,v in pairs(KKonfer) do
+  for k,v in pairs(registry) do
     if (k ~= "...") then
       if (not KK.IsSuspended(k)) then
         if (opens_on_loot(k)) then
@@ -189,7 +202,7 @@ function KK.IsSuspended(handle)
     return true
   end
 
-  local me = KKonfer[handle]
+  local me = registry[handle]
   if (not me) then
     return true
   end
@@ -202,7 +215,7 @@ function KK.SetSuspended(handle, onoff)
     return
   end
 
-  local me = KKonfer[handle]
+  local me = registry[handle]
   if (not me) then
     return
   end
@@ -225,12 +238,12 @@ function KK.SetSuspended(handle, onoff)
 end
 
 local function create_konfer_dialogs()
-  local kchoice = KKonfer["..."]
+  local kchoice = registry["..."]
   assert(kchoice)
   local ks = "|cffff2222<" .. K.KAHLUA ..">|r"
 
   local arg = {
-    x = "CENTER", y = "MIDDLE", name = "KKonferModuleSelector",
+    x = "CENTER", y = "MIDDLE", name = "KonferModuleSelector",
     title = strfmt(L["KONFER_SEL_TITLE"], ks),
     canmove = true,
     canresize = false,
@@ -255,7 +268,7 @@ local function create_konfer_dialogs()
   ksd.header = KUI:CreateStringLabel(arg, ksd)
 
   arg = {
-    name = "KKonferModSelDD",
+    name = "KonferModSelDD",
     x = 35, y = -105, dwidth = 350, justifyh = "CENTER", border = "THIN",
     mode = "SINGLE", itemheight = 16, items = KUI.emptydropdown,
   }
@@ -264,27 +277,24 @@ local function create_konfer_dialogs()
     if (not usr) then
       return
     end
-    local kkonfer = _G["KKonfer"]
-    assert(kkonfer)
-    for k,v in pairs(kkonfer) do
+    for k,v in pairs(registry) do
       if (k ~= "..." and k ~= val) then
         KK.SetSuspended(k, true)
       end
     end
     KK.SetSuspended(val, false)
-    kkonfer["..."].seldialog:Hide()
+    registry["..."].seldialog:Hide()
     ksd.selected = val
   end)
 
   ksd.RefreshList = function(party, raid)
-    local kkonfer = _G["KKonfer"] or {}
     local items = {}
-    local kd = kkonfer["..."].seldialog.seldd
+    local kd = registry["..."].seldialog.seldd
 
     tinsert(items, {
       text = L["KONFER_SEL_DDTITLE"], value = "", title = true,
     })
-    for k,v in pairs(kkonfer) do
+    for k,v in pairs(registry) do
       if (k ~= "...") then
         if ((party and v.party) or (raid and v.raid)) then
           local item = {
@@ -300,7 +310,7 @@ local function create_konfer_dialogs()
   end
 
   arg = {
-    x = "CENTER", y = "MIDDLE", name = "KKonferModuleDisable",
+    x = "CENTER", y = "MIDDLE", name = "KonferModuleDisable",
     title = strfmt(L["KONFER_SEL_TITLE"], ks),
     canmove = true,
     canresize = false,
@@ -317,7 +327,7 @@ local function create_konfer_dialogs()
   }
   kchoice.actdialog = KUI:CreateDialogFrame(arg)
   kchoice.actdialog:Catch("OnAccept", function(this, evt)
-    for k,v in pairs(KKonfer) do
+    for k,v in pairs(registry) do
       if (k ~= "..." and k ~= this.mod) then
         KK.SetSuspended(k, true)
       end
@@ -429,9 +439,9 @@ end
 --
 -- Two independent things are versioned here, and they must not be confused:
 --
---   KORE_WIRE (below) versions this envelope -- the framing, the checksum and
---   the serialisation. It belongs to Kore, is the same for every addon built
---   on it, and changes only when this file or KoreHash changes.
+--   KK.WIRE_VERSION (above) versions this envelope -- the framing, the
+--   checksum and the serialisation. It belongs to Kore, is the same for every
+--   addon built on it, and changes only when this file or KoreHash changes.
 --
 --   self.protocol is the *addon's* protocol: the set of events it sends and
 --   understands, and their arguments. It says nothing about the wire format.
@@ -558,41 +568,19 @@ local function comm_received(self, prefix, msg, dist, snd, dispatcher)
   end
 
   --
-  -- Work out which envelope version this came from by which checksum rule it
-  -- satisfies. The envelope carries no version field of its own, but each
-  -- version computes the CRC over a different span, so the checksum that
-  -- matches identifies the sender's wire version.
+  -- The envelope carries no version field of its own: the span the CRC32
+  -- covers is what identifies it. At wire version 1 that span is the header
+  -- (protocol, command and config) followed by the payload, exactly as
+  -- send_addon_msg() below computes it.
   --
-  local wire = nil
-  local mf = nil
+  local crc = H:CRC32(strfmt("%02x:%s:%s:", proto, cmd, cfg), nil, false)
+  crc = H:CRC32(data, crc, true)
+  local mf = K.hexstr(crc)
 
-  for w = KORE_WIRE, KORE_WIRE_MIN, -1 do
-    local crc
-
-    if (w >= 2) then
-      -- Header and payload.
-      crc = H:CRC32(strfmt("%02x:%s:%s:", proto, cmd, cfg), nil, false)
-      crc = H:CRC32(data, crc, true)
-    else
-      -- Payload alone.
-      crc = H:CRC32(data)
-    end
-
-    mf = K.hexstr(crc)
-    if (mf == msum) then
-      wire = w
-      break
-    end
-  end
-
-  if (not wire) then
+  if (mf ~= msum) then
     self.debug(1, "mismatch: cmd=%q mysum=%q theirsum=%q", tostring(cmd), tostring(mf), tostring(msum))
     warn_once(sender, "WARNING: addon message from %q was truncated!", tostring(sender))
     return
-  end
-
-  if (wire < KORE_WIRE) then
-    self.debug(2, "recv: wire version %d from %q", wire, tostring(sender))
   end
 
   local decoded = ZL:DecodeForWoWAddonChannel(data)
@@ -920,7 +908,7 @@ local function kk_version_check_reply(self, sender, version)
 end
 
 --
--- Register a new addon (like KSK) with the base Konfer system. The single
+-- Register a new addon (like Konfer) with the base Konfer system. The single
 -- argument to this function is a table with various parameters, as described
 -- below. Returns a handle to the mod, which is a table.
 --
@@ -930,7 +918,7 @@ function KK.RegisterKonfer(kmod)
     error("Invalid call to RegisterKonfer.", 2)
   end
 
-  local me = KKonfer[targ.handle]
+  local me = registry[targ.handle]
   if (me ~= nil) then
     return me
   end
@@ -953,7 +941,7 @@ function KK.RegisterKonfer(kmod)
   kmod.VersionCheckReply = kk_version_check_reply
   kmod.KonferCommReceived = comm_received
 
-  KKonfer[targ.handle] = targ
+  registry[targ.handle] = targ
 
   check_duplicate_modules(targ, false)
 end

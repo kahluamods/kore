@@ -5,7 +5,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2021 James Kean Johnston. All rights reserved.
+   Copyright 2008-2026 Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -981,12 +981,12 @@ local function kahlua(input)
   if (input:lower() == L["CMD_VERSION"] or input:lower() == "version" or input:lower() == "ver") then
     K.printf(K.ucolor, "|cffff2222<%s>|r %s - %s", K.KAHLUA,
       strfmt(L["KAHLUA_VER"], KORE_MINOR), L["KAHLUA_DESC"])
-    K.printf(K.ucolor, "(C) Copyright 2008-2019 J. Kean Johnston (Cruciformer). All rights reserved.")
+    K.printf(K.ucolor, "(C) Copyright 2008-2026 Kean Johnston (Cruciformer). All rights reserved.")
     K.printf(K.ucolor, L["Kore extensions loaded:"])
     for k,v in pairs(K.extensions) do
       K.printf(K.ucolor, "    |cffffff00%s|r %s", k, strfmt(L["KAHLUA_VER"], v.version))
     end
-    K.printf(K.ucolor, "This is open source software, distributed under the terms of the Apache license. For the latest version and other KahLua modules, visit |cffffffffhttps://www.curseforge.com/wow/addons/ksk-classic|r.")
+    K.printf(K.ucolor, "This is open source software, distributed under the terms of the Apache license. For the latest version and other KahLua modules, visit |cffffffffhttps://www.curseforge.com/wow/addons/konfer|r.")
     return
   end
 
@@ -1919,7 +1919,7 @@ function K.GetTooltipLine(link, line, side)
     return UnsetTooltipHack()
   end
 
-  local text = _G["KKUTooltipText"..side..line]:GetText()
+  local text = _G["KoreUTooltipText"..side..line]:GetText()
   UnsetTooltipHack()
   return text
 end
@@ -1929,7 +1929,7 @@ function K.GetTooltipLines(link, ...)
   SetTooltipHack(link)
         
   for k,v in pairs({...}) do
-    lines[#lines+1] = _G["KKUTooltipTextLeft"..v]:GetText()
+    lines[#lines+1] = _G["KoreUTooltipTextLeft"..v]:GetText()
   end
 
   UnsetTooltipHack()

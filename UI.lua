@@ -5,7 +5,7 @@
 
    Please refer to the file LICENSE.txt for the Apache License, Version 2.0.
 
-   Copyright 2008-2021 James Kean Johnston. All rights reserved.
+   Copyright 2008-2026 Kean Johnston. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ local tmaxn = table.maxn
 
 local K, KM = LibStub:GetLibrary("Kore")
 assert(K, "KoreUI requires Kore")
-assert(tonumber(KM) >= 4, "KoreUI requires Kore r4 or later")
+assert(tonumber(KM) >= 1, "KoreUI requires Kore r1 or later")
 K:RegisterExtension(KUI, KOREUI_MAJOR, KOREUI_MINOR)
 
 local function debug(lvl,...)

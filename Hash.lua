@@ -14,7 +14,7 @@
 --
 
 local KOREHASH_MAJOR = "KoreHash"
-local KOREHASH_MINOR = 4
+local KOREHASH_MINOR = 1
 local H, oldminor = LibStub:NewLibrary(KOREHASH_MAJOR, KOREHASH_MINOR)
 
 if (not H) then
