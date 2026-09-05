@@ -13,18 +13,18 @@
 <Script file="Libs\LibSerialize.lua"/>
 <Script file="Libs\LibDeflate.lua"/>
 
-<Script file="KKore.lua"/>
+<Script file="Kore.lua"/>
 
-<Script file="Locales\KKore-enUS.lua"/>
-<Script file="Locales\KKore-deDE.lua"/>
-<Script file="Locales\KKore-frFR.lua"/>
-<Script file="Locales\KKore-ruRU.lua"/>
+<Script file="Locales\Kore-enUS.lua"/>
+<Script file="Locales\Kore-deDE.lua"/>
+<Script file="Locales\Kore-frFR.lua"/>
+<Script file="Locales\Kore-ruRU.lua"/>
 
-<Script file="KKoreHash.lua"/>
-<Script file="KKoreUI.lua"/>
-<Script file="KKoreParty.lua"/>
-<Script file="KKoreLoot.lua"/>
-<Script file="KKoreKonfer.lua"/>
-<Script file="KKoreDialogs.lua"/>
+<Script file="Hash.lua"/>
+<Script file="UI.lua"/>
+<Script file="Party.lua"/>
+<Script file="Loot.lua"/>
+<Script file="Konfer.lua"/>
+<Script file="Dialogs.lua"/>
 
 </Ui>

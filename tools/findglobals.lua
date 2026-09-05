@@ -9,7 +9,7 @@
 
    Requires luajit; it reads compiled bytecode rather than parsing source.
 
-     luajit kore/tools/findglobals.lua konfersk/*.lua kore/KKore*.lua
+     luajit kore/tools/findglobals.lua konfer/*.lua kore/*.lua
 
    Anything printed is either a real WoW or Lua global (fine) or a bug. Add
    known-good names to the KNOWN table below to quieten the output.
@@ -59,7 +59,7 @@ BackdropTemplateMixin
 end
 
 -- Prefix matches, for the large families of Blizzard constants.
-local KNOWN_PREFIX = { "INVTYPE_", "ITEM_QUALITY", "SLASH_", "KKore" }
+local KNOWN_PREFIX = { "INVTYPE_", "ITEM_QUALITY", "SLASH_", "Kore" }
 
 local function known(name)
   if (KNOWN[name]) then

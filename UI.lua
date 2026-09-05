@@ -23,12 +23,12 @@
 local addonName, addonPrivate = ...
 local texpath
 if (string.lower(addonName) == "kkore") then
-  texpath = "Interface\\Addons\\KKore\\Textures\\"
+  texpath = "Interface\\Addons\\Kore\\Textures\\"
 else
-  texpath = "Interface\\Addons\\" .. addonName .. "\\KKore\\Textures\\"
+  texpath = "Interface\\Addons\\" .. addonName .. "\\Kore\\Textures\\"
 end
 
-local KKOREUI_MAJOR = "KKoreUI"
+local KKOREUI_MAJOR = "KoreUI"
 local KKOREUI_MINOR = 5
 
 local KUI = LibStub:NewLibrary(KKOREUI_MAJOR, KKOREUI_MINOR)
@@ -64,9 +64,9 @@ local CreateFrame = CreateFrame
 local tsort = table.sort
 local tmaxn = table.maxn
 
-local K, KM = LibStub:GetLibrary("KKore")
-assert(K, "KKoreUI requires KKore")
-assert(tonumber(KM) >= 4, "KKoreUI requires KKore r4 or later")
+local K, KM = LibStub:GetLibrary("Kore")
+assert(K, "KoreUI requires Kore")
+assert(tonumber(KM) >= 4, "KoreUI requires Kore r4 or later")
 K:RegisterExtension(KUI, KKOREUI_MAJOR, KKOREUI_MINOR)
 
 local function debug(lvl,...)

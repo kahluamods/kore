@@ -19,13 +19,13 @@
    limitations under the License.
 ]]
 
-local K = LibStub:GetLibrary("KKore")
+local K = LibStub:GetLibrary("Kore")
 
 if (not K) then
   return
 end
 
-local L = LibStub("AceLocale-3.0"):NewLocale("KKore", "frFR")
+local L = LibStub("AceLocale-3.0"):NewLocale("Kore", "frFR")
 if (not L) then
   return
 end
@@ -67,7 +67,7 @@ L["The following modules are available:"] = "Les modules suivants sont disponibl
 L["Cannot enable debugging for '%s' - no such module."] = "Impossible d'activer le déboguage pour '%s' - module inexistant."
 L["Debug level %d out of bounds - must be between 0 and 10."] = "Niveau de déboguage %s hors limites - doit être compris entre 0 et 10."
 L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."] = "Module '%s' inexistant. Utilisez %s/%s %s%s pour une liste des modules disponibles."
-L["KKore extensions loaded:"] = "Extensions KKore chargées :"
+L["Kore extensions loaded:"] = "Extensions Kore chargées :"
 L["Chest"] = "Coffre"
 
 L["Not Set"] = "Non d\195\169fini"

@@ -19,13 +19,13 @@
    limitations under the License.
 ]]
 
-local K = LibStub:GetLibrary("KKore")
+local K = LibStub:GetLibrary("Kore")
 
 if (not K) then
   return
 end
 
-local L = LibStub("AceLocale-3.0"):NewLocale("KKore", "enUS", true)
+local L = LibStub("AceLocale-3.0"):NewLocale("Kore", "enUS", true)
 if (not L) then
   return
 end
@@ -67,7 +67,7 @@ L["The following modules are available:"] = true
 L["Cannot enable debugging for '%s' - no such module."] = true
 L["Debug level %d out of bounds - must be between 0 and 10."] = true
 L["Module '%s' does not exist. Use %s/%s %s%s for a list of available modules."] = true
-L["KKore extensions loaded:"] = true
+L["Kore extensions loaded:"] = true
 L["Chest"] = true
 
 -- Konfer related stuff
