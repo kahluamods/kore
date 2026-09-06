@@ -53,7 +53,7 @@ HIGHLIGHT_FONT_COLOR FillLocalizedClassList Ambiguate SetDesaturation
 ChatEdit_InsertLink ChatFrame_AddMessageEventFilter
 ChatFrame_RemoveMessageEventFilter PanelTemplates_SetTab
 PanelTemplates_SelectTab PanelTemplates_SetNumTabs PanelTemplates_TabResize
-BackdropTemplateMixin
+PanelTemplates_DeselectTab BackdropTemplateMixin
 ]]):gmatch("%S+") do
   KNOWN[w] = true
 end

@@ -1344,12 +1344,15 @@ Example:
 
 6.2 KUI:CreateTabbedDialog
 --------------------------
-A tabbed dialog is a dialog frame that can have a number of "tabs" along
-the bottom which change the content above it. A good example of a tabbed
-dialog is the social panel (press 'O' in game). KoreUI also allows you
-to create sub-tabs (which are presented at the top of the dialog) and
-it provides a header area that can either be tab or sub-tab specific,
-as you choose.
+A tabbed dialog is a dialog frame with a strip of buttons along the
+bottom which change the content above them, and optionally a second
+strip along the top of each of those. A good example is the social panel
+(press 'O' in game). It also provides a header area that can be specific
+to either strip, as you choose.
+
+The two strips are called PAGES and TABS respectively, and the section
+immediately below defines those terms; they are used strictly throughout
+the rest of this section.
 
 cfg.x, cfg.y, cfg.name, cfg.canmove, cfg.canresize, cfg.minwidth,
 cfg.maxwidth, cfg.minheight, cfg.minheight
@@ -1362,58 +1365,86 @@ cfg.title [string]
   Sets the title for the main tabbed dialog. This can be changed for
   each tab as you select it.
 
-cfg.tabs [table]
-  This is how you define the tabs that appear along the bottom of the
-  dialog. Each entry in the table must be a named table, and the name
-  of the table forms the name of the tab. Each table can have the
-  following elements inside it:
-  tab.title [string]
-    The title for this tab. If set, when you select this tab it will
-    change the top level title to be this string.
+PAGES AND TABS
 
-  tab.text [string]
-    The text that appears on the bottom tab. This should be kept very
-    short.
+A tabbed dialog has two independent strips of buttons, and they are two
+different things. The words below are used strictly and mean only one
+thing each:
 
-  tab.id [number]
-    The tab number. This should start at 1 and increment by 1 for each
-    tab you define.
+  A PAGE is one of the buttons along the BOTTOM edge of the dialog. A
+  page is a whole screen: it has its own frame, content area, top bar
+  and title.
 
-  tab.hsplit [table]
-    If you want this tab to have a horizontal split, then set this.
-    The values set in this table are the same as you would pass to
-    KUI:CreateHSplit as described above.  This will create a tab-specific
-    .hsplit element in the return value which can then be used to access
-    the top and bottom halves of the split. You should only set .hsplit
-    or .vsplit, not both.
+  A TAB is one of the buttons along the TOP of a page, drawn in that
+  page's own top bar. A page may have any number of tabs. A tab may not
+  have tabs of its own; only one level of nesting is supported, and a
+  tab cannot have a title of its own.
 
-  tab.vsplit [table]
-    If you want this tab to have a vertical split, then set this as you
-    would for a call to KUI:CreateVSplit as descrbed above.  This will
-    create a tab-specific .vsplit element in the return value which can then
-    be used to access the lft and right halves of the split. You should only
-    set .hsplit or .vsplit, not both.
+Both are addressed by NAME everywhere in this API and never by position.
+A name is the identity of a page or a tab and never changes. The "order"
+field decides only where in its strip the button is drawn, and positions
+shift the moment anything is hidden, added or removed - which is exactly
+why you never address by them.
 
-  tab.tabframe [string]
-    This controls what portion of the tab changes when you select
-    a subtab. If this tab has no subtabs, this value is not used.
-    It also only has meaning if your have a hsplit or vsplit
-    configured. The intended usage for this is for subtabs that
-    may have common content on one side of the split, and content
-    that changes with the subtab selection on the other side of the
-    split. This element tells KoreUI which side of the split changes
-    when a subtab is selected. If you have a vertical split then
-    this value can be either "LEFT" or "RIGHT" to have the left or
-    right hand side of the vertical split change as subtabs are
-    selected, or if you have a horizontal split, this can be either
-    "TOP" or "BOTTOM" to change the top or bottom half of the split.
+Hiding a page or tab closes its strip up, leaving no gap where the button
+was. If you hide the page or tab that is currently selected, the dialog
+moves to the nearest visible neighbour to its LEFT, or failing that to
+the nearest one to its right. If a dialog ends up with no visible pages
+at all that is a legitimate state: no page is shown and the title falls
+back to the dialog's own.
 
-  tab.tabs [table]
-    A table of subtabs, if this tab has any. These tab definitions
-    are identical to the ones above except they cannot themselves
-    have a tabs member, as only one level of subtabs is supported.
-    A subtab also cannot have a title, and trying to set one will
-    simply be ignored.
+cfg.defpage [string]
+  Name of the page to select when the dialog is first built. If not
+  given, the first visible page is used.
+
+cfg.pages [table]
+  Defines the pages. Each entry must be a named table, and the key names
+  the page unless the entry sets its own .name. Each page may have:
+
+  page.name [string]
+    The page's name. Defaults to its key in cfg.pages.
+
+  page.title [string]
+    Title for this page. If set, selecting the page changes the top
+    level title to this string.
+
+  page.text [string]
+    The text on the page's button. Keep it very short.
+
+  page.order [number]
+    Where this page is drawn in the bottom strip, lowest first. Pages
+    are sorted on this, because cfg.pages is keyed by name and Lua does
+    not promise an order when iterating it. It is not an identity and
+    it need not be dense or unique.
+
+  page.hidden [boolean]
+    If true, the page starts out hidden. Defaults to false.
+
+  page.hsplit [table]
+  page.vsplit [table]
+    Give this page a horizontal or vertical split, taking the same
+    values you would pass to KUI:CreateHSplit or KUI:CreateVSplit. This
+    creates a .hsplit or .vsplit element on the page's content frame,
+    from which the two halves can be reached. Set one or the other,
+    never both.
+
+  page.tabframe [string]
+    Controls which portion of the page changes when a tab is selected.
+    Only meaningful if the page has both tabs and a split. The intended
+    use is a page whose tabs share content on one side of the split and
+    vary on the other. With a vertical split use "LEFT" or "RIGHT"; with
+    a horizontal split use "TOP" or "BOTTOM".
+
+  page.deftab [string]
+    Name of the tab to select when this page is first shown.
+
+  page.tabs [table]
+    The page's tabs, in the same form: keyed by name, each with text,
+    order, hidden, hsplit and vsplit.
+
+Anything else you put in a page or tab config is left alone and handed
+back to you as .cfg on the page or tab, so you can hang your own meaning
+on a page without keeping a parallel table.
 
 cfg.titlefont [string]
   Sets the font to use for the title. Defaults to "GameFontNormal".
@@ -1424,51 +1455,90 @@ cfg.tltexture [string]
 ret:SetTitleText (string)
   Sets the top title text to the specified string.
 
-ret:SetTab (maintab, subtab)
-  Sets the current tab to the specified main and subtab. If no subtab
-  is specified and the tab has subtas, defaults to 1.
+ret:SetPage (pagename, tabname)
+  Selects the page and, within it, the tab. Both are optional. A nil
+  page means whichever page is current, else the default, else the first
+  visible one, and a nil tab means the same within the chosen page.
+  Naming a page that does not exist, or one that is hidden, falls back
+  the same way, so a caller never has to check first. Returns the page
+  name and tab name actually selected, or nil if every page is hidden.
+
+ret:SetTab (tabname)
+  Selects a tab within the page that is already current.
+
+ret:GetPage (pagename)
+ret:GetTab (pagename, tabname)
+  Return the page or tab table, or nil. Both arguments default to
+  whatever is current.
+
+ret:SetPageShown (pagename, onoff)
+ret:SetTabShown (pagename, tabname, onoff)
+  Show or hide a page or a tab. The strip closes up, and if what you
+  hid was current the dialog moves as described above.
+
+ret:AddPage (cfg)
+ret:AddTab (pagename, cfg)
+  Add a page, or a tab to an existing page, after the dialog has been
+  built. CFG takes the same fields as an entry in cfg.pages, including
+  its own tabs. Returns the new page or tab.
+
+ret:RemovePage (pagename)
+ret:RemoveTab (pagename, tabname)
+  Remove a page, or one tab of a page. WoW provides no way to destroy a
+  frame, so the frames are retired rather than freed, and adding a page
+  or tab of the same name again reuses them. This is why you should keep
+  names stable: churning through fresh names creates frames that live
+  until the UI is reloaded.
 
 ret.title [FontString]
   Pointer to the top level title font string.
 
 ret.content [frame]
-  This is set to a frame that covers the usable portion of the dialog,
-  inside the borders and above the buttons and tab bar. Note that
-  if you use the return value from KUI:CreateTabbedDialog() as the
-  parent argument to any of the KoreUI widgets, then the widgets
-  will automatically become children of ret.content, not the outer
-  containing frame. However, this is almost certainly not what you
-  want to do, as this top level .content frame sits "behind" all tabs,
-  and any widgets you place here will be visible on all tabs.
-  Usually you would pass the tab or subtab as the parent argument for
-  any widgets.
+  A frame covering the usable portion of the dialog, inside the borders
+  and above the buttons and page strip. Note that if you use the return
+  value from KUI:CreateTabbedDialog() as the parent argument to a KoreUI
+  widget then the widget becomes a child of ret.content, not of the outer
+  frame. That is almost certainly not what you want, as this frame sits
+  behind every page and anything on it shows on all of them. Usually you
+  pass a page or a tab as the parent instead.
+
+ret.pagecontent [frame]
+  The content frame of whatever is currently selected: the current tab's
+  content if the current page has tabs, otherwise the page's own.
 
 ret.topbar [frame]
-  A pointer to the top bar of the tabbed dialog. This is the global
-  top bar and visible to all tabs and subtabs. Each tab and subtab
-  gets its own topbar which can change as you select different tabs.
-  However if you always want the same content on the top bar regardless
-  of the tab or subtab selected, you can use this as a parent for any
-  widgets you want to place here.
+  The dialog's global top bar, visible on every page and tab. Each page
+  has its own top bar as well, which changes with the page; use this one
+  for content that should not change at all.
 
-ret.tabs [table]
-  A table of all of the tabs. Changing this can have dire consequences
-  so rather just don't. However, each element in this table has use
-  for assigning widgets.
-  ret.tabs[id].content
-    The main content for this tab. If the tab has subtabs, this content
-    covers all subtabs.
-  ret.tabs[id].frame
-    Full frame for this tab, that covers the content and the top bar.
-  ret.tabs[id].content.hsplit
-  ret.tabs[id].content.vsplit
-    Pointers to the horizontal or vertical splits, if configured.
-  ret.tabs[id].topbar
-    Pointer to the top bar for this frame.
-  ret.tabs[id].tbutton
-    Pointer to the actual tab button at the bottom of the dialog.
-  ret.tabs[id].tabs
-    Tabe of subtabs, if any.
+ret.currentpage [string]
+  Name of the currently selected page, or nil if none is shown.
+
+ret.pages [table]
+  Array of every page, in the order they are drawn. Use it to walk the
+  pages; do not reorder or edit it, use AddPage and RemovePage.
+
+ret.pagesbyname [table]
+  The same pages keyed by name. GetPage is the supported way to reach
+  one of these.
+
+  page.frame
+    Full frame for the page, covering its content and its top bar.
+  page.content
+    The page's content area. If the page has tabs, this covers them all.
+  page.content.hsplit
+  page.content.vsplit
+    The horizontal or vertical split, if one was configured.
+  page.topbar
+    The page's own top bar, where its tab buttons are drawn.
+  page.tbutton
+    The page's button on the bottom strip.
+  page.currenttab
+    Name of the page's currently selected tab, or nil.
+  page.tabs
+    Array of the page's tabs, in drawn order.
+  page.tabsbyname
+    The same tabs keyed by name. Each has .content and .tbutton.
 
 6.3 KUI:CreateScrollList
 ------------------------

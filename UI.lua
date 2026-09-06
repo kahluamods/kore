@@ -1963,123 +1963,692 @@ function KUI:CreateButton(cfg, kparent)
   return frame
 end
 
-local function td_SetTab(self, tab, subtab)
-  local seltab = 0
-  local sseltab = 0
+--
+-- A tabbed dialog has two independent strips of buttons. They are different
+-- things with different geometry and different templates, and the words for
+-- them are used strictly throughout this file:
+--
+--   PAGES are the buttons along the BOTTOM edge of the dialog. A page is a
+--   whole screen. It owns a frame, a content area, a top bar and a title.
+--
+--   TABS are the buttons along the TOP of a page, drawn in that page's top
+--   bar. A page may have any number of tabs; a tab may not have tabs of its
+--   own.
+--
+-- Both are addressed by NAME everywhere in this API, never by position. A
+-- page or a tab carries an "order", and that decides only where in its strip
+-- it is drawn. Position shifts whenever something is hidden, added or
+-- removed; a name does not, which is the entire point of the distinction.
+--
+local PAGE_STRIP = {
+  point = "BOTTOMLEFT", x = 15, y = 5, chainx = -16, chainy = 0,
+  template = "CharacterFrameTabButtonTemplate",
+}
 
-  if (not tab) then
-    if (self.deftab) then
-      tab = self.deftab
-    else
-      tab = self.currenttab or 1
+local TAB_STRIP = {
+  point = "BOTTOMLEFT", x = 0, y = 28, chainx = 0, chainy = 0,
+  template = "TabButtonTemplate",
+}
+
+local function order_sorter(a, b)
+  return (tonumber(a.order) or 0) < (tonumber(b.order) or 0)
+end
+
+--
+-- Re-anchor a strip of buttons, skipping the hidden ones so that the strip
+-- closes up instead of leaving a hole where a button used to be. Every path
+-- that changes what is visible in a strip finishes here.
+--
+local function strip_relayout(list, anchor, geom)
+  local prev = nil
+
+  for k, v in ipairs(list) do
+    local tb = v.tbutton
+
+    if (tb) then
+      if (v.hidden) then
+        tb:Hide()
+      else
+        tb:ClearAllPoints()
+        if (prev) then
+          tb:SetPoint("TOPLEFT", prev, "TOPRIGHT", geom.chainx, geom.chainy)
+        else
+          tb:SetPoint("TOPLEFT", anchor, geom.point, geom.x, geom.y)
+        end
+        tb:Show()
+        prev = tb
+      end
+    end
+  end
+end
+
+--
+-- Highlight the button named SELNAME and un-highlight every other one. We
+-- drive the buttons individually rather than calling PanelTemplates_SetTab,
+-- because that helper locates its buttons by iterating over
+-- _G[frame:GetName() .. "Tab" .. i], which would force every button name to
+-- encode its position in the strip. Our buttons are named for their page or
+-- tab, so the selection is done here instead.
+--
+local function strip_select(list, selname)
+  for k, v in ipairs(list) do
+    if (v.tbutton) then
+      if (v.name == selname) then
+        PanelTemplates_SelectTab(v.tbutton)
+      else
+        PanelTemplates_DeselectTab(v.tbutton)
+      end
+    end
+  end
+end
+
+--
+-- The name of the first entry in LIST that is not hidden, or nil if every
+-- one of them is.
+--
+local function first_visible(list)
+  for k, v in ipairs(list) do
+    if (not v.hidden) then
+      return v.name
     end
   end
 
-  if (tonumber(tab) ~= nil) then
-    seltab = tonumber(tab)
+  return nil
+end
+
+--
+-- Where to go when the entry named NAME stops being available. We look to
+-- the LEFT first, because a strip reads left to right and the neighbour
+-- before the one that went away is where the eye already is. Only if nothing
+-- to the left is visible do we look right. If the strip has nothing visible
+-- left at all we return nil, and the caller shows nothing -- an empty strip
+-- is a legitimate state, not an error.
+--
+local function nearest_visible(list, name)
+  local idx = nil
+
+  for k, v in ipairs(list) do
+    if (v.name == name) then
+      idx = k
+      break
+    end
+  end
+
+  if (not idx) then
+    return first_visible(list)
+  end
+
+  for k = idx - 1, 1, -1 do
+    if (not list[k].hidden) then
+      return list[k].name
+    end
+  end
+
+  for k = idx + 1, #list do
+    if (not list[k].hidden) then
+      return list[k].name
+    end
+  end
+
+  return nil
+end
+
+local function do_split(cframe, arg, which)
+  local oname = arg.name
+
+  if (not arg.name) then
+    arg.name = cframe:GetName() .. ((which == "h") and "HSplit" or "VSplit")
+  end
+
+  if (which == "h") then
+    cframe.hsplit = KUI:CreateHSplit(arg, cframe)
   else
-    for k,v in ipairs(self.tabs) do
-      if (v.name == tab) then
-        seltab = tonumber(k)
+    cframe.vsplit = KUI:CreateVSplit(arg, cframe)
+  end
+
+  arg.name = oname
+end
+
+--
+-- Build the frames for one page: its full-size frame, its content area, its
+-- top bar, and its button on the bottom strip. This is split out from
+-- CreateTabbedDialog so that AddPage() can build a page long after the
+-- dialog itself exists. Every frame is named for the page rather than for
+-- its position, because a position moves and a WoW frame name cannot.
+--
+local function build_page(frame, cfg)
+  local fname = frame:GetName()
+
+  --
+  -- The caller's own config table is kept as .cfg. KoreUI never looks inside
+  -- it beyond the fields below, but a caller commonly wants to hang its own
+  -- meaning on a page -- who may see it, which subsystem owns it -- and this
+  -- saves it keeping a parallel table keyed by page name.
+  --
+  local pg = {
+    name = cfg.name,
+    title = cfg.title,
+    text = cfg.text,
+    order = cfg.order,
+    hidden = cfg.hidden and true or false,
+    onclick = cfg.onclick,
+    deftab = cfg.deftab,
+    tabframe = cfg.tabframe,
+    cfg = cfg,
+    tabs = {},
+    tabsbyname = {},
+    retired = {},
+  }
+
+  local pf = MakeFrame("Frame", fname .. "Page" .. pg.name, frame)
+  pf:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+  pf:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+  pf.pagename = pg.name
+  pf:Hide()
+  pg.frame = pf
+
+  local pcf = MakeFrame("Frame", pf:GetName() .. "Content", pf)
+  pcf:SetPoint("TOPLEFT", pf, "TOPLEFT", 22, -75)
+  pcf:SetPoint("BOTTOMRIGHT", pf, "BOTTOMRIGHT", -12, 12)
+  pcf.pagename = pg.name
+  pg.content = pcf
+
+  --
+  -- If the caller asked for a split, reserve the space now. Only one of the
+  -- two is honoured; setting both is not supported.
+  --
+  if (cfg.hsplit) then
+    pg.hsplit = cfg.hsplit
+    do_split(pcf, cfg.hsplit, "h")
+  end
+
+  if (cfg.vsplit) then
+    pg.vsplit = cfg.vsplit
+    do_split(pcf, cfg.vsplit, "v")
+  end
+
+  local ptb = MakeFrame("Frame", pf:GetName() .. "Topbar", pf)
+  ptb:SetPoint("TOPLEFT", pf, "TOPLEFT", 73, -36)
+  ptb:SetPoint("BOTTOMRIGHT", pf, "TOPRIGHT", -12, -68)
+  ptb.pagename = pg.name
+  pg.topbar = ptb
+
+  local tb = MakeFrame("Button", fname .. "Tab" .. pg.name, frame,
+    PAGE_STRIP.template)
+  tb:SetText(pg.text)
+  tb.pagename = pg.name
+  PanelTemplates_TabResize(tb, 0)
+  tb:SetScript("OnClick", function(this)
+    this:GetParent():SetPage(this.pagename)
+  end)
+  tb.SetShown = BC.SetShown
+  pg.tbutton = tb
+
+  return pg
+end
+
+--
+-- Build one tab inside page PG: its content frame and its button on that
+-- page's top strip. Where the page has a split and asked, through tabframe,
+-- for only one side of it to change as tabs are selected, the tab's content
+-- covers just that side; otherwise it covers the whole page content.
+--
+local function build_tab(frame, pg, cfg)
+  local tab = {
+    name = cfg.name,
+    text = cfg.text,
+    order = cfg.order,
+    hidden = cfg.hidden and true or false,
+    onclick = cfg.onclick,
+    cfg = cfg,
+  }
+
+  local stcontent = pg.content
+
+  if (pg.tabframe and (pg.vsplit or pg.hsplit)) then
+    if (pg.vsplit) then
+      if (pg.tabframe == "LEFT") then
+        stcontent = pg.content.vsplit.leftframe
+      elseif (pg.tabframe == "RIGHT") then
+        stcontent = pg.content.vsplit.rightframe
+      end
+    elseif (pg.hsplit) then
+      if (pg.tabframe == "TOP") then
+        stcontent = pg.content.hsplit.topframe
+      elseif (pg.tabframe == "BOTTOM") then
+        stcontent = pg.content.hsplit.bottomframe
       end
     end
   end
 
-  if (not seltab) then
+  local scf = MakeFrame("Frame",
+    pg.content:GetName() .. "Sub" .. tab.name, stcontent)
+  scf:SetPoint("TOPLEFT", stcontent, "TOPLEFT", 0, 0)
+  scf:SetPoint("BOTTOMRIGHT", stcontent, "BOTTOMRIGHT", 0, 0)
+  scf.pagename = pg.name
+  scf.tabname = tab.name
+  scf:Hide()
+  tab.content = scf
+
+  if (cfg.hsplit) then
+    tab.hsplit = cfg.hsplit
+    do_split(scf, cfg.hsplit, "h")
+  end
+
+  if (cfg.vsplit) then
+    tab.vsplit = cfg.vsplit
+    do_split(scf, cfg.vsplit, "v")
+  end
+
+  --
+  -- The button is a child of the page frame even though it is anchored to
+  -- that page's top bar, so that hiding the page hides its tab strip too.
+  --
+  local stb = MakeFrame("Button", pg.frame:GetName() .. "Tab" .. tab.name,
+    pg.frame, TAB_STRIP.template)
+  stb:SetText(tab.text)
+  stb.pagename = pg.name
+  stb.tabname = tab.name
+  PanelTemplates_TabResize(stb, 0)
+  stb:SetScript("OnClick", function(this)
+    frame:SetPage(this.pagename, this.tabname)
+  end)
+  stb.SetShown = BC.SetShown
+  tab.tbutton = stb
+
+  return tab
+end
+
+--
+-- Select the page named PAGENAME and, within it, the tab named TABNAME.
+-- Both are optional. A nil page means "whichever is current, else the
+-- default, else the first visible one", and a nil tab means the same within
+-- the chosen page. Naming a page that does not exist, or one that is hidden,
+-- falls back the same way, so a caller never has to check first.
+--
+-- Returns the page name and tab name actually selected, or nil if every page
+-- is hidden.
+--
+local function td_SetPage(self, pagename, tabname)
+  local pg = pagename and self.pagesbyname[pagename] or nil
+
+  if (not pg or pg.hidden) then
+    pg = self.pagesbyname[self.currentpage or ""]
+  end
+
+  if (not pg or pg.hidden) then
+    pg = self.pagesbyname[self.defpage or ""]
+  end
+
+  if (not pg or pg.hidden) then
+    pg = self.pagesbyname[first_visible(self.pages) or ""]
+  end
+
+  --
+  -- Nothing is visible. Show no page at all and fall back to the dialog's
+  -- own title.
+  --
+  if (not pg) then
+    for k, v in ipairs(self.pages) do
+      v.frame:Hide()
+    end
+
+    strip_select(self.pages, nil)
+    self.currentpage = nil
+    self.pagecontent = nil
+
+    if (self.titletext and self.titletext ~= "") then
+      self.title:SetText(self.titletext)
+    else
+      self.title:SetText(self.maintitle or "")
+    end
+
     return nil
   end
 
-  PanelTemplates_SetTab(self, seltab)
-  local tl = self.tabs
-  for k,v in ipairs(tl) do
-    if (k == seltab) then
+  for k, v in ipairs(self.pages) do
+    if (v.name == pg.name) then
       v.frame:Show()
     else
       v.frame:Hide()
     end
   end
-  self.currenttab = seltab
 
-  if (self.onclick and not subtab) then
-    self:onclick(seltab, 0)
-  end
+  strip_select(self.pages, pg.name)
+  self.currentpage = pg.name
+  self.pagecontent = pg.content
 
-  if (self.tabs[seltab].title) then
-    self.title:SetText(self.tabs[seltab].title)
+  if (pg.title) then
+    self.title:SetText(pg.title)
   elseif (self.titletext and self.titletext ~= "") then
     self.title:SetText(self.titletext)
   elseif (self.maintitle and self.maintitle ~= "") then
     self.title:SetText(self.maintitle)
   end
 
-  --
-  -- Set the "tabcontent" pointer to this current new content.
-  --
-  self.tabcontent = self.tabs[seltab].content
+  local tab = tabname and pg.tabsbyname[tabname] or nil
 
-  if (not self.tabs[seltab].tabs) then
-    return seltab
+  if (not tab or tab.hidden) then
+    tab = pg.tabsbyname[pg.currenttab or ""]
+  end
+
+  if (not tab or tab.hidden) then
+    tab = pg.tabsbyname[pg.deftab or ""]
+  end
+
+  if (not tab or tab.hidden) then
+    tab = pg.tabsbyname[first_visible(pg.tabs) or ""]
   end
 
   --
-  -- If this page has subtabs and an explicit subtab was not specified,
-  -- see if we have have a current subtab or not, and if not, select the
-  -- first subtab.
+  -- A page with no tabs at all, or one whose tabs are all hidden, is
+  -- perfectly normal: its own content frame is the whole page.
   --
-  if (self.tabs[seltab].tabs) then
-    if (not subtab) then
-      if (self.tabs[seltab].deftab) then
-        subtab = self.tabs[seltab].deftab
-      else
-        subtab = self.tabs[seltab].currenttab or 1
-      end
-    end
-  end
-
-  if (subtab) then
-    if (not self.tabs[seltab].tabs) then
-      return seltab
-    end
-
-    if (tonumber(subtab) ~= nil) then
-      sseltab = tonumber(subtab)
-    else
-      for k,v in ipairs(self.tabs[seltab].tabs) do
-        if (v.name == subtab) then
-          sseltab = tonumber(k)
-        end
-      end
-    end
-
-    if (not sseltab) then
-      return seltab
-    end
-
-    PanelTemplates_SetTab(self.tabs[seltab].frame, sseltab)
-    local tl = self.tabs[seltab].tabs
-    for k,v in ipairs(tl) do
-      if (k == sseltab) then
-        v.content:Show()
-      else
-        v.content:Hide()
-      end
-    end
-    self.tabs[seltab].currenttab = sseltab
-    self.tabcontent = tl[sseltab].content
+  if (not tab) then
+    pg.currenttab = nil
 
     if (self.onclick) then
-      self:onclick(seltab, sseltab)
+      self:onclick(pg.name, nil)
     end
 
-    if (self.tabs[seltab].onclick) then
-      self.tabs[seltab]:onclick(seltab, sseltab)
+    if (pg.onclick) then
+      pg:onclick(pg.name, nil)
     end
 
-    if (tl[sseltab].onclick) then
-      tl[sseltab]:onclick(seltab, sseltab)
+    return pg.name
+  end
+
+  for k, v in ipairs(pg.tabs) do
+    if (v.name == tab.name) then
+      v.content:Show()
+    else
+      v.content:Hide()
     end
   end
-  return seltab
+
+  strip_select(pg.tabs, tab.name)
+  pg.currenttab = tab.name
+  self.pagecontent = tab.content
+
+  if (self.onclick) then
+    self:onclick(pg.name, tab.name)
+  end
+
+  if (pg.onclick) then
+    pg:onclick(pg.name, tab.name)
+  end
+
+  if (tab.onclick) then
+    tab:onclick(pg.name, tab.name)
+  end
+
+  return pg.name, tab.name
+end
+
+--
+-- Select a tab within the page that is already current.
+--
+local function td_SetTab(self, tabname)
+  return td_SetPage(self, self.currentpage, tabname)
+end
+
+local function td_GetPage(self, pagename)
+  return self.pagesbyname[pagename or self.currentpage or ""]
+end
+
+local function td_GetTab(self, pagename, tabname)
+  local pg = td_GetPage(self, pagename)
+
+  if (not pg) then
+    return nil
+  end
+
+  return pg.tabsbyname[tabname or pg.currenttab or ""]
+end
+
+--
+-- Show or hide the page named PAGENAME. The strip closes up around it, and
+-- if the page being hidden was the current one we move to its nearest
+-- visible neighbour rather than leaving the dialog showing nothing.
+--
+local function td_SetPageShown(self, pagename, onoff)
+  local pg = self.pagesbyname[pagename]
+
+  if (not pg) then
+    return
+  end
+
+  local hidden = (onoff == false)
+
+  if (pg.hidden == hidden) then
+    return
+  end
+
+  local fallback = nearest_visible(self.pages, pagename)
+
+  pg.hidden = hidden
+  strip_relayout(self.pages, self, PAGE_STRIP)
+
+  if (hidden) then
+    if (self.currentpage == pagename) then
+      td_SetPage(self, fallback)
+    end
+  elseif (not self.currentpage) then
+    td_SetPage(self, pagename)
+  end
+end
+
+--
+-- Show or hide one tab of one page. As with pages, the strip closes up and
+-- a hidden current tab moves to its nearest visible neighbour.
+--
+local function td_SetTabShown(self, pagename, tabname, onoff)
+  local pg = self.pagesbyname[pagename]
+
+  if (not pg) then
+    return
+  end
+
+  local tab = pg.tabsbyname[tabname]
+
+  if (not tab) then
+    return
+  end
+
+  local hidden = (onoff == false)
+
+  if (tab.hidden == hidden) then
+    return
+  end
+
+  local fallback = nearest_visible(pg.tabs, tabname)
+
+  tab.hidden = hidden
+  strip_relayout(pg.tabs, pg.topbar, TAB_STRIP)
+
+  if (self.currentpage ~= pagename) then
+    if (pg.currenttab == tabname and hidden) then
+      pg.currenttab = fallback
+    end
+    return
+  end
+
+  if (hidden) then
+    if (pg.currenttab == tabname) then
+      td_SetPage(self, pagename, fallback)
+    end
+  elseif (not pg.currenttab) then
+    td_SetPage(self, pagename, tabname)
+  end
+end
+
+--
+-- Add a page to the dialog after it has been created. If a page of this
+-- name was removed earlier its frames are reused, because WoW frames cannot
+-- be destroyed and creating a fresh set on every add would leak them for the
+-- life of the session. CFG takes the same fields as a page in the tabs
+-- config passed to CreateTabbedDialog, including its own tabs.
+--
+local function td_AddPage(self, cfg)
+  if (not cfg or not cfg.name) then
+    return nil
+  end
+
+  if (self.pagesbyname[cfg.name]) then
+    return self.pagesbyname[cfg.name]
+  end
+
+  local pg = self.retired[cfg.name]
+
+  if (pg) then
+    self.retired[cfg.name] = nil
+    pg.hidden = false
+    if (cfg.order) then
+      pg.order = cfg.order
+    end
+  else
+    pg = build_page(self, cfg)
+
+    if (cfg.tabs) then
+      for k, v in pairs(cfg.tabs) do
+        local tcfg = v
+        tcfg.name = tcfg.name or k
+        local tab = build_tab(self, pg, tcfg)
+        tinsert(pg.tabs, tab)
+        pg.tabsbyname[tab.name] = tab
+      end
+      tsort(pg.tabs, order_sorter)
+      strip_relayout(pg.tabs, pg.topbar, TAB_STRIP)
+    end
+  end
+
+  self.pagesbyname[pg.name] = pg
+  tinsert(self.pages, pg)
+  tsort(self.pages, order_sorter)
+  strip_relayout(self.pages, self, PAGE_STRIP)
+
+  if (not self.currentpage) then
+    td_SetPage(self, pg.name)
+  end
+
+  return pg
+end
+
+--
+-- Remove the page named PAGENAME. Its frames are retired rather than
+-- destroyed -- WoW has no way to destroy a frame -- and are reused if a page
+-- of the same name is added again later.
+--
+local function td_RemovePage(self, pagename)
+  local pg = self.pagesbyname[pagename]
+
+  if (not pg) then
+    return
+  end
+
+  local fallback = nearest_visible(self.pages, pagename)
+
+  for k, v in ipairs(self.pages) do
+    if (v.name == pagename) then
+      tremove(self.pages, k)
+      break
+    end
+  end
+
+  self.pagesbyname[pagename] = nil
+  self.retired[pagename] = pg
+
+  pg.tbutton:Hide()
+  pg.frame:Hide()
+
+  strip_relayout(self.pages, self, PAGE_STRIP)
+
+  if (self.currentpage == pagename) then
+    self.currentpage = nil
+    td_SetPage(self, fallback)
+  end
+end
+
+--
+-- Add a tab to an existing page, reusing a retired tab of the same name if
+-- there is one, for the same reason AddPage does.
+--
+local function td_AddTab(self, pagename, cfg)
+  local pg = self.pagesbyname[pagename]
+
+  if (not pg or not cfg or not cfg.name) then
+    return nil
+  end
+
+  if (pg.tabsbyname[cfg.name]) then
+    return pg.tabsbyname[cfg.name]
+  end
+
+  local tab = pg.retired[cfg.name]
+
+  if (tab) then
+    pg.retired[cfg.name] = nil
+    tab.hidden = false
+    if (cfg.order) then
+      tab.order = cfg.order
+    end
+  else
+    tab = build_tab(self, pg, cfg)
+  end
+
+  pg.tabsbyname[tab.name] = tab
+  tinsert(pg.tabs, tab)
+  tsort(pg.tabs, order_sorter)
+  strip_relayout(pg.tabs, pg.topbar, TAB_STRIP)
+
+  if (self.currentpage == pagename and not pg.currenttab) then
+    td_SetPage(self, pagename, tab.name)
+  end
+
+  return tab
+end
+
+--
+-- Remove a tab from a page, retiring its frames for reuse.
+--
+local function td_RemoveTab(self, pagename, tabname)
+  local pg = self.pagesbyname[pagename]
+
+  if (not pg) then
+    return
+  end
+
+  local tab = pg.tabsbyname[tabname]
+
+  if (not tab) then
+    return
+  end
+
+  local fallback = nearest_visible(pg.tabs, tabname)
+
+  for k, v in ipairs(pg.tabs) do
+    if (v.name == tabname) then
+      tremove(pg.tabs, k)
+      break
+    end
+  end
+
+  pg.tabsbyname[tabname] = nil
+  pg.retired[tabname] = tab
+
+  tab.tbutton:Hide()
+  tab.content:Hide()
+
+  strip_relayout(pg.tabs, pg.topbar, TAB_STRIP)
+
+  if (pg.currenttab == tabname) then
+    pg.currenttab = nil
+    if (self.currentpage == pagename) then
+      td_SetPage(self, pagename, fallback)
+    else
+      pg.currenttab = fallback
+    end
+  end
 end
 
 local function td_OnSizeChanged(this, w, h)
@@ -2109,7 +2678,6 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   frame.texs = {}
   frame.maintitle = cfg.title or ""
   frame.onclick = cfg.onclick
-  frame.deftab = cfg.deftab
 
   local it = frame:CreateTexture(nil, "BACKGROUND")
   it:SetTexture(cfg.tltexture or "Interface/FriendsFrame/FriendsFrameScrollIcon")
@@ -2233,211 +2801,61 @@ function KUI:CreateTabbedDialog(cfg, kparent)
     add_escclose(fname)
   end
 
-  local function sorter(a,b)
-    return tonumber(a.id) < tonumber(b.id)
+  --
+  -- Build every page named in the config, and every tab inside each of
+  -- them. The config tables are keyed by name and pairs() does not promise
+  -- an order, which is exactly why each entry carries an explicit "order"
+  -- that we sort on afterwards.
+  --
+  frame.pages = {}
+  frame.pagesbyname = {}
+  frame.retired = {}
+  frame.defpage = cfg.defpage
+
+  for k, v in pairs(cfg.pages) do
+    local pcfg = v
+    pcfg.name = pcfg.name or k
+
+    local pg = build_page(frame, pcfg)
+
+    if (pcfg.tabs) then
+      for kk, vv in pairs(pcfg.tabs) do
+        local tcfg = vv
+        tcfg.name = tcfg.name or kk
+
+        local tab = build_tab(frame, pg, tcfg)
+        tinsert(pg.tabs, tab)
+        pg.tabsbyname[tab.name] = tab
+      end
+
+      tsort(pg.tabs, order_sorter)
+      strip_relayout(pg.tabs, pg.topbar, TAB_STRIP)
+    end
+
+    tinsert(frame.pages, pg)
+    frame.pagesbyname[pg.name] = pg
   end
 
-  frame.tabs = {}
-  for k,v in pairs(cfg.tabs) do
-    local tval = { name = k, title = v.title, text = v.text, id=v.id,
-      hsplit = v.hsplit, vsplit = v.vsplit, tabframe = v.tabframe,
-      onclick = v.onclick}
-    if (v.tabs) then
-      tval.tabs = {}
-      tval.deftab = v.deftab
-      for kk, vv in pairs(v.tabs) do
-        local stval = { name = kk, text = vv.text, id = vv.id,
-          hsplit = vv.hsplit, vsplit = vv.vsplit, onclick = vv.onclick }
-        tinsert(tval.tabs, stval)
-      end
-      tsort(tval.tabs, sorter)
-    end
-    tinsert(frame.tabs, tval)
-  end
-  tsort(frame.tabs, sorter)
-
-  local num_tabs = tmaxn(frame.tabs)
-  local rtp = "BOTTOMLEFT"
-  local rf = frame
-  local rx, ry = 15, 5
-  for k,v in ipairs(frame.tabs) do
-    local thistab = frame.tabs[k]
-    thistab.subtab = 1
-
-    -- Full frame for this page
-    local pf = MakeFrame("Frame", fname .. "Page" .. k, frame) 
-    pf:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-    pf:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
-    pf.tabnum = k
-    thistab.frame = pf
-    pf:Hide()
-
-    -- Content frame for this page
-    local pcf = MakeFrame("Frame", pf:GetName() .. "Content", pf)
-    pcf:SetPoint("TOPLEFT", pf, "TOPLEFT", 22, -75)
-    pcf:SetPoint("BOTTOMRIGHT", pf, "BOTTOMRIGHT", -12, 12)
-    pcf.tabnum = k
-    thistab.content = pcf
-
-    local function do_hsplit(cframe, arg)
-      local oname = arg.name
-      if (not arg.name) then
-        arg.name = cframe:GetName() .. "HSplit";
-      end
-      cframe.hsplit = self:CreateHSplit(arg, cframe)
-      arg.name = oname
-    end
-
-    local function do_vsplit(cframe, arg)
-      local oname = arg.name
-      if (not arg.name) then
-        arg.name = cframe:GetName() .. "VSplit";
-      end
-      cframe.vsplit = self:CreateVSplit(arg, cframe)
-      arg.name = oname
-    end
-
-    --
-    -- If the user has requested it, reserve space at the bottom for buttons
-    -- or other stuff. Draw the horizontal divider and set two frame pointers,
-    -- for the top half and the bottom half.
-    --
-    if (thistab.hsplit) then
-      do_hsplit(pcf, thistab.hsplit)
-    end
-
-    --
-    -- Also if the user has requested a vertical split, do that too.
-    --
-    if (thistab.vsplit) then
-      do_vsplit(pcf, thistab.vsplit)
-    end
-
-    -- Header bar for this page
-    local ptb = MakeFrame("Frame", pf:GetName() .. "Topbar", pf)
-    ptb:SetPoint("TOPLEFT", pf, "TOPLEFT", 73, -36)
-    ptb:SetPoint("BOTTOMRIGHT", pf, "TOPRIGHT", -12, -68)
-    ptb.tabnum = k
-    thistab.topbar = ptb
-
-    -- Create the actual tab button for the bottom edge of the frame
-    local tb = MakeFrame("Button", fname .. "Tab" .. k, frame,
-      "CharacterFrameTabButtonTemplate")
-    tb:SetID(k)
-    tb:SetText(v.text)
-    tb:SetPoint("TOPLEFT", rf, rtp, rx, ry)
-    tb.onclick = v.onclick
-    PanelTemplates_SelectTab(tb)
-    PanelTemplates_TabResize(tb, 0)
-    tb:SetScript("OnClick", function(this)
-      local tnum = this:GetID()
-      this:GetParent():SetTab(tnum)
-    end)
-    thistab.tbutton = tb
-    tb.SetShown = BC.SetShown
-    rf = tb
-    rtp = "TOPRIGHT"
-    rx = -16
-    ry = 0
-
-    --
-    -- Now see if this main tab has sub-tabs that are displayed on the top bar.
-    -- The frames created by this cover only the content portion. The header
-    -- frame remains under the domain of the containing tab page. Each sub-
-    -- tab will get its own content frame though. However, because these
-    -- sub-frames are children of the page's content frame, they are
-    -- automatically hidden when the page is hidden and the user selects
-    -- a different page using the bottom tabs. When this page frame is
-    -- shown, however, it will revert back to the last sub-frame selected,
-    -- unless that has been changed by some other function.
-    --
-    if (thistab.tabs) then
-      local num_sub_tabs = tmaxn(thistab.tabs)
-      local srtp = "BOTTOMLEFT"
-      local srf = thistab.topbar
-      local srx, sry = 0, 28
-
-      for kk,vv in ipairs(thistab.tabs) do
-        local subtab = thistab.tabs[kk]
-
-        --
-        -- First the sub-tab content frame. If the main tab has a horizontal
-        -- or vertical split (but not both, this code doesn't handle that
-        -- case well), and they have requested that the subtab control one of
-        -- those sides of the split, ensure we cover only that portion.
-        --
-        local stcontent = thistab.content
-
-        if (thistab.tabframe and (thistab.vsplit or thistab.hsplit)) then
-          if (thistab.vsplit) then
-            if (thistab.tabframe == "LEFT") then
-              stcontent = pcf.vsplit.leftframe
-            elseif (thistab.tabframe == "RIGHT") then
-              stcontent = pcf.vsplit.rightframe
-            end
-          elseif (thistab.hsplit) then
-            if (thistab.tabframe == "TOP") then
-              stcontent = pcf.hsplit.topframe
-            elseif (thistab.tabframe == "BOTTOM") then
-              stcontent = pcf.hsplit.bottomframe
-            end
-          end
-        end
-
-        local scf = MakeFrame("Frame",
-          thistab.content:GetName() .. "Sub" .. kk, stcontent)
-        scf:SetPoint("TOPLEFT", stcontent, "TOPLEFT", 0, 0)
-        scf:SetPoint("BOTTOMRIGHT", stcontent, "BOTTOMRIGHT", 0, 0)
-        scf.tabnum = kk
-        scf:Hide()
-        subtab.content = scf
-        if (subtab.hsplit) then
-          do_hsplit(scf, subtab.hsplit)
-        end
-
-        if (subtab.vsplit) then
-          do_vsplit(scf, subtab.vsplit)
-        end
-
-        -- Now the actual button for the top bar. This is made a child of the
-        -- page's main frame, even though it is anchored to the topbar frame.
-        local stb = MakeFrame("Button",
-          thistab.frame:GetName() .. "Tab" .. kk, thistab.frame,
-          "TabButtonTemplate")
-        stb:SetID(kk)
-        stb:SetText(vv.text)
-        stb.pbuttonid = k
-        stb:SetPoint("TOPLEFT", srf, srtp, srx, sry)
-        PanelTemplates_SelectTab(stb)
-        PanelTemplates_TabResize(stb, 0)
-        stb:SetScript("OnClick", function(this)
-          local tnum = this:GetID()
-          this:GetParent():GetParent():SetTab(this.pbuttonid, tnum)
-        end)
-        subtab.tbutton = stb
-        stb.SetShown = BC.SetShown
-        srtp = "TOPRIGHT"
-        srf = stb
-        srx = 0
-        sry = 0
-      end
-      PanelTemplates_SetNumTabs(thistab.frame, num_sub_tabs)
-      PanelTemplates_SetTab(thistab.frame, 1)
-    end
-  end
-
-  frame.tabs[1].frame:Show()
-  PanelTemplates_SetNumTabs(frame, num_tabs)
-  PanelTemplates_SetTab(frame, 1)
+  tsort(frame.pages, order_sorter)
+  strip_relayout(frame.pages, frame, PAGE_STRIP)
 
   frame.SetTitleText = function(this, text)
     this.titletext = text or ""
     this.title:SetText(this.titletext)
   end
 
+  frame.SetPage = td_SetPage
   frame.SetTab = td_SetTab
+  frame.GetPage = td_GetPage
+  frame.GetTab = td_GetTab
+  frame.SetPageShown = td_SetPageShown
+  frame.SetTabShown = td_SetTabShown
+  frame.AddPage = td_AddPage
+  frame.RemovePage = td_RemovePage
+  frame.AddTab = td_AddTab
+  frame.RemoveTab = td_RemoveTab
 
-  frame:SetTab(1,1)
+  frame:SetPage(cfg.defpage)
   td_OnSizeChanged(frame, width, height)
 
   return frame
