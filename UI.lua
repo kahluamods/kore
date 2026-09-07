@@ -230,6 +230,35 @@ function KUI:MeasureStrWidth(str, font)
   return w+4,h
 end
 
+--
+-- How wide the widest of a set of strings comes out in FONT, and which one it
+-- was. This is what a column of labelled widgets is asking for: give every
+-- label this width and their widgets line up down one edge, instead of each
+-- starting wherever its own word happens to end.
+--
+-- Measuring rather than declaring a number is the point of it. Which string
+-- is the longest is a question about the locale, and a width that lines up
+-- perfectly in one language is crooked in the next.
+--
+-- FONT defaults to GameFontNormal, which is what a label is drawn in unless
+-- it says otherwise.
+--
+function KUI:WidestString(strings, font)
+  local widest = 0
+  local which = nil
+
+  for _, v in ipairs(strings or {}) do
+    local w = self:MeasureStrWidth(v, font or "GameFontNormal")
+
+    if (w > widest) then
+      widest = w
+      which = v
+    end
+  end
+
+  return widest, which
+end
+
 function KUI:GetFontColor(font, rgbtab)
   if (font and font ~= self.lastfont) then
     self.strwidth:SetFontObject(font)
@@ -698,6 +727,207 @@ end
 --
 local INSET_EDGE_TILE = 16
 
+--
+-- A TITLE PLATE: words on a small plate, which is how anything in this
+-- toolkit says what it is. A panel hangs one on its top edge, a dialog hangs
+-- one off the top of its border. They are the same object built by the same
+-- code, and only where it is hung differs.
+--
+-- Everything about a title is one table, rather than a handful of
+-- cfg.titleSomething keys spread through the host widget's own options:
+--
+--   { text, style, width, height, padding, font, bordercolor }
+--
+-- A title is one thing with several properties and reads as one, and having a
+-- shape of its own it can be handed along untouched by anything that builds
+-- one widget on behalf of another -- which is what the splits do with their
+-- panes, and CreatePopupList with its dialog. A bare string is that table
+-- with only its text filled in, which is what nearly every caller wants.
+--
+-- Two styles:
+--
+--   THIN is the toolkit's thin grey-bordered plate -- the same backdrop
+--   CreateStringLabel draws with border = true. It is what one section of a
+--   page wants, and is what a panel takes if it says nothing.
+--
+--   THICK is the stock dialog header, the ornate gold plate a window title
+--   sits in, for something that is a whole thing in its own right. It is
+--   built from three pieces of one texture: a centre that stretches and an
+--   end cap at each side that does not, which is why a THICK plate can never
+--   be narrower than its two caps. It is what a dialog takes if it says
+--   nothing.
+--
+-- One table rather than seven file locals: Lua 5.1 allows a chunk two hundred
+-- of those and this file is close enough to the ceiling to care.
+local TITLE = { CAP = 30 }
+
+TITLE.STYLES = {
+  THIN  = { height = 24, font = "GameFontNormal", padding = 12 },
+  THICK = { height = 40, font = "GameFontNormal", padding = 16 },
+}
+
+--
+-- Width of the plate for the text in it: what the string measures plus a
+-- margin each side.
+--
+-- On a THICK plate the caps are ornament flaring off the ends rather than
+-- room for words, so the margin is measured against the centre they sit
+-- either side of and the two of them are added on top of it. Measured against
+-- the whole plate instead, a title only a little wider than sixty pixels
+-- would be left with a centre narrower than itself and would run out into
+-- the wings.
+--
+function TITLE.measure(this)
+  local w = ceil(this.text:GetStringWidth()) + (2 * this.pad)
+
+  if (this.caps) then
+    w = w + (2 * TITLE.CAP)
+  end
+
+  return w
+end
+
+--
+-- Not called SetWidth: that is a real frame method and this is not it. What
+-- is set here is the plate as a whole, and on a THICK one only the centre
+-- stretches -- the caps are anchored to its ends and follow it out, so all
+-- that changes is what is left when they have taken their thirty pixels each.
+--
+function TITLE.setwidth(this, width)
+  this:SetWidth(width)
+
+  if (this.caps) then
+    this.bg:SetWidth(max(width - (2 * TITLE.CAP), 1))
+  end
+end
+
+function TITLE.settext(this, text)
+  this.text:SetText(text or "")
+
+  --
+  -- A plate given an explicit width keeps it whatever it is later told to
+  -- say, because the caller sized it to fit a column or a neighbour rather
+  -- than to fit these particular words.
+  --
+  if (this.auto) then
+    TITLE.setwidth(this, TITLE.measure(this))
+  end
+end
+
+--
+-- Build one. SPEC is the table or string above, or nil for no plate at all.
+-- DEFSTYLE is only the fallback: a spec naming a style gets that style, so a
+-- panel can ask for THICK and a dialog for THIN. The plate is returned
+-- unanchored, because where it hangs is the whole of what the host widget has
+-- left to decide.
+--
+function TITLE.plate(parent, spec, defstyle)
+  if (spec == nil) then
+    return nil
+  end
+
+  if (type(spec) ~= "table") then
+    spec = { text = spec }
+  end
+
+  local st = TITLE.STYLES[string.upper(spec.style or "")] or TITLE.STYLES[defstyle]
+  local th = tonumber(spec.height) or st.height
+  local plate = MakeFrame("Frame", nil, parent)
+
+  plate:SetHeight(th)
+  plate.pad = tonumber(spec.padding) or st.padding
+  plate.caps = (st == TITLE.STYLES.THICK)
+  plate.auto = spec.width == nil
+  plate.SetPlateWidth = TITLE.setwidth
+  plate.SetTitleText = TITLE.settext
+
+  if (plate.caps) then
+    local bg = plate:CreateTexture(nil, "BORDER")
+
+    bg:SetTexture(131080) -- Interface\\DialogFrame\\UI-DialogBox-Header
+    bg:SetTexCoord(0.31, 0.67, 0, 0.63)
+    bg:SetPoint("TOP", plate, "TOP", 0, 0)
+    bg:SetHeight(th)
+    plate.bg = bg
+
+    local cl = plate:CreateTexture(nil, "BORDER")
+
+    cl:SetTexture(131080)
+    cl:SetTexCoord(0.21, 0.31, 0, 0.63)
+    cl:SetPoint("RIGHT", bg, "LEFT", 0, 0)
+    cl:SetWidth(TITLE.CAP)
+    cl:SetHeight(th)
+
+    local cr = plate:CreateTexture(nil, "BORDER")
+
+    cr:SetTexture(131080)
+    cr:SetTexCoord(0.67, 0.77, 0, 0.63)
+    cr:SetPoint("LEFT", bg, "RIGHT", 0, 0)
+    cr:SetWidth(TITLE.CAP)
+    cr:SetHeight(th)
+  else
+    plate:SetBackdrop(cfbackdrop)
+    plate:SetBackdropColor(0, 0, 0, 1)
+
+    local bc = spec.bordercolor
+
+    plate:SetBackdropBorderColor(bc and bc.r or 0.4, bc and bc.g or 0.4,
+      bc and bc.b or 0.4, bc and bc.a or 1)
+  end
+
+  local tt = plate:CreateFontString(nil, "OVERLAY", spec.font or st.font)
+
+  tt:SetPoint("CENTER", plate, "CENTER", 0, 0)
+  tt:SetJustifyH("CENTER")
+  tt:SetText(spec.text or "")
+  plate.text = tt
+
+  TITLE.setwidth(plate, tonumber(spec.width) or TITLE.measure(plate))
+
+  return plate
+end
+
+--
+-- The host's half of it: hand the plate on to whoever asks the widget for it,
+-- so that ret.title, ret.titletext and ret:SetTitleText mean the same thing
+-- on a panel and on a dialog.
+--
+function TITLE.attach(frame, plate)
+  frame.title = plate
+  frame.titletext = plate.text
+
+  frame.SetTitleText = function(this, text)
+    this.title:SetTitleText(text)
+  end
+end
+
+--
+-- A panel names itself on a plate straddling its top edge: centred
+-- horizontally, and hung so that the panel's own top border runs through the
+-- middle of it. Straddling is the whole point -- a plate sitting wholly above
+-- the panel is a caption floating in the window, and one sitting wholly
+-- inside it is just a widget somebody put there. On the line it belongs to
+-- the panel and says what the panel is. The plate is opaque, so the border
+-- stops at its edges instead of being drawn through the words.
+--
+-- Returns the plate's height, which is what the panel below it has to make
+-- room for; zero when there is no title at all, which leaves every
+-- measurement below exactly as it was.
+--
+function TITLE.panel(frame, cfg, p)
+  local plate = TITLE.plate(frame, cfg.title, "THIN")
+
+  if (not plate) then
+    return 0
+  end
+
+  plate:SetFrameLevel(frame:GetFrameLevel() + 4)
+  plate:SetPoint("TOP", frame, "TOP", 0, 0 - p.top)
+  TITLE.attach(frame, plate)
+
+  return plate:GetHeight()
+end
+
 function KUI:CreateInset(cfg, kparent)
   local cfg = cfg or {}
   local frame, parent = newobj(cfg, kparent, 100, 100, cfg.name)
@@ -748,6 +978,8 @@ function KUI:CreateInset(cfg, kparent)
   frame.padding = p
   frame.inner_padding = ip
 
+  local th = TITLE.panel(frame, cfg, p)
+
   --
   -- What each side gives up in total, which is what the panel's usable area is
   -- inset by. Both paddings are the panel's own and apply whatever it is
@@ -762,11 +994,43 @@ function KUI:CreateInset(cfg, kparent)
     rings[k] = p[k] + bw + ip[k]
   end
 
+  --
+  -- A title pushes the panel down under itself. The panel's top edge falls
+  -- half a plate below the top of the frame, so that the border runs through
+  -- the middle of the plate, and the content clears the whole plate rather
+  -- than just the border: along that edge the plate has taken the border's
+  -- place, and everything it covers goes with it.
+  --
+  if (th > 0) then
+    rings.top = p.top + th + ip.top
+  end
+
   frame.rings = rings
+
+  --
+  -- What the top edge still owes the title once the panel has stopped being a
+  -- panel. A container gives up nothing on any side, but a plate is a real
+  -- object hanging off the top of the frame and content laid over it would
+  -- simply be on top of the words.
+  --
+  frame.titlering = (th > 0) and (p.top + th) or 0
+
+  --
+  -- Where the panel's own top edge goes. With a title it drops half a plate,
+  -- so that the line it draws runs through the middle of the plate -- less
+  -- half a border, because that line is not the inset frame's edge: the
+  -- border is INSET_BORDER of artwork with the line down the middle of it, so
+  -- the edge has to sit that much higher for the line to come out level.
+  --
+  local pt = p.top
+
+  if (th > 0) then
+    pt = p.top + th / 2 - KUI.INSET_BORDER / 2
+  end
 
   local xl = e.left and p.left or 0 - INSET_EDGE_TILE
   local xr = e.right and p.right or 0 - INSET_EDGE_TILE
-  local xt = e.top and p.top or 0 - INSET_EDGE_TILE
+  local xt = e.top and pt or 0 - INSET_EDGE_TILE
   local xb = e.bottom and p.bottom or 0 - INSET_EDGE_TILE
 
   inner:SetPoint("TOPLEFT", frame, "TOPLEFT", xl, 0 - xt)
@@ -807,7 +1071,7 @@ function KUI:CreateInset(cfg, kparent)
     local rg = this.rings
     local l = onoff and rg.left or 0
     local r = onoff and rg.right or 0
-    local t = onoff and rg.top or 0
+    local t = onoff and rg.top or this.titlering
     local b2 = onoff and rg.bottom or 0
 
     this.content:ClearAllPoints()
@@ -841,6 +1105,13 @@ function KUI:UseAsContainer(frame)
 end
 
 --
+-- A split's pane is a panel and is titled like one, with the very same table.
+-- That is the whole reason a title is one table rather than a handful of
+-- cfg.titleSomething keys: it can be passed along untouched by anything that
+-- builds a panel on somebody else's behalf.
+--
+
+--
 -- Split a frame into two panes, one above the other.
 --
 -- cfg.height is the usable height of the static pane, as it always was, so a
@@ -871,10 +1142,10 @@ function KUI:CreateHSplit(cfg, kparent)
   local ea = inset_edges(cfg.inset_art)
 
   local tp = self:CreateInset({ padding = cfg.padding,
-    inner_padding = cfg.inner_padding,
+    inner_padding = cfg.inner_padding, title = cfg.toptitle,
     inset_art = { left = ea.left, right = ea.right, top = ea.top } }, frame)
   local bp = self:CreateInset({ padding = cfg.padding,
-    inner_padding = cfg.inner_padding,
+    inner_padding = cfg.inner_padding, title = cfg.bottomtitle,
     inset_art = { left = ea.left, right = ea.right, bottom = ea.bottom } },
     frame)
 
@@ -935,10 +1206,10 @@ function KUI:CreateVSplit(cfg, kparent)
   local ea = inset_edges(cfg.inset_art)
 
   local lp = self:CreateInset({ padding = cfg.padding,
-    inner_padding = cfg.inner_padding,
+    inner_padding = cfg.inner_padding, title = cfg.lefttitle,
     inset_art = { left = ea.left, top = ea.top, bottom = ea.bottom } }, frame)
   local rp = self:CreateInset({ padding = cfg.padding,
-    inner_padding = cfg.inner_padding,
+    inner_padding = cfg.inner_padding, title = cfg.righttitle,
     inset_art = { right = ea.right, top = ea.top, bottom = ea.bottom } },
     frame)
 
@@ -1157,46 +1428,23 @@ function KUI:CreateDialogFrame(cfg, kparent)
 
   frame:Hide()
 
-  if (cfg.title and bstyle > 0) then
-    local title = MakeFrame("Frame", nil, frame)
-    frame.title = title
-    title:EnableMouse(true)
+  --
+  -- A dialog's title is the same plate a panel names itself with, hung off
+  -- the top of the border rather than straddling an edge, and taking THICK
+  -- when it says nothing: the ornate header is what a window title has always
+  -- sat in. It doubles as the drag handle, which is the only thing here a
+  -- panel's title does not do.
+  --
+  local dtitle = (bstyle > 0) and TITLE.plate(frame, cfg.title, "THICK") or nil
+
+  if (dtitle) then
+    TITLE.attach(frame, dtitle)
+    dtitle:SetPoint("TOP", frame, "TOP", 0, 12)
+    dtitle:EnableMouse(true)
+
     if (frame:IsMovable()) then
-      title:SetScript("OnMouseDown", parent_StartMoving)
-      title:SetScript("OnMouseUp", parent_StopMoving)
-    end
-
-    local titletext = title:CreateFontString(nil, "OVERLAY",
-      cfg.titlefont or "GameFontNormal")
-    titletext:SetText(cfg.title)
-    frame.titletext = titletext
-
-    local titlebg = frame:CreateTexture(nil, "OVERLAY")
-    titlebg:SetTexture(131080) -- Interface\\DialogFrame\\UI-DialogBox-Header
-    titlebg:SetTexCoord(0.31, 0.67, 0, 0.63)
-    titlebg:SetPoint("TOP", frame, "TOP", 0, 12)
-    titlebg:SetWidth(cfg.titlewidth or 150)
-    titlebg:SetHeight(cfg.titleheight or 40)
-
-    local titlebg_l = frame:CreateTexture(nil, "OVERLAY")
-    titlebg_l:SetTexture(131080) -- Interface\\DialogFrame\\UI-DialogBox-Header
-    titlebg_l:SetTexCoord(0.21, 0.31, 0, 0.63)
-    titlebg_l:SetPoint("RIGHT", titlebg, "LEFT", 0, 0)
-    titlebg_l:SetWidth(30)
-    titlebg_l:SetHeight(cfg.titleheight or 40)
-
-    local titlebg_r = frame:CreateTexture(nil, "OVERLAY")
-    titlebg_r:SetTexture(131080) -- Interface\\DialogFrame\\UI-DialogBox-Header
-    titlebg_r:SetTexCoord(0.67, 0.77, 0, 0.63)
-    titlebg_r:SetPoint("LEFT", titlebg, "RIGHT", 0, 0)
-    titlebg_r:SetWidth(30)
-    titlebg_r:SetHeight(cfg.titleheight or 40)
-
-    title:SetAllPoints(titlebg)
-    titletext:SetPoint("TOP", titlebg, "TOP", 0, -14)
-
-    frame.SetTitleText = function(this, text)
-      this.titletext:SetText(text or "")
+      dtitle:SetScript("OnMouseDown", parent_StartMoving)
+      dtitle:SetScript("OnMouseUp", parent_StopMoving)
     end
   else
     if (frame:IsMovable()) then
@@ -1455,7 +1703,15 @@ function KUI:CreateEditBox(cfg, kparent)
   if (cfg.x ~= "CENTER") then
     dwe = 8
   end
-  local frame,ppf,width,height = newobj(cfg, kparent, { 200, dwe }, 24, frname, "EditBox", "InputBoxTemplate")
+  --
+  -- Twenty, because that is what InputBoxTemplate draws: its textures are a
+  -- fixed 20 tall and anchored to the top of whatever frame wears them. A
+  -- taller frame does not make a taller box, it makes an edit box with dead
+  -- space under it -- and a caller stacking a column of widgets, who has
+  -- nothing to go on but GetHeight, would leave a gap here that it does not
+  -- leave under anything else.
+  --
+  local frame,ppf,width,height = newobj(cfg, kparent, { 200, dwe }, 20, frname, "EditBox", "InputBoxTemplate")
 
   frame:SetTextInsets(0, 0, 3, 3)
   frame:SetMaxLetters(cfg.len or 128)
@@ -2290,6 +2546,19 @@ function KUI:CreateImageButton(cfg, kparent)
     end)
   end
 
+  --
+  -- A second click is a second intention rather than a repeat of the first:
+  -- pick this one, then go into it. Wired only when the caller asks for it,
+  -- because WoW gives the second click of a pair to OnDoubleClick INSTEAD of
+  -- OnClick, and a button with no use for the distinction would have every
+  -- other click quietly go missing.
+  --
+  if (cfg.doubleclick) then
+    frame:SetScript("OnDoubleClick", function(this, ...)
+      this:Throw("OnDoubleClick", ...)
+    end)
+  end
+
   frame:SetEnabled(cfg.enabled)
   return frame
 end
@@ -3007,7 +3276,21 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   frame:Hide()
 
   frame.texs = {}
-  frame.maintitle = cfg.title or ""
+
+  --
+  -- The one title in the toolkit that is not a plate: the TDF border draws a
+  -- title bar of its own and this is the words written on it. It takes the
+  -- same title table all the same, so that a caller never has to remember
+  -- which widget wants which shape. Only text and font mean anything here --
+  -- there is no plate to give a style or a size to.
+  --
+  local tspec = cfg.title
+
+  if (type(tspec) ~= "table") then
+    tspec = { text = tspec }
+  end
+
+  frame.maintitle = tspec.text or ""
   frame.onclick = cfg.onclick
 
   local it = frame:CreateTexture(nil, "BACKGROUND")
@@ -3087,7 +3370,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   tframe:SetPoint("TOPLEFT", frame, "TOPLEFT", 80, -16)
   tframe:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -32, -32)
 
-  local title = tframe:CreateFontString(nil, "OVERLAY", cfg.titlefont or "GameFontNormal")
+  local title = tframe:CreateFontString(nil, "OVERLAY", tspec.font or "GameFontNormal")
   title:SetPoint("TOPLEFT", tframe, "TOPLEFT", 0, 0)
   title:SetPoint("BOTTOMRIGHT", tframe, "BOTTOMRIGHT", 0, 0)
   title:SetJustifyH("CENTER")
@@ -5006,23 +5289,35 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     --
     local tn = "Interface/Glues/CharacterCreate/CharacterCreate-LabelFrame"
     local ppf
-    frame, ppf = newobj(cfg, parent, 100, 32, cfg.name .. "DDContainer")
+    --
+    -- The frame is 24 and the artwork below is 32, drawn two pixels above the
+    -- frame's top and hanging over its bottom. That is not a mistake: the
+    -- LabelFrame slice is transparent for two pixels, opaque for twenty-four
+    -- and transparent for the rest, so 24 is the box you see and 32 is the
+    -- picture it is cut from, offset to bring the two into line.
+    --
+    -- The frame is the size of the box because GetHeight has to be able to
+    -- answer "where does the next widget go". Dead space inside a frame makes
+    -- it lie, and every caller then compensates by eye with a constant of its
+    -- own -- which is what everything anchored inside here used to do.
+    --
+    frame, ppf = newobj(cfg, parent, 100, 24, cfg.name .. "DDContainer")
     frame:SetWidth(cfg.dwidth)
-    frame:SetHeight(32)
+    frame:SetHeight(24)
 
     local lt = frame:CreateTexture(frame:GetName() .. "Left", "ARTWORK")
     lt:SetTexture(tn)
     lt:SetTexCoord(0.125, 0.2109375, 0.25, 0.75)
     lt:SetWidth(12)
     lt:SetHeight(32)
-    lt:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    lt:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 2)
 
     local rt = frame:CreateTexture(frame:GetName() .. "Right", "ARTWORK")
     rt:SetTexture(tn)
     rt:SetTexCoord(0.78128, 0.875, 0.25, 0.75)
     rt:SetWidth(12)
     rt:SetHeight(32)
-    rt:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    rt:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 2)
 
     local mt = frame:CreateTexture(frame:GetName() .. "Middle", "ARTWORK")
     mt:SetTexture(tn)
@@ -5036,8 +5331,8 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     frame.text = text
     text:SetFontObject("GameFontHighlightSmall")
     text:ClearAllPoints()
-    text:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -6)
-    text:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -26, 8)
+    text:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, 0)
+    text:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -26, 0)
 
     local button = MakeFrame("Button", frame:GetName() .. "Button", frame)
     frame.button = button
@@ -5045,7 +5340,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     button:SetWidth(24)
     button:SetHeight(24)
     button:ClearAllPoints()
-    button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, -3)
+    button:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
 
     local bnt = button:CreateTexture(button:GetName() .. "NormalTexture")
     bnt:SetTexture("Interface/ChatFrame/UI-ChatIcon-ScrollDown-Up")
@@ -5122,7 +5417,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
       check_tooltip_title(frame, cfg, cfg.label.text)
 
       if (cfg.label.pos == "LEFT") then
-        label:SetPoint("TOPRIGHT", frame, "TOPLEFT", -4, -6)
+        label:SetPoint("TOPRIGHT", frame, "TOPLEFT", -4, -4)
         if (cfg.x) then
           if (cfg.x == "CENTER") then
             frame:SetPoint("CENTER", ppf, "CENTER", (lwidth/2)*-1, 0)
@@ -5131,7 +5426,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
           end
         end
       elseif (cfg.label.pos == "RIGHT") then
-        label:SetPoint("TOPLEFT", frame, "TOPRIGHT", 4, -6)
+        label:SetPoint("TOPLEFT", frame, "TOPRIGHT", 4, -4)
         if (cfg.x and cfg.x == "CENTER") then
           frame:SetPoint("CENTER", ppf, "CENTER", (lwidth/2)*-1, 0)
         end
@@ -5265,7 +5560,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     frame.dropdown = create_dd_sa(cfg, frame, frame, false)
     frame.dropdown:SetFrameLevel(frame.dropdown:GetFrameLevel() + 4)
     frame.dropdown:ClearAllPoints()
-    frame.dropdown:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, 6)
+    frame.dropdown:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, -2)
     if (frame.mode ~= MODE_SINGLE) then
       local tfont = cfg.title.font or "GameFontNormalSmallLeft"
       frame.text:SetFontObject(tfont)
@@ -5634,12 +5929,10 @@ function KUI:CreatePopupList(cfg, parent)
     width = cfg.width,
     height = cfg.height,
     title = cfg.title,
-    titlewidth = cfg.titlewidth,
     minwidth = cfg.minwidth,
     maxwidth = cfg.maxwidth,
     minheight = cfg.minheight,
     maxheight = cfg.maxheight,
-    titleheight = cfg.titleheight,
     canmove = cfg.canmove,
     canresize = cfg.canresize,
     escclose = cfg.escclose,

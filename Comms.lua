@@ -582,7 +582,7 @@ local function kk_version_check(self)
     local arg = {
       x = "CENTER", y = "MIDDLE",
       name = self.comms.handle .. "KCVersionCheck",
-      title = strfmt(L["VCTITLE"], ks, self.comms.title),
+      title = { text = strfmt(L["VCTITLE"], ks, self.comms.title), width = 330 },
       canmove = true,
       canresize = false,
       escclose = true,
@@ -590,7 +590,6 @@ local function kk_version_check(self)
       width = 400,
       height = 350,
       framelevel = 64,
-      titlewidth = 270,
       border = true,
       blackbg = true,
       okbutton = { text = K.OK_STR },

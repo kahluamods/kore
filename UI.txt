@@ -185,6 +185,23 @@ width, height = KUI:MeasureStrWidth (str, font)
   this defaults to the last font used in a call to this or GetFontColor
   below.
 
+width, str = KUI:WidestString (strings, font)
+  Measures every string in the list and returns how wide the widest of them
+  comes out, and which one it was. Font defaults to GameFontNormal, which is
+  what a label is drawn in unless it says otherwise.
+
+  This is what a column of labelled widgets is asking for. A label sized to
+  its own words puts its widget wherever that particular word happens to end,
+  so a stack of them comes out ragged; give every label this one width and
+  their widgets line up down a single edge:
+
+    local lw = KUI:WidestString({ L["User Name"], L["User Class"] })
+    ... label = { text = L["User Name"], pos = "LEFT", width = lw } ...
+
+  Measuring rather than declaring a number is the point. Which of the strings
+  is the longest is a question about the locale, and a width that lines up
+  perfectly in one language is crooked in the next.
+
 r, g, b, a = KUI.GetFontColor (font)
 rgbtable = KUI.GetFontColor (font, true)
   Returns the default colors for the given font, either as a set of
@@ -703,6 +720,13 @@ cfg.push [boolean]
 
 cfg.hook [boolean]
   As for KUI:CreateButton.
+
+cfg.doubleclick [boolean]
+  Throw OnDoubleClick as well as OnClick, for a button where a second click is
+  a second intention rather than a repeat of the first - pick this one, then go
+  into it. Off by default, and deliberately so: WoW gives the second click of a
+  pair to OnDoubleClick INSTEAD of OnClick, so a button that asks for this and
+  then ignores the event has every other click go missing.
 
 ret:SetTexture (texture, texcoord)
   Change the picture, and its texture coordinates. Either may be nil.
@@ -1230,6 +1254,75 @@ cfg.inset_art [boolean or table]
   that clips it. On a client that cannot clip, every edge draws: a border
   too many is a cosmetic loss, artwork loose in the window is not.
 
+cfg.title [string or table]
+  Words on a plate straddling the panel's top edge: centred horizontally, and
+  hung so the panel's own top border runs through the middle of it. Straddling
+  is the point - a plate wholly above the panel is a caption floating in the
+  window, and one wholly inside it is just a widget somebody put there. On the
+  line it belongs to the panel and says what the panel is. The plate is opaque,
+  so the border stops at its edges rather than being drawn through the words.
+
+  A title costs content space. The top of the frame becomes the top of the
+  plate, the panel's own top edge falls half a plate below that, and the
+  content starts at the bottom of the plate plus the inner padding - so the
+  top ring is the padding, the whole plate and the inner padding, where it
+  would otherwise have been the padding, four pixels of border and the inner
+  padding. Nothing else about the panel changes.
+
+  A string is the words alone, which is nearly always all anybody wants. A
+  table says more:
+
+    text [string]
+      The words. Absent is an empty plate, which is only useful with a width.
+
+    style [string]
+      "THIN", the default, is the thin grey-bordered plate, the same backdrop
+      CreateStringLabel draws with border = true, and is what a section of a
+      page wants. "THICK" is the stock dialog header, the ornate gold plate a
+      window title sits in, for a panel that is a thing in its own right. A
+      THICK plate is three pieces of one texture - a centre that stretches
+      and an end cap each side that does not - so it can never be narrower
+      than its two caps.
+
+    width [number]
+      Width of the whole plate, caps included. Left out, the plate measures
+      itself against the words and keeps doing so every time ret:SetTitleText
+      changes them. Given, it is that wide and stays that wide whatever it is
+      later told to say, because you sized it to match a neighbour rather
+      than its contents.
+
+    padding [number]
+      Space each side of the words when the plate measures itself. Ignored
+      when a width was given, there being nothing left to decide.
+
+      On a THICK plate this is measured against the centre piece and the two
+      caps are added on top of it, because a cap is ornament flaring off the
+      end rather than room for words. A width you give yourself is still the
+      whole plate, so allow the caps their sixty pixels between them.
+
+    height [number]
+    font [string]
+      Override what the style says. The height is what the panel makes room
+      for, so raising it pushes the content down.
+
+    bordercolor [table]
+      { r, g, b, a } of the thin plate's border. Defaults to the same grey
+      CreateStringLabel uses. THIN only; a THICK plate is artwork.
+
+  A title is one thing with several properties, so it is one table rather than
+  seven cfg.titleSomething keys spread through the panel's own options - and
+  because it has a shape of its own, anything that builds a panel on somebody
+  else's behalf can take a title and pass it straight along. That is exactly
+  what the splitters do with cfg.toptitle and friends below.
+
+ret.title [table]
+ret.titletext [table]
+  The plate's frame and its font string, for anything this does not cover.
+  Both are nil on a panel with no title.
+
+ret:SetTitleText (string)
+  Change the words. The plate re-measures itself unless it was given a width.
+
 ret.content [table]
   The frame covering the area inside the border and the padding. This is
   what you place widgets in.
@@ -1240,6 +1333,12 @@ ret:SetBorderShown (boolean)
   exists because a panel usually cannot know it is a container when it is
   made. The splitters call it on their own parent, having just discovered
   that it holds panels rather than content.
+
+  A container gives up nothing on any side, with one exception: a titled panel
+  keeps the room its plate occupies, because the plate is a real object
+  hanging off the top of the frame and content laid over it would be on top of
+  the words. So a titled container is a legitimate thing - a named region with
+  panels inside it - rather than a contradiction.
 
 KUI:UseAsContainer (frame)
   Given the content frame of a panel, tells that panel it is a container
@@ -1285,6 +1384,14 @@ cfg.inset_art [boolean or table]
   right go to both. The two edges facing each other are interior and always
   draw.
 
+cfg.toptitle [string or table]
+cfg.bottomtitle [string or table]
+  Title one or both panes. A pane is a panel, so this is exactly cfg.title as
+  described under KUI:CreateInset and is handed to the pane untouched.
+
+  A title on the static pane makes that pane taller, since cfg.height is the
+  usable height and the plate is not part of it.
+
 cfg.inset [number]
   Number of pixels to inset the whole splitter by, if any. Rarely used.
 
@@ -1325,6 +1432,10 @@ cfg.inset_art [boolean or table]
   the right one, and top and bottom go to both. The two edges facing each
   other are interior and always draw.
 
+cfg.lefttitle [string or table]
+cfg.righttitle [string or table]
+  Title one or both panes, in the form cfg.toptitle takes above.
+
 cfg.inset [number]
   Number of pixels to inset the whole splitter by, if any. Rarely used.
 
@@ -1362,18 +1473,18 @@ cfg.maxwidth, cfg.minheight, cfg.minheight
 cfg.strata [string]
   Sets the strata for this dialog box. Defaults to "FULLSCREEN_DIALOG".
 
-cfg.title [string]
+cfg.title [string or table]
   Sets the title for the dialog box. If you want a dialog box to be
-  movable, you must provide a title.
+  movable, you must provide a title: the plate is the drag handle.
 
-cfg.titlefont [string]
-  Sets the font to use for the title. Defaults to "GameFontNormal".
+  This is the title plate described under KUI:CreateInset, in exactly the
+  same form, and everything said there applies here - the only difference is
+  that a dialog takes THICK when the spec names no style, a panel taking
+  THIN. Either can ask for either.
 
-cfg.titlewidth [number]
-  Width of the title. Defaults to 150.
-
-cfg.titleheight [number]
-  Height of the title. Defaults to 40.
+  Note that a width is the width of the whole plate, end caps included, and
+  not of the centre piece alone. Left out, the plate measures itself against
+  the words.
 
 cfg.border [string or boolean]
   Specifies whether or not the dialog has a border, and if so, what type.
@@ -1493,9 +1604,15 @@ cfg.maxwidth, cfg.minheight, cfg.minheight
 cfg.strata [string]
   Sets the strata for this dialog box. Defaults to "FULLSCREEN_DIALOG".
 
-cfg.title [string]
+cfg.title [string or table]
   Sets the title for the main tabbed dialog. This can be changed for
   each tab as you select it.
+
+  This is the one title in the toolkit that is not a plate: the TDF border
+  draws a title bar of its own and this is the words written on it. It takes
+  the same table all the same, so a caller never has to remember which widget
+  wants which shape - but only text and font mean anything here, there being
+  no plate to give a style or a size to.
 
 PAGES AND TABS
 
@@ -1577,9 +1694,6 @@ cfg.pages [table]
 Anything else you put in a page or tab config is left alone and handed
 back to you as .cfg on the page or tab, so you can hang your own meaning
 on a page without keeping a parallel table.
-
-cfg.titlefont [string]
-  Sets the font to use for the title. Defaults to "GameFontNormal".
 
 cfg.tltexture [string]
   Name of the texture to use for the top-left hand corner.
@@ -1940,8 +2054,9 @@ cfg.header [number]
 cfg.footer [number]
   Number of pixels to leave below the popup menu for a footer frame.
 
-cfg.title [string]
-  The title displayed at the very top of the popup.
+cfg.title [string or table]
+  The title displayed at the very top of the popup, handed straight to the
+  dialog this is built on. See KUI:CreateDialogFrame.
 
 cfg.timeout [number]
   How long the popup will remain visible when the mouse moves away from it
