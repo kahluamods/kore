@@ -652,6 +652,71 @@ throw:OnClick (button, down)
   was pressed, and DOWN is true if the button is being pressed, false or nil
   if it is being released.
 
+5.6.1 KUI:CreateImageButton
+---------------------------
+A button whose face is a picture rather than a word: an icon, a card, one cell
+of a sprite sheet. UIPanelButtonTemplate is a plate with a caption cut into it
+and is no use for any of those, so this widget carries no template at all and
+draws what it is given. It throws OnClick and supports tooltips exactly as
+KUI:CreateButton does.
+
+The picture fills the button. Nothing here scales it or preserves its shape -
+you set the size, and if the aspect ratio matters you work it out, because only
+you know which of the two dimensions you are fitting into.
+
+cfg.texture [string]
+  Path to the image.
+
+cfg.texcoord [table]
+  { left, right, top, bottom } to show part of the texture rather than all of
+  it - one cell of a sprite sheet, or an edge trimmed away. Defaults to the
+  whole thing.
+
+cfg.color [table]
+  { r, g, b, a } applied to the texture. Useful for tinting a plain white
+  image, or for a placeholder drawn from a solid colour.
+
+cfg.text [string]
+cfg.font [string]
+cfg.textx, cfg.texty [number]
+cfg.justifyh [string]
+  An optional caption drawn over the picture, for a button whose picture does
+  not say enough by itself or has not been drawn yet. The font string is made
+  either way, so a button reused for several things can be given text later.
+
+cfg.highlight [string or false]
+  Texture drawn over the button while the pointer is on it, blended ADD.
+  Defaults to the stock quest title highlight; false for no highlight at all.
+
+cfg.outline [table]
+  { r, g, b, a } of a rim drawn around the outside of the button, shown by
+  ret:SetSelected and hidden otherwise. A button that is never selected does
+  not ask for one and does not get the texture.
+
+cfg.outlinesize [number]
+  How far that rim extends beyond the button on each side. Defaults to 2.
+
+cfg.push [boolean]
+  Whether the picture shifts a pixel down and right while the button is held,
+  which is what makes it feel like a button rather than a picture. Defaults to
+  true; set false for something that should not move.
+
+cfg.hook [boolean]
+  As for KUI:CreateButton.
+
+ret:SetTexture (texture, texcoord)
+  Change the picture, and its texture coordinates. Either may be nil.
+
+ret:SetSelected (boolean)
+  Show or hide the rim. Does nothing if no cfg.outline was given.
+
+ret.image [table]
+  The texture itself, for anything this does not cover - desaturation, a
+  different blend mode, an animation.
+
+A disabled image button is desaturated rather than greyed, which is what
+Blizzard does to an icon that cannot be used.
+
 5.7 KUI:CreateDropDown
 ----------------------
 Custom replacement for the notoriously confusing Blizzard dropdown menu code.
@@ -1086,141 +1151,192 @@ is not a widget but a container. However, since they are so similar
 to a dropdown menu (they use the exact same code) they are lumped with
 widgets here.
 
-5.9 KUI:CreateHSplit
---------------------
-Creates a horizontal splitter, usually used to separate parts of a tab in
-a tabbed dialog, as discussed below. This splitter is not movable as splitters
-in Windows applications are. However, if the frame that is being split is
-resizable, one half of the split will resize with it. The other half is
-always a fixed size.
+5.9 KUI:CreateInset
+-------------------
+Creates a recessed panel, in the style Blizzard's own windows use to divide
+themselves up - the member list and the message of the day box in the Guild
+pane of the Social window are both insets.
 
-cfg.placeframe [function]
-  Used to manually place the splitter frame. This function is passed the
-  created splitter frame as its only parameter. Very rarely used.
+This is how KoreUI separates regions of a window. It replaced an older idiom
+of drawing divider lines with end caps, which could not work reliably: a
+divider has to meet the border it runs into, so its caps have to be drawn for
+that particular border, and a window bordered any other way had no join to be
+had at any offset. An inset carries its own corners and meets nothing, so
+there is nothing to align.
+
+Panels are meant to be siblings, never nested. An inset drawn inside another
+gives a doubled border and a very busy window. A panel that turns out to be a
+container for further panels should therefore stop drawing itself, which the
+splits below do automatically and which you can do by hand with
+KUI:UseAsContainer.
+
+Put your widgets in ret.content, never in the panel itself, or they will sit
+on top of the border artwork.
+
+A panel is three rings deep on every side. The frame is the outer box and the
+width and height you ask for are that outer size:
+
+  cfg.padding        between the frame edge and the artwork
+  KUI.INSET_BORDER   the artwork itself, which is 4 pixels
+  cfg.inner_padding  between the artwork and the usable area
+
+So a 100x100 panel with the defaults has its artwork box from 4,4 to 96,96
+and ret.content, the part you can use, from 10,10 to 90,90.
+
+cfg.padding [number or table]
+  Space left between the panel's outer edge and its artwork, so that a panel
+  stands clear of its neighbours and of the window. Either a single number
+  for all four sides, or a table with any of left, right, top and bottom -
+  anything not named is taken as zero. Left out altogether it is
+  KUI.INSET_PADDING, which is 4.
+
+  Two panels placed side by side each give up this much, so the space
+  between them is twice it. That is why nothing in KoreUI has a gutter
+  setting: the padding is the gutter, and there is one number to change.
+
+  Note this is not the same thing as cfg.inset on the splitters below, which
+  is the margin left on the *outside* of the splitter.
+
+cfg.inner_padding [number or table]
+  Space left inside the artwork before the usable area starts, so that
+  widgets do not sit hard against the border. Same forms as cfg.padding.
+  Left out it is KUI.INSET_INNER_PADDING, which is 2.
+
+cfg.inset_art [boolean or table]
+  Which of the panel's four edges draw their border. Left out, or true, all
+  four do, which is what almost every panel wants. A table names only the
+  sides that differ and anything not named still draws, so
+
+    inset_art = { top = false }
+
+  is "everything but the top". false draws nothing at all.
+
+  Suppressing an edge only stops it being drawn. Both paddings belong to the
+  panel rather than to the border and are kept either way, so a side with no
+  border on it gives up those four pixels and nothing else. A panel under a
+  tab strip with { top = false } therefore has no line cutting the tab off
+  from the space it opens on to, and the two read as one surface.
+
+  Drawing nothing is not by itself a container: a panel with no artwork still
+  holds content, which still has to stand clear of what is beside it. A
+  container is all three rings at zero,
+
+    KUI:CreateInset({ inset_art = false, padding = 0, inner_padding = 0 })
+
+  which is a frame whose content is the whole of it.
+
+  A border is eight pieces of one texture and there is no way to leave one
+  of them out, so a suppressed edge is put out of sight instead, in a frame
+  that clips it. On a client that cannot clip, every edge draws: a border
+  too many is a cosmetic loss, artwork loose in the window is not.
+
+ret.content [table]
+  The frame covering the area inside the border and the padding. This is
+  what you place widgets in.
+
+ret:SetBorderShown (boolean)
+  Turn the panel into a container, or back into the panel it was made as.
+  This is the same state as the three rings being declared at zero above; it
+  exists because a panel usually cannot know it is a container when it is
+  made. The splitters call it on their own parent, having just discovered
+  that it holds panels rather than content.
+
+KUI:UseAsContainer (frame)
+  Given the content frame of a panel, tells that panel it is a container
+  rather than a leaf and should not draw itself. The splitters call this on
+  their own parent; hand-built layouts can call it directly.
+
+5.10 KUI:CreateHSplit
+---------------------
+Splits a frame into two panes, one above the other, usually to separate parts
+of a tab in a tabbed dialog. The split is not movable as splitters in Windows
+applications are. If the frame being split is resizable, one pane resizes with
+it and the other is always a fixed size.
+
+Both panes are KUI:CreateInset panels and the frames handed back are their
+content areas, so widgets placed in them are already clear of the border. If
+the frame being split is itself a panel, it is told to stop drawing its own
+border, so that panels stay siblings rather than nesting.
+
+The two panes meet edge to edge. Each already stands its own padding clear of
+its outside, so the space between them is those two paddings and there is no
+gutter setting anywhere: change cfg.padding and the space between the panes
+changes with it.
 
 cfg.height [number]
-  The height of the static portion of the split, in pixels. This splits
-  the parent frame into two regions, one which is this number of pixels,
-  and the other which is the remainder of the frame.
+  The usable height of the static pane, in pixels. This splits the parent
+  frame into two regions, one which is this number of pixels and the other
+  which is the remainder. The panel drawn around it is taller than this by
+  everything its own edges give up, so a caller asking for 48 still gets 48
+  to put things in.
 
 cfg.topanchor [boolean]
-  By default, the height specifies the number of pixels to reserve at the
-  bottom portion of the split. In other words, the split is anchored to
-  the bottom of the parent frame. Set this to instead have it anchored to
-  the top of the frame.
+  By default the height reserves the bottom pane, so the split is anchored to
+  the bottom of the parent frame. Set this to reserve the top one instead.
 
-cfg.leftsplit [boolean]
-  If the left edge of the split is a vertical split, set this to true, so
-  that the left texture can be set to a "tee" which joins nicely with the
-  vertical split.
+cfg.padding [number or table]
+cfg.inner_padding [number or table]
+  Passed to both panes. See KUI:CreateInset above.
 
-cfg.leftshift [number]
-  Set the number of pixels to shift the left edge by. This is sometimes
-  needed to micro-adjust the position of the left texture if you are
-  doing weird placement of the frame.
-
-cfg.setleft [function]
-  Function to place the left edge texture. Passed the split frame and the
-  left edge texture as its only two parameters. If this is specified then
-  cfg.leftshift, cfg.leftsplit, cfg.inset and cfg.topanchor are not not
-  used for the left edge placement.
-
-cfg.rightsplit [boolean]
-  Same as for cfg.leftsplit above but for the right edge.
-
-cfg.rightshift [number]
-  Same as for cfg.leftshift above but for the right edge.
-
-cfg.setright [function]
-  Same as for cfg.setleft above but for the right edge.
-
-cfg.midshift [number]
-  Same as for cfg.leftshift above but for the middle portion of the texture.
-
-cfg.setmiddle [function]
-  Same as for cfg.setleft but for the middle texture.
-
-cfg.resizeadjust [number]
-  Sets the number of pixels to adjust the middle texture width by when the
-  containing window is resized. If not provided this is calculated as a
-  function of the inset, the left shift and the right shift. Very rarely
-  needed.
+cfg.inset_art [boolean or table]
+  Which edges of the *pair* draw, in the same form CreateInset takes. Each
+  pane is given only the sides it actually owns, so on a horizontal split
+  top belongs to the top pane and bottom to the bottom one, while left and
+  right go to both. The two edges facing each other are interior and always
+  draw.
 
 cfg.inset [number]
-  Number of pixels to inset the frame by, if any. Rarely used.
+  Number of pixels to inset the whole splitter by, if any. Rarely used.
 
 ret.topframe [table]
-  The top frame.
+  The top pane's content frame.
 
 ret.bottomframe [table]
-  The bottom frame.
+  The bottom pane's content frame.
 
-5.10 KUI:CreateVSplit
+ret.topinset [table]
+ret.bottominset [table]
+  The panels themselves, should you need to call SetBorderShown on one.
+
+5.11 KUI:CreateVSplit
 ---------------------
 Identical in purpose and function to KUI:CreateHSplit above, except this
 creates a vertical split, splitting the parent frame into a left and right
-component.
-
-cfg.placeframe [function]
-  Used to manually place the splitter frame. This function is passed the
-  created splitter frame as its only parameter. Very rarely used.
+component. Both panes are KUI:CreateInset panels and the frames handed back
+are their content areas.
 
 cfg.width [number]
-  The width of the static portion of the split, in pixels. This splits
-  the parent frame into two regions, one which is this number of pixels,
-  and the other which is the remainder of the frame.
+  The usable width of the static pane, in pixels. This splits the parent
+  frame into two regions, one which is this number of pixels and the other
+  which is the remainder. The panel drawn around it is wider than this by
+  everything its own edges give up, so a caller asking for 180 still gets
+  180 to put things in.
 
 cfg.rightanchor [boolean]
-  By default, the width specifies the number of pixels to reserve on the
-  left portion of the split. In other words, the split is anchored to
-  the left of the parent frame. Set this to instead have it anchored to
-  the right of the frame.
+  By default the width reserves the left pane, so the split is anchored to
+  the left of the parent frame. Set this to reserve the right one instead.
 
-cfg.topsplit [boolean]
-  If the top edge of the split is a horizontal split, set this to true, so
-  that the top texture can be set to a "tee" which joins nicely with the
-  horizontal split.
+cfg.padding [number or table]
+cfg.inner_padding [number or table]
+  Passed to both panes. See KUI:CreateInset above.
 
-cfg.topshift [number]
-  Set the number of pixels to shift the top edge by. This is sometimes
-  needed to micro-adjust the position of the top texture if you are
-  doing weird placement of the frame.
-
-cfg.settop [function]
-  Function to place the top edge texture. Passed the split frame and the
-  top edge texture as its only two parameters. If this is specified then
-  cfg.topshift, cfg.topsplit, cfg.inset and cfg.rightanchor are not not
-  used for the top edge placement.
-
-cfg.bottomsplit [boolean]
-  Same as for cfg.topsplit above but for the bottom edge.
-
-cfg.bottomshift [number]
-  Same as for cfg.topshift above but for the bottom edge.
-
-cfg.setbottom [function]
-  Same as for cfg.settop above but for the bottom edge.
-
-cfg.midshift [number]
-  Same as for cfg.topshift above but for the middle portion of the texture.
-
-cfg.setmiddle [function]
-  Same as for cfg.settop but for the middle texture.
-
-cfg.resizeadjust [number]
-  Sets the number of pixels to adjust the middle texture height by when the
-  containing window is resized. If not provided this is calculated as a
-  function of the inset, the top shift and the bottom shift. Very rarely
-  needed.
+cfg.inset_art [boolean or table]
+  As for the horizontal split above: left belongs to the left pane, right to
+  the right one, and top and bottom go to both. The two edges facing each
+  other are interior and always draw.
 
 cfg.inset [number]
-  Number of pixels to inset the frame by, if any. Rarely used.
+  Number of pixels to inset the whole splitter by, if any. Rarely used.
+
+ret.leftinset [table]
+ret.rightinset [table]
+  The panels themselves, should you need to call SetBorderShown on one.
 
 ret.leftframe [table]
-  The left hand frame.
+  The left hand pane's content frame.
 
 ret.rightframe [table]
-  The right hand frame.
+  The right hand pane's content frame.
 
 
 6.  Containers
@@ -1288,6 +1404,22 @@ cfg.okbutton [table]
     Text to display on the cancel button.
   If this is set and the button is pressed, this throws an OnCancel or
   OnAccept event.
+
+  The buttons are handed back as ret.okbutton and ret.cancelbutton. They sit
+  in the bottom right corner, and OK is anchored to the cancel button, so
+  re-anchoring the cancel button moves the pair.
+
+cfg.padding [number or table]
+  Space left inside the dialog's border before ret.content starts, in the
+  same form KUI:CreateInset takes it - a number for all four sides, or a
+  table naming any of left, right, top and bottom with anything unnamed
+  taken as zero. There is none unless you ask for one, because a dialog is
+  laid out in its content's own coordinates and adding padding moves
+  everything in it.
+
+  The border offset is not this. That clears the artwork and nothing more,
+  which is why a widget placed at 0,0 without padding sits hard against the
+  frame.
 
 cfg.statusbar [boolean]
   Set to true if you want a status bar at the bottom of the dialog
@@ -1624,6 +1756,20 @@ cfg.name [string]
 cfg.itemheight [number]
   The height of each item. The newitem function below must create and
   return a single frame that is exactly this high.
+
+cfg.smoothscroll [boolean]
+  By default the list scrolls a whole item at a time: the item at the top of
+  the list is always a whole one, and the scrollbar steps by the item height.
+  That is right for a list of text rows, where an item is a line or two high
+  and stopping between two of them would only look untidy.
+
+  Set this for a list whose items are big enough that jumping a whole one is
+  a lurch. The list then scrolls by the pixel: an item is cut off at the top
+  and at the bottom, the list keeps one more visual element than fits to draw
+  them, and a wheel notch moves half an item rather than half a page.
+
+  Nothing else changes. The item and slot numbers mean what they always did,
+  and setitem is called for the part items exactly as for the whole ones.
 
 cfg.newitem [function]
   This is the user-supplied function that is used to create new visual

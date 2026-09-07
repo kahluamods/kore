@@ -138,15 +138,35 @@ function KC.TimeStamp()
   return strfmt("%04d%02d%02d%02d%02d", yr, mo, dy, hh, mm), yr, mo, dy, hh, mm
 end
 
-function KC.CreateNewID(strtohash)
-  local _, y, mo, d, h, m = KC.TimeStamp()
-  local ts = strfmt("%02d%02d%02d", y-2000, mo, d)
-  local crc = H:CRC32(ts, nil, false)
-  crc = H:CRC32(tostring(h), crc, false)
-  crc = H:CRC32(tostring(m), crc, false)
-  crc = H:CRC32(strtohash, crc, true)
-  ts = ts .. K.hexstr(crc)
-  return ts
+--
+-- A fresh identifier, eight hexadecimal characters, for anything that has to
+-- be named on the wire: a config space, a roll list.
+--
+-- Nothing the caller supplies goes into it, and that is the point. An id
+-- derived from what a thing is called collides whenever two people name two
+-- different things the same way at about the same time, which on a raid night
+-- is an ordinary Tuesday rather than a freak event. Two admins who both create
+-- "Main Raid" are creating two separate things and must get two ids.
+--
+-- Uniqueness rests on three legs so that none of them has to carry it alone:
+-- the clock to the second, a counter that separates ids issued within the same
+-- second, and the player's own name, which is what keeps two people apart when
+-- their clocks agree. None of it needs the random number generator to have
+-- been seeded, which is not something an addon can assume.
+--
+local newid_seq = 0
+
+function KC.CreateNewID()
+  local t = date("*t")
+
+  newid_seq = newid_seq + 1
+
+  local crc = H:CRC32(strfmt("%04d%02d%02d%02d%02d%02d", t.year, t.month,
+    t.day, t.hour, t.min, t.sec), nil, false)
+  crc = H:CRC32(tostring(newid_seq), crc, false)
+  crc = H:CRC32((K.player and K.player.name) or "", crc, true)
+
+  return K.hexstr(crc)
 end
 
 function KC:OldProtoDialog()

@@ -589,225 +589,389 @@ local function parent_StopMoving(this)
   end
 end
 
-local function hs_OnSizeChanged(this, w, h)
-  local hst = this.hstextures
-  local tx = w - hst.adjust
-  hst.middle:SetWidth(tx)
-  hst.middle:SetTexCoord(0, tx / 1024.0, 0, 1)
+--
+-- A recessed panel, the way Blizzard's own windows divide themselves up.
+--
+-- This is what replaced the divider-and-tee idiom. A divider has to meet the
+-- border it runs into, so its end caps have to be drawn for that particular
+-- border, and the moment a split went into a window bordered any other way
+-- there was no join to be had at any offset. An inset carries its own corners
+-- and meets nothing, so there is nothing to align and nothing to get wrong.
+-- It is also stock art, which is the more important half: Blizzard does not
+-- break its own templates.
+--
+-- The frame returned is the panel. Put widgets in ret.content, which is the
+-- area inside its border -- anything anchored to the panel itself sits on top
+-- of the artwork.
+--
+local INSET_BACKDROP = {
+  bgFile = "Interface/ChatFrame/ChatFrameBackground",
+  edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+  tile = true, tileSize = 16, edgeSize = 16,
+  insets = { left = 4, right = 4, top = 4, bottom = 4 }
+}
+
+--
+-- A panel is three rings deep on every side. The frame handed back is the
+-- outer box and the size the caller asked for is that outer size:
+--
+--   cfg.padding        space between the frame edge and the artwork, so that
+--                      a panel stands clear of its neighbours and of the
+--                      window. Two panels side by side each give up this
+--                      much, so the space between them is twice it and no
+--                      separate gutter is needed anywhere.
+--   INSET_BORDER       the artwork itself. The border texture is cut into
+--                      16 pixel tiles but the line inside one sits 4 in,
+--                      which is what this records.
+--   cfg.inner_padding  space inside the artwork before the usable area, so
+--                      that widgets do not sit hard against the border.
+--
+-- So a 100x100 panel with the defaults has its artwork box from 4,4 to 96,96
+-- and ret.content, the part a caller can use, from 10,10 to 90,90.
+--
+KUI.INSET_BORDER = 4
+KUI.INSET_PADDING = 4
+KUI.INSET_INNER_PADDING = 2
+
+--
+-- Either ring is a single number for all four sides, or a table naming any
+-- of left, right, top and bottom with anything left out taken as none. Left
+-- out altogether the ring is the framework default.
+--
+local function padding_sides(spec, def)
+  if (type(spec) == "table") then
+    return {
+      left = spec.left or 0, right = spec.right or 0,
+      top = spec.top or 0, bottom = spec.bottom or 0
+    }
+  end
+
+  local n = tonumber(spec) or def
+
+  return { left = n, right = n, top = n, bottom = n }
 end
 
+--
+-- Which of a panel's four edges draw. cfg.inset_art left out, or true, is all
+-- four, which is what almost every panel wants. A table names the sides that
+-- differ and anything not named still draws, so { top = false } reads as
+-- "everything but the top" -- the shape a panel wants when it sits directly
+-- under a tab strip, where a line across the top cuts the tab off from the
+-- space it belongs to. cfg.inset_art = false draws nothing at all.
+--
+-- Suppressing an edge only stops it being drawn. Both paddings belong to the
+-- panel rather than to the border and are kept, so the content sits where it
+-- would have, four pixels further out.
+--
+-- A container is all three rings at zero and nothing more:
+--
+--   { inset_art = false, padding = 0, inner_padding = 0 }
+--
+-- is a frame whose content is the whole of it. SetBorderShown(false) is that
+-- same state arrived at later rather than a different thing, and it exists
+-- because a panel usually cannot know it is a container when it is made: the
+-- splits find out only when they are built inside one.
+--
+local INSET_SIDES = { "left", "right", "top", "bottom" }
+
+local function inset_edges(spec)
+  local e = { left = true, right = true, top = true, bottom = true }
+
+  if (type(spec) == "table") then
+    for _, k in ipairs(INSET_SIDES) do
+      if (spec[k] ~= nil) then
+        e[k] = spec[k] and true or false
+      end
+    end
+  end
+
+  return e
+end
+
+--
+-- A border is eight pieces of one texture and there is no way to leave one of
+-- them out, so an edge that is not wanted is put out of sight instead. The
+-- artwork lives in a frame that clips its children and a suppressed side is
+-- anchored a whole edge tile beyond it, where it is cut away. The background
+-- goes with it, so the panel still fills right to that edge and simply has no
+-- line drawn on it.
+--
+local INSET_EDGE_TILE = 16
+
+function KUI:CreateInset(cfg, kparent)
+  local cfg = cfg or {}
+  local frame, parent = newobj(cfg, kparent, 100, 100, cfg.name)
+
+  local art = MakeFrame("Frame", nil, frame)
+  art:SetAllPoints(frame)
+  frame.artframe = art
+
+  --
+  -- Without clipping there is nowhere for a suppressed edge to go but over
+  -- the panel next door, so on a client that cannot clip every edge draws.
+  -- A border too many is a cosmetic loss; artwork loose in the window is not.
+  --
+  local canclip = art.SetClipsChildren and true or false
+
+  if (canclip) then
+    art:SetClipsChildren(true)
+  end
+
+  frame.drawart = cfg.inset_art ~= false
+  frame.edges = canclip and inset_edges(cfg.inset_art) or inset_edges(true)
+
+  --
+  -- CreateFrame raises on a template it does not know rather than returning
+  -- nil, so the stock inset is tried behind a pcall and a plainer backdrop
+  -- stands in where there is no such template. A flatter panel is a great
+  -- deal better than an addon that will not load.
+  --
+  local ok, inner = pcall(MakeFrame, "Frame", nil, art, "InsetFrameTemplate")
+
+  if (not (ok and inner)) then
+    inner = MakeFrame("Frame", nil, art)
+    inner:SetBackdrop(INSET_BACKDROP)
+    inner:SetBackdropColor(0, 0, 0, 1)
+  end
+
+  frame.inset = inner
+
+  --
+  -- cfg.padding is not cfg.inset: the splits already use that name for the
+  -- margin they leave on the *outside* of themselves, and one key cannot
+  -- mean both.
+  --
+  local e = frame.edges
+  local p = padding_sides(cfg.padding, KUI.INSET_PADDING)
+  local ip = padding_sides(cfg.inner_padding, KUI.INSET_INNER_PADDING)
+
+  frame.padding = p
+  frame.inner_padding = ip
+
+  --
+  -- What each side gives up in total, which is what the panel's usable area is
+  -- inset by. Both paddings are the panel's own and apply whatever it is
+  -- drawing; a side with no border on it gives up the four pixels of border
+  -- and nothing else.
+  --
+  local rings = {}
+
+  for _, k in ipairs(INSET_SIDES) do
+    local bw = (frame.drawart and e[k]) and KUI.INSET_BORDER or 0
+
+    rings[k] = p[k] + bw + ip[k]
+  end
+
+  frame.rings = rings
+
+  local xl = e.left and p.left or 0 - INSET_EDGE_TILE
+  local xr = e.right and p.right or 0 - INSET_EDGE_TILE
+  local xt = e.top and p.top or 0 - INSET_EDGE_TILE
+  local xb = e.bottom and p.bottom or 0 - INSET_EDGE_TILE
+
+  inner:SetPoint("TOPLEFT", frame, "TOPLEFT", xl, 0 - xt)
+  inner:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0 - xr, xb)
+
+  local content = MakeFrame("Frame", nil, frame)
+  frame.content = content
+
+  --
+  -- The artwork sits one frame deeper than the panel, inside the frame that
+  -- clips it, so the content has to be lifted clear of it by hand or the
+  -- border draws over everything placed in the panel.
+  --
+  content:SetFrameLevel(frame:GetFrameLevel() + 3)
+
+  --
+  -- A back pointer so that a split created inside this panel can find it and
+  -- turn its border off. See SetBorderShown.
+  --
+  content.owninginset = frame
+
+  --
+  -- Panels are meant to be siblings, never nested. An inset drawn inside
+  -- another inset gives a doubled border and a very busy window, which is
+  -- what happens the moment one split is placed inside another -- and Konfer
+  -- nests them two and three deep. So a panel that turns out to be a
+  -- container for further panels stops drawing itself and becomes plain
+  -- space, leaving only the innermost ones visible.
+  --
+  frame.SetBorderShown = function(this, onoff)
+    this.inset:SetShown(onoff and this.drawart)
+
+    --
+    -- A container is not a panel at all: it holds panels, which bring their
+    -- own padding, so it gives up nothing on any side and the content is the
+    -- whole of it.
+    --
+    local rg = this.rings
+    local l = onoff and rg.left or 0
+    local r = onoff and rg.right or 0
+    local t = onoff and rg.top or 0
+    local b2 = onoff and rg.bottom or 0
+
+    this.content:ClearAllPoints()
+    this.content:SetPoint("TOPLEFT", this, "TOPLEFT", l, 0 - t)
+    this.content:SetPoint("BOTTOMRIGHT", this, "BOTTOMRIGHT", 0 - r, b2)
+  end
+
+  frame:SetBorderShown(true)
+
+  return frame
+end
+
+--
+-- Called by both splits: if the frame they are being built in is the inside
+-- of a panel, that panel is a container rather than a leaf and should not be
+-- drawing a border of its own.
+--
+local function unborder_parent(parent)
+  if (parent and parent.owninginset) then
+    parent.owninginset:SetBorderShown(false)
+  end
+end
+
+--
+-- Say that a pane is going to hold panels of its own rather than content, so
+-- it should not draw itself. The splits do this to their parent already; this
+-- is for code laying panels out by hand.
+--
+function KUI:UseAsContainer(frame)
+  unborder_parent(frame)
+end
+
+--
+-- Split a frame into two panes, one above the other.
+--
+-- cfg.height is the usable height of the static pane, as it always was, so a
+-- caller asking for 48 still gets 48 to put things in: the panel is made
+-- taller than that by everything its own edges give up. cfg.topanchor makes
+-- the static pane the top one. The end cap and shift options a divider needed
+-- are accepted and ignored, because there is no divider any more.
+--
+-- The two panes meet edge to edge. Each already stands its own padding clear
+-- of its outside, so the space between them is those two paddings and there
+-- is no gutter to add on top of it.
+--
 function KUI:CreateHSplit(cfg, kparent)
   local frame, parent = newobj(cfg, kparent, 0, 0, cfg.name)
+  local inset = cfg.inset or 0
 
-  frame.hstextures = {}
-  local hst = frame.hstextures
-  hst.inset = cfg.inset or 0
+  unborder_parent(parent)
 
-  frame:SetPoint("LEFT", parent, "LEFT", hst.inset, 0)
-  frame:SetPoint("RIGHT", parent, "RIGHT", 0 - hst.inset, 0)
-  if (cfg.topanchor) then
-    frame:SetPoint("TOP", parent, "TOP", 0, 0 - hst.inset)
-  else
-    frame:SetPoint("BOTTOM", parent, "BOTTOM", 0, hst.inset)
-  end
-  frame:SetHeight(cfg.height or 24)
-
-  local left = frame:CreateTexture(nil, "ARTWORK")
-  if (cfg.leftsplit) then
-    left:SetTexture(texpath .. "HDIV-LeftSplit")
-  else
-    left:SetTexture(texpath .. "HDIV-Left")
-  end
-  left:SetWidth(16)
-  left:SetHeight(16)
-  if (cfg.setleft) then
-    hst.leftshift = cfg.setleft(frame, left)
-  else
-    local ls = cfg.leftshift or (-10 - hst.inset)
-    if (cfg.leftsplit) then
-      ls = ls - 2
-    end
-    hst.leftshift = ls
-    if (cfg.topanchor) then
-      local vs = -12 - hst.inset
-      left:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", ls, vs)
-    else
-      local vs = 12 + hst.inset
-      left:SetPoint("TOPLEFT", frame, "TOPLEFT", ls, vs)
-    end
-  end
-  hst.left = left
-
-  local right = frame:CreateTexture(nil, "ARTWORK")
-  if (cfg.rightsplit) then
-    right:SetTexture(texpath .. "HDIV-RightSplit")
-  else
-    right:SetTexture(texpath .. "HDIV-Right")
-  end
-  right:SetWidth(16)
-  right:SetHeight(16)
-  if (cfg.setright) then
-    hst.rightshift = cfg.setright(frame, right)
-  else
-    local rs = cfg.rightshift or (12 + hst.inset)
-    if (cfg.rightsplit) then
-      rs = rs - 4
-    end
-    hst.rightshift = rs
-    if (cfg.topanchor) then
-      local vs = -12 - hst.inset
-      right:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", rs, vs)
-    else
-      local vs = 12 + hst.inset
-      right:SetPoint("TOPRIGHT", frame, "TOPRIGHT", rs, vs)
-    end
-  end
-  hst.right = right
-
-  local middle = frame:CreateTexture(nil, "ARTWORK")
-  middle:SetTexture(texpath .. "HDIV-Mid")
-  middle:SetHeight(16)
-  if (cfg.setmiddle) then
-    hst.midshift = cfg.setmiddle(frame, middle)
-  else
-    local ms = cfg.midshift or 0
-    middle:SetPoint("TOPLEFT", left, "TOPRIGHT", ms, 0)
-    hst.midshift = ms
-  end
-  hst.middle = middle
-
-  if (cfg.resizeadjust ~= nil) then
-    hst.adjust = cfg.resizeadjust
-  else
-    hst.adjust = (8 - (hst.inset * 2)) + hst.rightshift + hst.leftshift
-  end
-
-  frame:HookScript("OnSizeChanged", hs_OnSizeChanged)
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPLEFT", parent, "TOPLEFT", inset, 0 - inset)
+  frame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0 - inset, inset)
 
   --
-  -- Set two frame pointers for the two halves
+  -- cfg.inset_art describes the outside of the pair, not either panel, and
+  -- each pane is given only the sides it actually owns. The two edges facing
+  -- each other across the gutter are interior and always draw.
   --
+  local ea = inset_edges(cfg.inset_art)
+
+  local tp = self:CreateInset({ padding = cfg.padding,
+    inner_padding = cfg.inner_padding,
+    inset_art = { left = ea.left, right = ea.right, top = ea.top } }, frame)
+  local bp = self:CreateInset({ padding = cfg.padding,
+    inner_padding = cfg.inner_padding,
+    inset_art = { left = ea.left, right = ea.right, bottom = ea.bottom } },
+    frame)
+
+  --
+  -- The static pane is sized so that what is left inside it is the height the
+  -- caller asked for, which is not the same for both panes: the one with an
+  -- edge left open gives up nothing on that side.
+  --
+  local sp = cfg.topanchor and tp or bp
+  local hh = (cfg.height or 24) + sp.rings.top + sp.rings.bottom
+
+  tp:ClearAllPoints()
+  bp:ClearAllPoints()
+
   if (cfg.topanchor) then
-    frame.topframe = frame
-    frame.bottomframe = MakeFrame("Frame", nil, parent)
-    frame.bottomframe:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, -6 - (2 * hst.inset))
-    frame.bottomframe:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0 - hst.inset, hst.inset)
+    tp:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    tp:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    tp:SetHeight(hh)
+    bp:SetPoint("TOPLEFT", tp, "BOTTOMLEFT", 0, 0)
+    bp:SetPoint("TOPRIGHT", tp, "BOTTOMRIGHT", 0, 0)
+    bp:SetPoint("BOTTOM", frame, "BOTTOM", 0, 0)
   else
-    frame.bottomframe = frame
-    frame.topframe = MakeFrame("Frame", nil, parent)
-    frame.topframe:SetPoint("TOPLEFT", parent, "TOPLEFT", hst.inset, 0 - hst.inset)
-    frame.topframe:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", 0, 8 + (2 * hst.inset))
+    bp:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+    bp:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+    bp:SetHeight(hh)
+    tp:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    tp:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    tp:SetPoint("BOTTOM", bp, "TOP", 0, 0)
   end
+
+  frame.topinset = tp
+  frame.bottominset = bp
+  frame.topframe = tp.content
+  frame.bottomframe = bp.content
 
   return frame
 end
 
-local function vs_OnSizeChanged(this, w, h)
-  local vst = this.vstextures
-  local ty = h - vst.adjust
-  vst.middle:SetHeight(ty)
-  vst.middle:SetTexCoord(0, 1, 0, ty / 1024.0)
-end
 
+--
+-- Split a frame into two panes, side by side. cfg.width is the usable width
+-- of the static pane and cfg.rightanchor makes that the right hand one.
+--
 function KUI:CreateVSplit(cfg, kparent)
   local frame, parent = newobj(cfg, kparent, 0, 0, cfg.name)
+  local inset = cfg.inset or 0
 
-  frame.vstextures = {}
-  local vst = frame.vstextures
-  vst.inset = cfg.inset or 0
+  unborder_parent(parent)
 
-  frame:SetPoint("TOP", parent, "TOP", 0, 0 - vst.inset)
-  frame:SetPoint("BOTTOM", parent, "BOTTOM", 0, vst.inset)
-  if (cfg.rightanchor) then
-    frame:SetPoint("RIGHT", parent, "RIGHT", 0 - vst.inset, 0)
-  else
-    frame:SetPoint("LEFT", parent, "LEFT", vst.inset, 0)
-  end
-  frame:SetWidth(cfg.width or 24)
-
-  local top = frame:CreateTexture(nil, "ARTWORK")
-  if (cfg.topsplit) then
-    top:SetTexture(texpath .. "VDIV-TopSplit")
-  else
-    top:SetTexture(texpath .. "VDIV-Top")
-  end
-  top:SetWidth(16)
-  top:SetHeight(16)
-  if (cfg.settop) then
-    vst.topshift = cfg.settop(frame, top)
-  else
-    local ts = cfg.topshift or (2 + vst.inset)
-    vst.topshift = ts
-    if (cfg.rightanchor) then
-      local vs = 2 - vst.inset
-      top:SetPoint("TOPRIGHT", frame, "TOPLEFT", vs, ts)
-    else
-      local vs = -4 + vst.inset
-      top:SetPoint("TOPLEFT", frame, "TOPRIGHT", vs, ts)
-    end
-  end
-  vst.top = top
-
-  local bottom = frame:CreateTexture(nil, "ARTWORK")
-  if (cfg.bottomsplit) then
-    bottom:SetTexture(texpath .. "VDIV-BotSplit")
-  else
-    bottom:SetTexture(texpath .. "VDIV-Bot")
-  end
-  bottom:SetWidth(16)
-  bottom:SetHeight(16)
-  if (cfg.setbottom) then
-    vst.bottomshift = cfg.setbottom(frame, bottom)
-  else
-    local bs = cfg.bottomshift or (-10 - vst.inset)
-    vst.bottomshift = bs
-    if (cfg.rightanchor) then
-      local ls = 2 - vst.inset
-      bottom:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", ls, bs)
-    else
-      local ls = -4 + vst.inset
-      bottom:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", ls, bs)
-    end
-  end
-  vst.bottom = bottom
-
-  local middle = frame:CreateTexture(nil, "ARTWORK")
-  middle:SetTexture(texpath .. "VDIV-Mid")
-  middle:SetWidth(16)
-  if (cfg.setmiddle) then
-    vst.midshift = cfg.setmiddle(frame, middle)
-  else
-    local ms = cfg.midshift or 0
-    middle:SetPoint("TOPLEFT", top, "BOTTOMLEFT", 0, ms)
-    vst.midshift = ms
-  end
-  vst.middle = middle
-
-  if (cfg.resizeadjust ~= nil) then
-    vst.adjust = cfg.resizeadjust
-  else
-    vst.adjust = vst.bottomshift + vst.topshift + 28 - (vst.inset * 2)
-  end
-
-  frame:HookScript("OnSizeChanged", vs_OnSizeChanged)
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPLEFT", parent, "TOPLEFT", inset, 0 - inset)
+  frame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0 - inset, inset)
 
   --
-  -- Set two frame pointers for the two halves
+  -- As for the horizontal split: the outer sides are handed to whichever
+  -- pane owns them, and the two facing the gutter always draw.
   --
+  local ea = inset_edges(cfg.inset_art)
+
+  local lp = self:CreateInset({ padding = cfg.padding,
+    inner_padding = cfg.inner_padding,
+    inset_art = { left = ea.left, top = ea.top, bottom = ea.bottom } }, frame)
+  local rp = self:CreateInset({ padding = cfg.padding,
+    inner_padding = cfg.inner_padding,
+    inset_art = { right = ea.right, top = ea.top, bottom = ea.bottom } },
+    frame)
+
+  local sp = cfg.rightanchor and rp or lp
+  local ww = (cfg.width or 24) + sp.rings.left + sp.rings.right
+
+  lp:ClearAllPoints()
+  rp:ClearAllPoints()
+
   if (cfg.rightanchor) then
-    frame.rightframe = frame
-    frame.leftframe = MakeFrame("Frame", nil, parent)
-    frame.leftframe:SetPoint("TOPLEFT", parent, "TOPLEFT", vst.inset, 0 - vst.inset)
-    frame.leftframe:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", -10 - (2 * vst.inset), 0)
+    rp:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    rp:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+    rp:SetWidth(ww)
+    lp:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    lp:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+    lp:SetPoint("RIGHT", rp, "LEFT", 0, 0)
   else
-    frame.leftframe = frame
-    frame.rightframe = MakeFrame("Frame", nil, parent)
-    frame.rightframe:SetPoint("TOPLEFT", frame, "TOPRIGHT", 8 + (2 * vst.inset), 0)
-    frame.rightframe:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0 -vst.inset, vst.inset)
+    lp:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    lp:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+    lp:SetWidth(ww)
+    rp:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    rp:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+    rp:SetPoint("LEFT", lp, "RIGHT", 0, 0)
   end
+
+  frame.leftinset = lp
+  frame.rightinset = rp
+  frame.leftframe = lp.content
+  frame.rightframe = rp.content
 
   return frame
 end
+
 
 --
 -- Helper function called when we stop resizing a frame.
@@ -1069,6 +1233,12 @@ function KUI:CreateDialogFrame(cfg, kparent)
     cancel:SetText(cfg.cancelbutton.text or K.CANCEL_STR)
     addheight = max(addheight, cancel:GetHeight())
 
+    --
+    -- Kept so that a caller can move the pair. The OK button hangs off the
+    -- cancel button, so re-anchoring this one moves both.
+    --
+    frame.cancelbutton = cancel
+
     rightmost = cancel
     rightpoint = "BOTTOMLEFT"
     xoffs = -5
@@ -1085,6 +1255,8 @@ function KUI:CreateDialogFrame(cfg, kparent)
     ok:SetWidth(cfg.okbutton.width or 100)
     ok:SetText(cfg.okbutton.text or K.OK_STR)
     addheight = max(addheight, ok:GetHeight())
+
+    frame.okbutton = ok
 
     rightmost = ok
     rightpoint = "BOTTOMLEFT"
@@ -1117,9 +1289,20 @@ function KUI:CreateDialogFrame(cfg, kparent)
   end
 
   local content = MakeFrame("Frame", nil, frame)
+  --
+  -- The border offset clears the artwork and nothing more, so content placed
+  -- at 0,0 sits hard against it. cfg.padding is kept inside that, for a dialog
+  -- that would rather its widgets looked placed than jammed into the corner.
+  -- It is none unless asked for: every dialog written before this one is laid
+  -- out in its own coordinates and would move under it.
+  --
+  local pad = padding_sides(cfg.padding, 0)
+
   frame.content = content
-  content:SetPoint("TOPLEFT", frame, "TOPLEFT", offset, -(offset+topheight))
-  content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -offset, offset+addheight)
+  content:SetPoint("TOPLEFT", frame, "TOPLEFT", offset + pad.left,
+    0 - (offset + topheight + pad.top))
+  content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT",
+    0 - (offset + pad.right), offset + addheight + pad.bottom)
 
   if (cfg.escclose) then
     add_escclose(fname)
@@ -1816,7 +1999,7 @@ function KUI:CreateSlider(cfg, kparent)
   frame.step = cfg.step or 1
 
   local sliderbg = {
-    bfFile = "Interface/Buttons/UI-SliderBar-Background",
+    bgFile = "Interface/Buttons/UI-SliderBar-Background",
     edgeFile = "Interface/Buttons/UI-SliderBar-Border",
     tile = true,
     tileSize = 8,
@@ -1827,14 +2010,26 @@ function KUI:CreateSlider(cfg, kparent)
     frame:SetBackdrop(sliderbg)
     frame:SetThumbTexture("Interface/Buttons/UI-SliderBar-Button-Horizontal")
     local tt = frame:GetThumbTexture()
-    tt:SetHeight(height+8)
+    --
+    -- Size both dimensions here, even though SetThumbTexture has already
+    -- given the texture its natural 32 wide. Setting the size explicitly at
+    -- this point is what makes the engine place the thumb correctly straight
+    -- away; left to resolve it later, a fresh slider draws its thumb adrift
+    -- and only corrects itself once something drags it.
+    --
+    -- The width stays at the natural 32. A slider's thumb travel is inset by
+    -- half the thumb's width at each end, so the knob stops short of both
+    -- stops -- but that is how Blizzard's own sliders behave and narrowing
+    -- the thumb to close the gap only squashes the artwork.
+    --
+    tt:SetSize(32, height + 8)
   else
     sliderbg.insets.top = 3
     sliderbg.insets.bottom = 3
     frame:SetBackdrop(sliderbg)
     frame:SetThumbTexture("Interface/Buttons/UI-SliderBar-Button-Vertical")
     local tt = frame:GetThumbTexture()
-    tt:SetWidth(width+8)
+    tt:SetSize(width + 8, 32)
   end
 
   -- The min and max labels
@@ -1958,6 +2153,142 @@ function KUI:CreateButton(cfg, kparent)
   local fs = frame:GetFontString()
   fs:SetWidth(width - 6)
   fs:SetHeight(height - 6)
+
+  frame:SetEnabled(cfg.enabled)
+  return frame
+end
+
+--
+-- A button whose face is a picture rather than a word: an icon, a card, one
+-- cell of a sprite sheet. UIPanelButtonTemplate is a plate with a caption cut
+-- into it and is no use for any of those, so this one carries no template at
+-- all and draws what it is given.
+--
+-- The picture fills the button. Nothing here scales it or preserves its
+-- shape -- the caller sets the size, and a caller who cares about the aspect
+-- ratio works it out, because only the caller knows which of the two
+-- dimensions it is fitting into.
+--
+local function ib_OnEnable(this, onoff)
+  --
+  -- A picture cannot go grey the way a caption does, so a disabled one is
+  -- desaturated, which is what Blizzard does to an icon that cannot be used.
+  --
+  this.image:SetDesaturated(not onoff)
+end
+
+local function ib_OnMouseDown(this)
+  if (this.enabled == false) then
+    return
+  end
+
+  this.image:SetPoint("TOPLEFT", this, "TOPLEFT", 1, -1)
+  this.image:SetPoint("BOTTOMRIGHT", this, "BOTTOMRIGHT", 1, -1)
+end
+
+local function ib_OnMouseUp(this)
+  this.image:SetPoint("TOPLEFT", this, "TOPLEFT", 0, 0)
+  this.image:SetPoint("BOTTOMRIGHT", this, "BOTTOMRIGHT", 0, 0)
+end
+
+local function ib_SetTexture(this, texture, texcoord)
+  if (texture) then
+    this.image:SetTexture(texture)
+  end
+
+  local tc = texcoord
+
+  if (tc) then
+    this.image:SetTexCoord(tc[1] or 0, tc[2] or 1, tc[3] or 0, tc[4] or 1)
+  else
+    this.image:SetTexCoord(0, 1, 0, 1)
+  end
+end
+
+local function ib_SetSelected(this, onoff)
+  this.selected = onoff and true or false
+
+  if (this.outline) then
+    this.outline:SetShown(this.selected)
+  end
+end
+
+function KUI:CreateImageButton(cfg, kparent)
+  local frame, parent, width, height =
+    newobj(cfg, kparent, 32, 32, cfg.name, "Button")
+
+  --
+  -- Drawn behind the picture and larger than it, so that what shows is a rim
+  -- around the outside. A button that is never selected does not ask for one
+  -- and does not get the texture.
+  --
+  if (cfg.outline) then
+    local ow = cfg.outlinesize or 2
+    local ol = frame:CreateTexture(nil, "BACKGROUND")
+
+    ol:SetPoint("TOPLEFT", frame, "TOPLEFT", 0 - ow, ow)
+    ol:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", ow, 0 - ow)
+    ol:SetTexture("Interface\\Buttons\\WHITE8X8")
+    ol:SetVertexColor(cfg.outline.r or 1, cfg.outline.g or 1,
+      cfg.outline.b or 1, cfg.outline.a or 1)
+    ol:Hide()
+    frame.outline = ol
+  end
+
+  local image = frame:CreateTexture(nil, "ARTWORK")
+  image:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+  image:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+  frame.image = image
+
+  --
+  -- A caption over the picture, for a button whose picture does not say
+  -- enough by itself or has not been drawn yet. Made either way, because a
+  -- caller that reuses one button for several things may want it later.
+  --
+  local fs = frame:CreateFontString(nil, "OVERLAY",
+    cfg.font or "GameFontNormal")
+  fs:SetPoint("TOPLEFT", frame, "TOPLEFT", cfg.textx or 10,
+    0 - (cfg.texty or 10))
+  fs:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0 - (cfg.textx or 10),
+    0 - (cfg.texty or 10))
+  fs:SetJustifyH(cfg.justifyh or "LEFT")
+  frame:SetFontString(fs)
+
+  if (cfg.highlight ~= false) then
+    frame:SetHighlightTexture(cfg.highlight or
+      "Interface/QuestFrame/UI-QuestTitleHighlight", "ADD")
+  end
+
+  frame.SetTexture = ib_SetTexture
+  frame.SetSelected = ib_SetSelected
+  frame.OnEnable = ib_OnEnable
+  frame.OnEnter = tip_OnEnter
+  frame.OnLeave = tip_OnLeave
+
+  frame:SetTexture(cfg.texture, cfg.texcoord)
+
+  if (cfg.color) then
+    image:SetVertexColor(cfg.color.r or 1, cfg.color.g or 1, cfg.color.b or 1,
+      cfg.color.a or 1)
+  end
+
+  frame:SetText(cfg.text or "")
+  check_tooltip_title(frame, cfg, cfg.text)
+
+  if (cfg.push ~= false) then
+    frame:HookScript("OnMouseDown", ib_OnMouseDown)
+    frame:HookScript("OnMouseUp", ib_OnMouseUp)
+  end
+
+  if (cfg.hook) then
+    frame:HookScript("OnClick", function(this, ...)
+      this:Throw("OnClick", ...)
+    end)
+  else
+    frame:SetScript("OnClick", function(this, ...)
+      this:Throw("OnClick", ...)
+    end)
+  end
 
   frame:SetEnabled(cfg.enabled)
   return frame
@@ -2791,8 +3122,15 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   -- pointer using ret.tabs[id].content.
   --
   frame.content = MakeFrame("Frame", fname .. "Content", frame)
-  frame.content:SetPoint("TOPLEFT", frame, "TOPLEFT", 22, -75)
-  frame.content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 12)
+  --
+  -- Clear of the frame's own artwork, which is 32 wide down the sides and 16
+  -- along the bottom. Content used to start inside that, which was harmless
+  -- while a page drew flat dividers cut to tuck under the border, but a
+  -- recessed panel put there lands its border on top of the frame's and reads
+  -- as a doubled edge.
+  --
+  frame.content:SetPoint("TOPLEFT", frame, "TOPLEFT", 34, -75)
+  frame.content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -34, 18)
   frame.topbar = MakeFrame("Frame", fname .. "TopBar", frame)
   frame.topbar:SetPoint("TOPLEFT", frame, "TOPLEFT", 75, -36)
   frame.topbar:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -12, -68)
@@ -2966,12 +3304,41 @@ local function sl_setrem_highlight(objp, onoff)
   end
 end
 
+--
+-- How many visual elements a list needs. A list that scrolls by whole items
+-- needs only as many as fit; one that scrolls smoothly needs one more, because
+-- at every position but the top there is a part of an item showing at each end.
+--
+local function sl_slotcount(objp)
+  local n = floor(objp:GetHeight() / objp.itemheight)
+
+  if (objp.smoothscroll) then
+    n = n + 1
+  end
+
+  return n
+end
+
 local function sl_vertscroll(objp, offset)
   sl_setrem_highlight(objp, false)
   local sb = objp.scrollbar
   local sel = objp.selecteditem
-  objp.visibleslots = floor(objp:GetHeight() / objp.itemheight)
-  local maxoffs = (objp.itemcount - objp.visibleslots) * objp.itemheight
+  objp.visibleslots = sl_slotcount(objp)
+
+  --
+  -- Scrolling by whole items stops when the last item is in the bottom slot;
+  -- scrolling smoothly stops when the bottom of the last item reaches the
+  -- bottom of the list, which is a little further and is what lets the final
+  -- part item be brought fully into view.
+  --
+  local maxoffs
+
+  if (objp.smoothscroll) then
+    maxoffs = (objp.itemcount * objp.itemheight) - objp:GetHeight()
+  else
+    maxoffs = (objp.itemcount - objp.visibleslots) * objp.itemheight
+  end
+
   maxoffs = max(maxoffs, 0)
 
   if (offset ~= nil) then
@@ -2981,12 +3348,29 @@ local function sl_vertscroll(objp, offset)
       offset = maxoffs
     end
     sb:SetValue(offset)
-    objp.offset = floor((offset / objp.itemheight) + 0.5)
+
+    --
+    -- The item offset is which item is at the top. Scrolling smoothly keeps
+    -- the leftover pixels as well, and the slots are shifted up by that much
+    -- so the top item is cut off rather than snapped away.
+    --
+    if (objp.smoothscroll) then
+      objp.offset = floor(offset / objp.itemheight)
+      objp.pixeloffset = offset - (objp.offset * objp.itemheight)
+    else
+      objp.offset = floor((offset / objp.itemheight) + 0.5)
+    end
   end
 
-  if (objp.itemcount <= objp.visibleslots) then
+  if (maxoffs <= 0) then
     objp.offset = 0
+    objp.pixeloffset = 0
     sb:SetValue(0)
+  end
+
+  if (objp.smoothscroll and objp.slots[1]) then
+    objp.slots[1]:SetPoint("TOPLEFT", objp, "TOPLEFT", 0,
+      objp.pixeloffset or 0)
   end
 
   for i = 1, objp.visibleslots do
@@ -3014,7 +3398,7 @@ local function sl_vertscroll(objp, offset)
     end
 
     sb:SetMinMaxValues(0, maxoffs)
-    sb:SetValueStep(objp.itemheight)
+    sb:SetValueStep(objp.smoothscroll and 1 or objp.itemheight)
     objp.content:SetHeight(sch)
 
     if (objp.offset > maxoffs) then
@@ -3040,7 +3424,7 @@ local function sl_updatevals(objp)
   sl_setrem_highlight(objp, false)
   local dispheight = objp:GetHeight()
   local fullheight = objp.content:GetHeight()
-  local numvisible = floor(dispheight / objp.itemheight)
+  local numvisible = sl_slotcount(objp)
   local desiredheight = objp.itemcount * objp.itemheight
   local rslot = nil
   local rbtn = nil
@@ -3077,7 +3461,21 @@ local function sl_updatevals(objp)
 
   objp.content:SetHeight(desiredheight)
   objp.visibleslots = numvisible
-  if (numvisible < objp.itemcount) then
+
+  --
+  -- Scrolling smoothly has a slot more than fits, so counting slots would say
+  -- there is nothing to scroll while the last item is still half off the
+  -- bottom. What matters is whether the items are taller than the list.
+  --
+  local needbar
+
+  if (objp.smoothscroll) then
+    needbar = desiredheight > dispheight
+  else
+    needbar = numvisible < objp.itemcount
+  end
+
+  if (needbar) then
     objp.scrollbar:Show()
     objp.scrollbar:SetValue(objp.scrollbar:GetValue() or 0)
   else
@@ -3203,8 +3601,13 @@ function KUI:CreateScrollList(cfg, kparent)
   frame.offset = 0
   frame.content = content
 
+  --
+  -- Held one clear of the left edge so that a selected row's highlight does
+  -- not sit flush against whatever the list is inside. Twenty is reserved on
+  -- the right for the scrollbar, which lives in that strip.
+  --
   frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+  frame:SetPoint("TOPLEFT", parent, "TOPLEFT", 1, 0)
   frame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -20, 0)
   frame:SetScrollChild(content)
   frame:EnableMouseWheel(true)
@@ -3227,17 +3630,30 @@ function KUI:CreateScrollList(cfg, kparent)
   frame.setitem = cfg.setitem
   frame.selectitem = cfg.selectitem
   frame.highlightitem = cfg.highlightitem
+  frame.smoothscroll = cfg.smoothscroll and true or false
   frame.slots = {}
   frame.numslots = 0
   frame.visibleslots = 0
   frame.itemcount = 0
+  frame.pixeloffset = 0
 
+  --
+  -- Half the bar's height is half a page, which reads as a page turn on a list
+  -- of text rows. A list that scrolls smoothly is one whose items are big, so
+  -- a notch there moves half an item and the movement can be seen.
+  --
   frame:HookScript("OnMouseWheel", function(self, delta)
     local sb = self.scrollbar
+    local step = sb:GetHeight() / 2
+
+    if (self.smoothscroll) then
+      step = self.itemheight / 2
+    end
+
     if (delta > 0) then
-      sb:SetValue(sb:GetValue() - (sb:GetHeight() / 2))
+      sb:SetValue(sb:GetValue() - step)
     else
-      sb:SetValue(sb:GetValue() + (sb:GetHeight() / 2))
+      sb:SetValue(sb:GetValue() + step)
     end
   end)
 
