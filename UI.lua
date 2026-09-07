@@ -86,6 +86,18 @@ local function safecall(func, ...)
   end
 end
 
+--
+-- The ground a window is filled with: a stippled grey-brown tile, and one of
+-- the few pieces of KoreUI's own artwork that earns its place. The stock
+-- dialog grounds are not a substitute -- they do not cover on their own, and
+-- a window using one shows the world through itself.
+--
+-- A tabbed dialog draws it untinted, which is where the stipple comes from.
+-- A plain dialog paints it black, which is why what tile it names looks like
+-- it makes no difference there.
+--
+local WINDOW_BG = texpath .. "TDF-Fill"
+
 local borders = {
   { -- Thin
     bgFile = "Interface/Tooltips/UI-Tooltip-Background",
@@ -228,6 +240,23 @@ function KUI:MeasureStrWidth(str, font)
   self.strwidth:SetText(str or "")
   local w, h = self.strwidth:GetStringWidth(), self.strwidth:GetStringHeight()
   return w+4,h
+end
+
+--
+-- The dwidth a dropdown needs to hold the longest of the things it can show,
+-- without eliding any of them and without the guessed round number that is
+-- otherwise always either too wide or, in some locale nobody tested, too
+-- narrow.
+--
+-- It has to be asked for rather than worked out inside CreateDropDown,
+-- because plenty of dropdowns are made empty and filled in later -- a config
+-- selector knows nothing at all when it is built -- and one of those would
+-- size itself to nothing. A caller that knows the whole set up front, which
+-- is any dropdown over a fixed vocabulary, can use this.
+--
+function KUI:DropDownWidth(strings, font)
+  return self:WidestString(strings, font or "GameFontHighlightSmall")
+    + KUI.DROPDOWN_CHROME
 end
 
 --
@@ -661,6 +690,31 @@ local INSET_BACKDROP = {
 KUI.INSET_BORDER = 4
 KUI.INSET_PADDING = 4
 KUI.INSET_INNER_PADDING = 2
+
+--
+-- The space between one widget and the next. A panel laying out a column
+-- walks down it with
+--
+--   ypos = ypos - widget:GetHeight() - KUI.WIDGET_GAP
+--
+-- and that is the whole of it: no per-panel constant, and nothing that has to
+-- know what kind of widget it just placed. That works only because a widget's
+-- frame is the size of the box it draws -- an edit box is 20 because
+-- InputBoxTemplate draws 20, a dropdown is 24 because its artwork is opaque
+-- for 24. A frame with dead space in it forces every caller to correct for it
+-- by eye, and then the gaps down a column are even in the source and uneven on
+-- the screen.
+--
+-- So: if a layout needs a number that is not this one, the widget is lying
+-- about its size. Fix the widget.
+--
+KUI.WIDGET_GAP = 4
+
+--
+-- What a dropdown costs beyond the words in it: the inset before the text and
+-- the arrow button after it, matching where CreateDropDown anchors its text.
+--
+KUI.DROPDOWN_CHROME = 12 + 26
 
 --
 -- Either ring is a single number for all four sides, or a table naming any
@@ -1400,14 +1454,14 @@ function KUI:CreateDialogFrame(cfg, kparent)
     bdrop.bgFile = borders[bstyle].bgFile
     bdrop.edgeFile = borders[bstyle].edgeFile
     bdrop.tileSize = borders[bstyle].tileSize
-    bdrop.edgeSize = borders[bstyle].edgesize
+    bdrop.edgeSize = borders[bstyle].edgeSize
     bdrop.insets = borders[bstyle].insets
     offset = borders[bstyle].offset
     bdrop.tile = true
   end
 
   if (cfg.blackbg) then
-    bdrop.bgFile = texpath .. "TDF-Fill"
+    bdrop.bgFile = WINDOW_BG
     bdrop.tile = true
   end
 
@@ -1596,13 +1650,20 @@ local function sl_SetText(this, text)
   this.label:SetText(text)
 end
 
+--
+-- A bordered label is bigger than the words in it by the backdrop's own
+-- declared insets, and by nothing else. Asked of cfbackdrop rather than
+-- written down, so that the frame, the padding and the autosize allowance
+-- cannot drift apart from each other or from the artwork.
+--
+local function sl_inset(cfg)
+  return cfg.border and cfbackdrop.insets.left or 0
+end
+
 function KUI:CreateStringLabel(cfg, kparent)
-  local dw = 200
-  local dh = 16
-  if (cfg.border) then
-    dw = 216
-    dh = 24
-  end
+  local bi = sl_inset(cfg)
+  local dw = 200 + (bi * 2)
+  local dh = 16 + (bi * 2)
   local frame,parent,width,height = newobj(cfg, kparent, dw, dh, cfg.name)
   frame.font = cfg.font or "GameFontHighlightSmall"
   local label = frame:CreateFontString(nil, "ARTWORK", frame.font)
@@ -1620,7 +1681,6 @@ function KUI:CreateStringLabel(cfg, kparent)
     frame.rgb = { r = cfg.color.r, g = cfg.color.g, b = cfg.color.b, a = cfg.color.a or 1 }
   end
 
-  local adj = 0
   if (cfg.border) then
     frame:SetBackdrop(cfbackdrop)
     frame:SetBackdropColor(0, 0, 0, 0)
@@ -1630,15 +1690,17 @@ function KUI:CreateStringLabel(cfg, kparent)
     else
       frame:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
     end
-    frame.xtrawidth = 16
-    frame.xtraheight = 12
-    adj = 2
-  else
-    frame.xtrawidth = 0
-    frame.xtraheight = 0
   end
-  label:SetPoint("TOPLEFT", frame, "TOPLEFT", (frame.xtrawidth/4)+adj, frame.xtraheight/-4)
-  label:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", (frame.xtrawidth/-4)-adj, frame.xtraheight/4)
+
+  --
+  -- How much wider and taller the frame is than the words, which is what
+  -- sl_SetText grows it by when it is asked to fit itself to new text.
+  --
+  frame.xtrawidth = bi * 2
+  frame.xtraheight = bi * 2
+
+  label:SetPoint("TOPLEFT", frame, "TOPLEFT", bi, 0 - bi)
+  label:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0 - bi, bi)
 
   frame.SetText = sl_SetText
   frame.SetTextColor = sl_SetTextColor
@@ -1773,6 +1835,20 @@ function KUI:CreateEditBox(cfg, kparent)
         frame:SetPoint("TOP", ppf, "CENTER", 0, (height + lh) / 2)
       end
     else -- Assume LEFT
+      --
+      -- Four further out than a dropdown places its label, because
+      -- InputBoxTemplate draws its left hand end five pixels outside the
+      -- frame wearing it -- measured, not guessed: a frame at 681.2 has its
+      -- leftmost texture at 676.2. The frame is set that much further right
+      -- so that the box you SEE starts where the label geometry says, and an
+      -- edit box lines up with a dropdown under it.
+      --
+      -- This does mean an edit box's frame is not where its artwork is. That
+      -- is Blizzard's template and not ours to re-anchor, and it costs
+      -- nothing here: columns are laid out by GetHeight, and nothing lays out
+      -- a row by GetWidth. If anything ever does, this is the first thing to
+      -- look at.
+      --
       label:SetPoint("TOPRIGHT", frame, "TOPLEFT", -8, 0)
       if (cfg.x) then
         if (cfg.x ~= "CENTER") then
@@ -3275,15 +3351,6 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   frame:SetFrameStrata(cfg.strata or "FULLSCREEN_DIALOG")
   frame:Hide()
 
-  frame.texs = {}
-
-  --
-  -- The one title in the toolkit that is not a plate: the TDF border draws a
-  -- title bar of its own and this is the words written on it. It takes the
-  -- same title table all the same, so that a caller never has to remember
-  -- which widget wants which shape. Only text and font mean anything here --
-  -- there is no plate to give a style or a size to.
-  --
   local tspec = cfg.title
 
   if (type(tspec) ~= "table") then
@@ -3293,12 +3360,24 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   frame.maintitle = tspec.text or ""
   frame.onclick = cfg.onclick
 
+  frame.texs = {}
+
   local it = frame:CreateTexture(nil, "BACKGROUND")
   it:SetTexture(cfg.tltexture or "Interface/FriendsFrame/FriendsFrameScrollIcon")
   it:SetWidth(60)
   it:SetHeight(60)
   it:SetPoint("TOPLEFT", frame, "TOPLEFT", 7, -6)
 
+  --
+  -- This window's own border, and the one piece of KoreUI artwork that is
+  -- here on purpose rather than by inheritance. No stock border has the
+  -- circular cutout the addon's logo sits in, and none of them carry the
+  -- stippled band the title and the tab strip stand on. A plain border plus
+  -- a title plate is not the same window.
+  --
+  -- The corner is 128 square, which is why the tab strip starts 75 in: to the
+  -- right of the circle rather than flush with the frame.
+  --
   local tl = frame:CreateTexture(nil, "ARTWORK")
   tl:SetTexture(texpath .. "TDF-TopLeft")
   tl:SetWidth(128)
@@ -3331,7 +3410,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   br:SetWidth(32)
   br:SetHeight(16)
   br:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
-  frame.texs.bl = br
+  frame.texs.br = br
 
   local bc = frame:CreateTexture(nil, "ARTWORK")
   bc:SetTexture(texpath .. "TDF-Bot")
@@ -3352,7 +3431,7 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   frame.texs.rs = rs
 
   local bdrop = {
-    bgFile = texpath .. "TDF-Fill",
+    bgFile = WINDOW_BG,
     tile = true,
     tileSize = 32,
     insets = { left = 32, top = 128, right = 32, bottom = 16 }
@@ -3365,6 +3444,12 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   xbutton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 4, -8)
   xbutton:SetScript("OnClick", xbutton_OnClick)
 
+  --
+  -- The same title plate a dialog wears, and the same drag handle. The words
+  -- on it change as pages and tabs are selected, so it is made empty and
+  -- given a width: a plate that measured itself would change size every time
+  -- the user pressed a page button.
+  --
   local tframe = MakeFrame("Frame", nil, frame)
   tframe:EnableMouse(true)
   tframe:SetPoint("TOPLEFT", frame, "TOPLEFT", 80, -16)
@@ -3405,13 +3490,6 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   -- pointer using ret.tabs[id].content.
   --
   frame.content = MakeFrame("Frame", fname .. "Content", frame)
-  --
-  -- Clear of the frame's own artwork, which is 32 wide down the sides and 16
-  -- along the bottom. Content used to start inside that, which was harmless
-  -- while a page drew flat dividers cut to tuck under the border, but a
-  -- recessed panel put there lands its border on top of the frame's and reads
-  -- as a doubled edge.
-  --
   frame.content:SetPoint("TOPLEFT", frame, "TOPLEFT", 34, -75)
   frame.content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -34, 18)
   frame.topbar = MakeFrame("Frame", fname .. "TopBar", frame)
@@ -5435,10 +5513,19 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
       else -- Assume TOP
         label:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 0)
         if (cfg.y) then
+          --
+          -- The label sits above the widget, so the pair of them is what has
+          -- to be centred or placed: the widget goes half the difference
+          -- below the centre, and cfg.y is where the label starts rather than
+          -- where the widget does. Both are asked of the label rather than
+          -- assumed, which is what CreateEditBox does with the same case.
+          --
+          local lh = label:GetHeight()
+
           if (cfg.y == "MIDDLE") then
-            frame:SetPoint("MIDDLE", ppf, "MIDDLE", 0, -8)
+            frame:SetPoint("TOP", ppf, "CENTER", 0, (frame:GetHeight() - lh) / 2)
           else
-            frame:SetPoint("TOP", ppf, "TOP", 0, cfg.y - 16)
+            frame:SetPoint("TOP", ppf, "TOP", 0, cfg.y - lh)
           end
         end
       end
@@ -5619,14 +5706,6 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     sframe.toplevel = frame.toplevel
     sframe:HookScript("OnEnter", tl_OnEnter)
     sframe:HookScript("OnLeave", tl_OnLeave)
-    -- JKJ FIXME - is this really needed?
-    local bdrop = {
-      bgFile = KUI.TEXTURE_PATH .. "TDF-Fill",
-      tile = true,
-      tileSize = 32,
-      insets = { left = 0, right = 0, top = 0, bottom = 0 }
-    }
-    sframe:SetBackdrop(bdrop)
   end
 
   if (not frame.cframe) then

@@ -202,6 +202,35 @@ width, str = KUI:WidestString (strings, font)
   is the longest is a question about the locale, and a width that lines up
   perfectly in one language is crooked in the next.
 
+width = KUI:DropDownWidth (strings, font)
+  The dwidth a dropdown needs to hold the longest of the things it can show:
+  KUI:WidestString plus KUI.DROPDOWN_CHROME, which is the inset before the
+  text and the arrow button after it. Font defaults to GameFontHighlightSmall,
+  which is what a dropdown draws its value in.
+
+  Use it instead of picking a round number, which is always either too wide or,
+  in some locale nobody tested, too narrow. CreateDropDown cannot do this for
+  itself: plenty of dropdowns are made empty and filled in later - a config
+  selector knows nothing when it is built - and one of those would size itself
+  to nothing. A caller that knows the whole vocabulary up front can use this.
+
+KUI.WIDGET_GAP
+  The space between one widget and the next, and the only spacing number a
+  panel should need. Walk down a column with
+
+    local ypos = 0
+    ... first widget at y = ypos ...
+    ypos = ypos - first:GetHeight() - KUI.WIDGET_GAP
+    ... second widget at y = ypos ...
+
+  and nothing has to know what kind of widget it just placed.
+
+  That works because a widget's frame is the size of the box it draws - an
+  edit box is 20 tall because InputBoxTemplate draws 20, a dropdown is 24
+  because its artwork is opaque for 24. If a column needs some number other
+  than this one to look even, the widget is lying about its size. Fix the
+  widget, not the panel.
+
 r, g, b, a = KUI.GetFontColor (font)
 rgbtable = KUI.GetFontColor (font, true)
   Returns the default colors for the given font, either as a set of
