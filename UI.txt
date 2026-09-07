@@ -1413,6 +1413,27 @@ cfg.inset_art [boolean or table]
   right go to both. The two edges facing each other are interior and always
   draw.
 
+cfg.toppadding [number or table]
+cfg.bottompadding [number or table]
+  cfg.padding for one pane only, in the same form and falling back to it. Use
+  this to nudge a panel within the space it was given: dropping a pane's top
+  padding moves the panel it draws up by that much, and because the pane's
+  FRAME does not move, the pane beside it stays exactly where it is.
+  Re-anchoring a pane afterwards would drag its neighbour along with it.
+
+  Remember that a table names the sides it wants and everything left out is
+  zero, so give all four when you only mean to change one.
+
+cfg.topborder [boolean]
+cfg.bottomborder [boolean]
+  Set either to false and that pane is a container rather than a panel: no
+  artwork and all three rings at zero, so what you put in it starts at the
+  pane's own edge. Use this where only one half of a split wants framing - a
+  page of plain options above a panel of buttons, say.
+
+  This is the same state ret.topinset:SetBorderShown(false) reaches, said when
+  the pane is built instead of undone afterwards.
+
 cfg.toptitle [string or table]
 cfg.bottomtitle [string or table]
   Title one or both panes. A pane is a panel, so this is exactly cfg.title as
@@ -1460,6 +1481,15 @@ cfg.inset_art [boolean or table]
   As for the horizontal split above: left belongs to the left pane, right to
   the right one, and top and bottom go to both. The two edges facing each
   other are interior and always draw.
+
+cfg.leftpadding [number or table]
+cfg.rightpadding [number or table]
+  As cfg.toppadding above: cfg.padding for one pane only.
+
+cfg.leftborder [boolean]
+cfg.rightborder [boolean]
+  As cfg.topborder above: false makes that pane a container rather than a
+  panel.
 
 cfg.lefttitle [string or table]
 cfg.righttitle [string or table]

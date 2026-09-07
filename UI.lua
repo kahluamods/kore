@@ -709,6 +709,13 @@ KUI.WIDGET_GAP = 4
 KUI.DROPDOWN_CHROME = 12 + 26
 
 --
+-- The box a checkbox draws, which its label starts to the right of. A caller
+-- laying checkboxes out in columns needs this to know what one costs beyond
+-- the words in it.
+--
+KUI.CHECKBOX_SIZE = 24
+
+--
 -- Either ring is a single number for all four sides, or a table naming any
 -- of left, right, top and bottom with anything left out taken as none. Left
 -- out altogether the ring is the framework default.
@@ -1156,6 +1163,21 @@ end
 -- cfg.titleSomething keys: it can be passed along untouched by anything that
 -- builds a panel on somebody else's behalf.
 --
+-- A pane told not to draw a border is a container instead of a panel: all
+-- three rings at zero, so what is put in it starts at the pane's own edge.
+-- That is the same state SetBorderShown(false) reaches, said when the pane is
+-- built rather than undone afterwards.
+--
+local function pane_border(arg, border)
+  if (border == false) then
+    arg.inset_art = false
+    arg.padding = 0
+    arg.inner_padding = 0
+  end
+
+  return arg
+end
+
 
 --
 -- Split a frame into two panes, one above the other.
@@ -1187,13 +1209,13 @@ function KUI:CreateHSplit(cfg, kparent)
   --
   local ea = inset_edges(cfg.inset_art)
 
-  local tp = self:CreateInset({ padding = cfg.padding,
-    inner_padding = cfg.inner_padding, title = cfg.toptitle,
-    inset_art = { left = ea.left, right = ea.right, top = ea.top } }, frame)
-  local bp = self:CreateInset({ padding = cfg.padding,
-    inner_padding = cfg.inner_padding, title = cfg.bottomtitle,
-    inset_art = { left = ea.left, right = ea.right, bottom = ea.bottom } },
-    frame)
+  local ta = { padding = cfg.toppadding or cfg.padding, inner_padding = cfg.inner_padding,
+    title = cfg.toptitle, inset_art = { left = ea.left, right = ea.right, top = ea.top } }
+  local ba = { padding = cfg.bottompadding or cfg.padding, inner_padding = cfg.inner_padding,
+    title = cfg.bottomtitle, inset_art = { left = ea.left, right = ea.right, bottom = ea.bottom } }
+
+  local tp = self:CreateInset(pane_border(ta, cfg.topborder), frame)
+  local bp = self:CreateInset(pane_border(ba, cfg.bottomborder), frame)
 
   --
   -- The static pane is sized so that what is left inside it is the height the
@@ -1251,13 +1273,13 @@ function KUI:CreateVSplit(cfg, kparent)
   --
   local ea = inset_edges(cfg.inset_art)
 
-  local lp = self:CreateInset({ padding = cfg.padding,
-    inner_padding = cfg.inner_padding, title = cfg.lefttitle,
-    inset_art = { left = ea.left, top = ea.top, bottom = ea.bottom } }, frame)
-  local rp = self:CreateInset({ padding = cfg.padding,
-    inner_padding = cfg.inner_padding, title = cfg.righttitle,
-    inset_art = { right = ea.right, top = ea.top, bottom = ea.bottom } },
-    frame)
+  local la = { padding = cfg.leftpadding or cfg.padding, inner_padding = cfg.inner_padding,
+    title = cfg.lefttitle, inset_art = { left = ea.left, top = ea.top, bottom = ea.bottom } }
+  local ra = { padding = cfg.rightpadding or cfg.padding, inner_padding = cfg.inner_padding,
+    title = cfg.righttitle, inset_art = { right = ea.right, top = ea.top, bottom = ea.bottom } }
+
+  local lp = self:CreateInset(pane_border(la, cfg.leftborder), frame)
+  local rp = self:CreateInset(pane_border(ra, cfg.rightborder), frame)
 
   local sp = cfg.rightanchor and rp or lp
   local ww = (cfg.width or 24) + sp.rings.left + sp.rings.right
@@ -2026,7 +2048,7 @@ local function cb_SetChecked(self, onoff, nothrow)
 end
 
 function KUI:CreateCheckBox(cfg, kparent)
-  local frame, bg, check = kui_checkradio(cfg, kparent, 24, 24)
+  local frame, bg, check = kui_checkradio(cfg, kparent, KUI.CHECKBOX_SIZE, KUI.CHECKBOX_SIZE)
 
   bg:SetTexture("Interface/Buttons/UI-CheckBox-Up")
   bg:SetTexCoord(0, 1, 0, 1)
