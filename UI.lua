@@ -21,12 +21,6 @@
 ]]
 
 local addonName, addonPrivate = ...
-local texpath
-if (string.lower(addonName) == "kore") then
-  texpath = "Interface\\Addons\\Kore\\Textures\\"
-else
-  texpath = "Interface\\Addons\\" .. addonName .. "\\Kore\\Textures\\"
-end
 
 local KOREUI_MAJOR = "KoreUI"
 local KOREUI_MINOR = 1
@@ -38,7 +32,6 @@ if (not KUI) then
 end
 
 KUI.debug_id = KOREUI_MAJOR
-KUI.TEXTURE_PATH = texpath
 
 local _G = _G
 local tinsert = table.insert
@@ -87,16 +80,15 @@ local function safecall(func, ...)
 end
 
 --
--- The ground a window is filled with: a stippled grey-brown tile, and one of
--- the few pieces of KoreUI's own artwork that earns its place. The stock
--- dialog grounds are not a substitute -- they do not cover on their own, and
--- a window using one shows the world through itself.
+-- What cfg.blackbg fills a window with. It is painted black by the caller, so
+-- all this has to be is a tile that covers -- which the stock dialog grounds
+-- do not do on their own. The custom tile this replaced was 32x32 of pure
+-- black, so a white fill painted black is the same pixels.
 --
--- A tabbed dialog draws it untinted, which is where the stipple comes from.
--- A plain dialog paints it black, which is why what tile it names looks like
--- it makes no difference there.
+-- The stippled rock a tabbed dialog is filled with is not this: that comes
+-- from ButtonFrameTemplate, which brings its own.
 --
-local WINDOW_BG = texpath .. "TDF-Fill"
+local WINDOW_BG = "Interface/Buttons/WHITE8X8"
 
 local borders = {
   { -- Thin
@@ -2656,8 +2648,13 @@ end
 -- it is drawn. Position shifts whenever something is hidden, added or
 -- removed; a name does not, which is the entire point of the distinction.
 --
+--
+-- The pages hang below the window, tucked under its bottom border. There is
+-- not much room to move here: the tab art is drawn to meet that border, so
+-- dropping them any further shows daylight between the two.
+--
 local PAGE_STRIP = {
-  point = "BOTTOMLEFT", x = 15, y = 5, chainx = -16, chainy = 0,
+  point = "BOTTOMLEFT", x = 15, y = 0, chainx = -16, chainy = 0,
   template = "CharacterFrameTabButtonTemplate",
 }
 
@@ -2823,9 +2820,13 @@ local function build_page(frame, cfg)
   pf:Hide()
   pg.frame = pf
 
+  --
+  -- A page's content is the dialog's content, and its top bar the dialog's
+  -- top bar: the same rectangles rather than the same numbers written down
+  -- twice, which is how they came to disagree.
+  --
   local pcf = MakeFrame("Frame", pf:GetName() .. "Content", pf)
-  pcf:SetPoint("TOPLEFT", pf, "TOPLEFT", 22, -75)
-  pcf:SetPoint("BOTTOMRIGHT", pf, "BOTTOMRIGHT", -12, 12)
+  pcf:SetAllPoints(frame.content)
   pcf.pagename = pg.name
   pg.content = pcf
 
@@ -2844,8 +2845,7 @@ local function build_page(frame, cfg)
   end
 
   local ptb = MakeFrame("Frame", pf:GetName() .. "Topbar", pf)
-  ptb:SetPoint("TOPLEFT", pf, "TOPLEFT", 73, -36)
-  ptb:SetPoint("BOTTOMRIGHT", pf, "TOPRIGHT", -12, -68)
+  ptb:SetAllPoints(frame.topbar)
   ptb.pagename = pg.name
   pg.topbar = ptb
 
@@ -3327,24 +3327,74 @@ local function td_RemoveTab(self, pagename, tabname)
   end
 end
 
-local function td_OnSizeChanged(this, w, h)
-  local tx = w-160
-  local ty = h-144
-  local ta = this.texs
-  ta.tc:SetWidth(tx)
-  ta.tc:SetTexCoord(0, tx / 1024.0, 0, 1)
-  ta.bc:SetWidth(tx)
-  ta.bc:SetTexCoord(0, tx / 1024.0, 0, 1)
-  ta.ls:SetHeight(ty)
-  ta.ls:SetTexCoord(0, 1, 0, ty/1024.0)
-  ta.rs:SetHeight(ty)
-  ta.rs:SetTexCoord(0, 1, 0, ty/1024.0)
-  this:Throw("OnSizeChanged", w, h)
-end
+--
+-- A tabbed dialog is Blizzard's PortraitFrameTemplate: the same window the
+-- Social pane is, and the one this addon's own border art was cut from. It
+-- brings the round portrait with its circular mask, the stippled rock ground,
+-- the title band and streaks above it, and tiling borders down every side, so
+-- it resizes -- which the pre-composed panels of a fixed-size stock window
+-- cannot do, and which is why that art had been re-cut by hand.
+--
+-- Not ButtonFrameTemplate, which is this plus a bar along the bottom for a
+-- row of buttons: thirty-two pixels reserved and a three pixel divider drawn
+-- above them. This window's page buttons hang below its bottom edge, so that
+-- bar is a line across nothing.
+--
+-- The geometry is written down in SharedUIPanelTemplates.xml rather than
+-- measured off a screenshot. The sides and the top are the insets Blizzard
+-- gives its own content frame; the bottom is the height of _UI-Frame-Bot,
+-- the border tile itself, there being no button bar to clear.
+--
+-- One off the top of that 60: the tabs stand on the client area, and at the
+-- number Blizzard writes down they leave a hairline of the window's ground
+-- under their feet.
+--
+local TD_INSET = { left = 4, top = 59, right = 6, bottom = 6 }
+
+--
+-- What the portrait takes out of the top left corner, which is what the tab
+-- strip and the title both start clear of. Blizzard's TitleText uses the same
+-- number for the same reason.
+--
+local TD_PORTRAIT = 60
+
+--
+-- How far the black client backing runs past the content: up to meet the
+-- foot of the tab buttons, and down to meet the window's bottom border
+-- without painting over it.
+--
+local TD_BLEED_TOP = 2
+local TD_BLEED_BOT = 2
+
+--
+-- How far the tab strip's frame stands above the content. The tab art is
+-- drawn to meet what it opens on to, so this is what decides whether their
+-- feet sit on the client area or a hair off it.
+--
+local TD_BARGAP = 9
 
 function KUI:CreateTabbedDialog(cfg, kparent)
   local fname = cfg.name or("KUITabbedDlg"..self:GetWidgetNum("tabbeddialog"))
-  local frame, parent, width, height = newobj(cfg, kparent, 512, 512, fname)
+
+  --
+  -- CreateFrame raises on a template it does not know rather than returning
+  -- nil, so the stock one is tried behind a pcall and a plain bordered frame
+  -- stands in where there is none. A flatter window is a great deal better
+  -- than an addon that will not load.
+  --
+  local ok, frame, parent, width, height = pcall(newobj, cfg, kparent, 512, 512, fname, nil, "PortraitFrameTemplate")
+
+  if (not ok) then
+    frame, parent, width, height = newobj(cfg, kparent, 512, 512, fname)
+
+    local bd = borders[2]
+
+    frame:SetBackdrop({ bgFile = bd.bgFile, edgeFile = bd.edgeFile, tile = true, tileSize = bd.tileSize,
+      edgeSize = bd.edgeSize, insets = bd.insets })
+    frame:SetBackdropColor(0, 0, 0, 1)
+  end
+
+  frame.stockframe = ok
 
   frame:SetMovable(cfg.canmove and true or false)
   frame:EnableMouse(true)
@@ -3360,107 +3410,62 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   frame.maintitle = tspec.text or ""
   frame.onclick = cfg.onclick
 
-  frame.texs = {}
+  --
+  -- The addon's logo goes in the portrait the template already draws, where
+  -- the circular mask that comes with it crops it to the ring. Nothing here
+  -- places or sizes it: that is the template's business and it has done it.
+  --
+  if (frame.portrait) then
+    frame.portrait:SetTexture(cfg.tltexture or "Interface/FriendsFrame/FriendsFrameScrollIcon")
+  end
 
-  local it = frame:CreateTexture(nil, "BACKGROUND")
-  it:SetTexture(cfg.tltexture or "Interface/FriendsFrame/FriendsFrameScrollIcon")
-  it:SetWidth(60)
-  it:SetHeight(60)
-  it:SetPoint("TOPLEFT", frame, "TOPLEFT", 7, -6)
 
   --
-  -- This window's own border, and the one piece of KoreUI artwork that is
-  -- here on purpose rather than by inheritance. No stock border has the
-  -- circular cutout the addon's logo sits in, and none of them carry the
-  -- stippled band the title and the tab strip stand on. A plain border plus
-  -- a title plate is not the same window.
+  -- The template's own close button, wired to throw OnClose the way every
+  -- other window here does rather than merely hiding itself.
   --
-  -- The corner is 128 square, which is why the tab strip starts 75 in: to the
-  -- right of the circle rather than flush with the frame.
-  --
-  local tl = frame:CreateTexture(nil, "ARTWORK")
-  tl:SetTexture(texpath .. "TDF-TopLeft")
-  tl:SetWidth(128)
-  tl:SetHeight(128)
-  tl:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-  frame.texs.tl = tl
+  if (frame.CloseButton) then
+    frame.CloseButton:SetScript("OnClick", xbutton_OnClick)
+  else
+    local xbutton = MakeFrame("Button", nil, frame, "UIPanelCloseButton")
+    xbutton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
+    xbutton:SetScript("OnClick", xbutton_OnClick)
+  end
 
-  local tr = frame:CreateTexture(nil, "ARTWORK")
-  tr:SetTexture(texpath .. "TDF-TopRight")
-  tr:SetWidth(32)
-  tr:SetHeight(128)
-  tr:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
-  frame.texs.tr = tr
-
-  local tc = frame:CreateTexture(nil, "ARTWORK")
-  tc:SetTexture(texpath .. "TDF-Top")
-  tc:SetHeight(128)
-  tc:SetPoint("TOPLEFT", tl, "TOPRIGHT", 0, 0)
-  frame.texs.tc = tc
-
-  local bl = frame:CreateTexture(nil, "ARTWORK")
-  bl:SetTexture(texpath .. "TDF-BotLeft")
-  bl:SetWidth(128)
-  bl:SetHeight(16)
-  bl:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
-  frame.texs.bl = bl
-
-  local br = frame:CreateTexture(nil, "ARTWORK")
-  br:SetTexture(texpath .. "TDF-BotRight")
-  br:SetWidth(32)
-  br:SetHeight(16)
-  br:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
-  frame.texs.br = br
-
-  local bc = frame:CreateTexture(nil, "ARTWORK")
-  bc:SetTexture(texpath .. "TDF-Bot")
-  bc:SetHeight(16)
-  bc:SetPoint("TOPLEFT", bl, "TOPRIGHT", 0, 0)
-  frame.texs.bc = bc
-
-  local ls = frame:CreateTexture(nil, "ARTWORK")
-  ls:SetTexture(texpath .. "TDF-Left")
-  ls:SetWidth(32)
-  ls:SetPoint("TOPLEFT", tl, "BOTTOMLEFT", 0, 0)
-  frame.texs.ls = ls
-
-  local rs = frame:CreateTexture(nil, "ARTWORK")
-  rs:SetTexture(texpath .. "TDF-Right")
-  rs:SetWidth(32)
-  rs:SetPoint("TOPLEFT", tr, "BOTTOMLEFT", 0, 0)
-  frame.texs.rs = rs
-
-  local bdrop = {
-    bgFile = WINDOW_BG,
-    tile = true,
-    tileSize = 32,
-    insets = { left = 32, top = 128, right = 32, bottom = 16 }
-  }
-  frame:SetBackdrop(bdrop)
-
-  frame:HookScript("OnSizeChanged", td_OnSizeChanged)
-
-  local xbutton = MakeFrame("Button", nil, frame, "UIPanelCloseButton")
-  xbutton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 4, -8)
-  xbutton:SetScript("OnClick", xbutton_OnClick)
 
   --
-  -- The same title plate a dialog wears, and the same drag handle. The words
-  -- on it change as pages and tabs are selected, so it is made empty and
-  -- given a width: a plate that measured itself would change size every time
-  -- the user pressed a page button.
+  -- The title is the template's own font string where there is one, already
+  -- placed in the band and already clear of the portrait. It stays a font
+  -- string rather than becoming a plate, because the words change every time
+  -- a page or a tab is selected and SetPage sets them by calling SetText.
   --
-  local tframe = MakeFrame("Frame", nil, frame)
-  tframe:EnableMouse(true)
-  tframe:SetPoint("TOPLEFT", frame, "TOPLEFT", 80, -16)
-  tframe:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -32, -32)
+  local title = frame.TitleText
 
-  local title = tframe:CreateFontString(nil, "OVERLAY", tspec.font or "GameFontNormal")
-  title:SetPoint("TOPLEFT", tframe, "TOPLEFT", 0, 0)
-  title:SetPoint("BOTTOMRIGHT", tframe, "BOTTOMRIGHT", 0, 0)
-  title:SetJustifyH("CENTER")
+  if (not title) then
+    title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOP", frame, "TOP", 0, -5)
+    title:SetPoint("LEFT", frame, "LEFT", TD_PORTRAIT, 0)
+    title:SetPoint("RIGHT", frame, "RIGHT", 0 - TD_PORTRAIT, 0)
+    title:SetJustifyH("CENTER")
+  end
+
+  if (tspec.font) then
+    title:SetFontObject(tspec.font)
+  end
+
   title:SetText("")
   frame.title = title
+
+  --
+  -- The band the title sits in is the drag handle, and it is the whole width
+  -- of the window down to where the content starts.
+  --
+  local tframe = MakeFrame("Frame", nil, frame)
+
+  tframe:EnableMouse(true)
+  tframe:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+  tframe:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+  tframe:SetHeight(24)
 
   if (cfg.canmove) then
     tframe:SetScript("OnMouseDown", parent_StartMoving)
@@ -3490,11 +3495,42 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   -- pointer using ret.tabs[id].content.
   --
   frame.content = MakeFrame("Frame", fname .. "Content", frame)
-  frame.content:SetPoint("TOPLEFT", frame, "TOPLEFT", 34, -75)
-  frame.content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -34, 18)
+  frame.content:SetPoint("TOPLEFT", frame, "TOPLEFT", TD_INSET.left, 0 - TD_INSET.top)
+  frame.content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0 - TD_INSET.right, TD_INSET.bottom)
+
+  --
+  -- cfg.blackbg blacks out the content rectangle only. The rock ground the
+  -- template brings reads well behind a header, and reads as noise behind a
+  -- screen that is mostly panels -- so the header keeps it and the part that
+  -- holds the panels does not.
+  --
+  if (cfg.blackbg) then
+    local cbg = frame.content:CreateTexture(nil, "BACKGROUND")
+
+    --
+    -- Taller than the content at both ends, so no hairline of the ground is
+    -- left showing between it and the tab buttons above or the border below.
+    -- The content is not moved: this is the backing behind it, not the room
+    -- in it.
+    --
+    cbg:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 0, TD_BLEED_TOP)
+    cbg:SetPoint("BOTTOMRIGHT", frame.content, "BOTTOMRIGHT", 0, 0 - TD_BLEED_BOT)
+    cbg:SetTexture(WINDOW_BG)
+    cbg:SetVertexColor(0, 0, 0, 1)
+  end
+
+  --
+  -- The tab strip stands in the band between the title and the content,
+  -- starting clear of the portrait. Its height and its distance above the
+  -- content are what they have always been, so the tabs keep the position in
+  -- the band that TAB_STRIP was set up for.
+  --
+  local barbot = TD_INSET.top - TD_BARGAP
+  local bartop = barbot - 32
+
   frame.topbar = MakeFrame("Frame", fname .. "TopBar", frame)
-  frame.topbar:SetPoint("TOPLEFT", frame, "TOPLEFT", 75, -36)
-  frame.topbar:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -12, -68)
+  frame.topbar:SetPoint("TOPLEFT", frame, "TOPLEFT", TD_PORTRAIT, 0 - bartop)
+  frame.topbar:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", 0 - TD_INSET.right, 0 - barbot)
 
   if (cfg.escclose) then
     add_escclose(fname)
@@ -3555,7 +3591,6 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   frame.RemoveTab = td_RemoveTab
 
   frame:SetPage(cfg.defpage)
-  td_OnSizeChanged(frame, width, height)
 
   return frame
 end
@@ -5411,6 +5446,7 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     text:ClearAllPoints()
     text:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, 0)
     text:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -26, 0)
+    text:SetWordWrap(false)
 
     local button = MakeFrame("Button", frame:GetName() .. "Button", frame)
     frame.button = button
