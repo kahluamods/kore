@@ -702,6 +702,86 @@ K.IndexClass[K.CLASS_WARLOCK].w     = "warlock"
 K.IndexClass[K.CLASS_DRUID].w       = "druid"
 
 --
+-- A profession is Blizzard's own Enum.Profession value, so there is no second
+-- numbering to keep in step with theirs, and the value is stable, never
+-- localised and safe to store and to send over the wire.
+--
+K.FirstAid       = Enum.Profession.FirstAid
+K.Blacksmithing  = Enum.Profession.Blacksmithing
+K.Leatherworking = Enum.Profession.Leatherworking
+K.Alchemy        = Enum.Profession.Alchemy
+K.Herbalism      = Enum.Profession.Herbalism
+K.Cooking        = Enum.Profession.Cooking
+K.Mining         = Enum.Profession.Mining
+K.Tailoring      = Enum.Profession.Tailoring
+K.Engineering    = Enum.Profession.Engineering
+K.Enchanting     = Enum.Profession.Enchanting
+K.Fishing        = Enum.Profession.Fishing
+K.Skinning       = Enum.Profession.Skinning
+K.Jewelcrafting  = Enum.Profession.Jewelcrafting
+
+--
+-- "No profession", for a slot nobody has filled in. Negative because the enum
+-- starts at zero and zero is First Aid, so a table of professions cannot use
+-- it to mean the absence of one.
+--
+K.NoProfession = -1
+
+--
+-- K.professions[K.Engineering] is what to call that profession here, in
+-- whatever locale is running.
+--
+-- The game publishes no such list. Enum.Profession is numbers with no names
+-- attached, GetSkillLineInfo reports only what the player themselves has
+-- learned, and the PROFESSIONS_ globals are phrases ("Blacksmithing only")
+-- rather than names. What the client does have is the spell each profession
+-- is taught as, and that spell's name is the profession's name -- so the name
+-- is asked of the game rather than translated again by every addon that wants
+-- it. The English name is the fallback for a client that does not know the
+-- spell, so that a list is never silently missing an entry.
+--
+K.professions = {}
+
+do
+  local taughtas = {
+    [K.FirstAid]       = {  3273, "First Aid" },
+    [K.Blacksmithing]  = {  2018, "Blacksmithing" },
+    [K.Leatherworking] = {  2108, "Leatherworking" },
+    [K.Alchemy]        = {  2259, "Alchemy" },
+    [K.Herbalism]      = {  2366, "Herbalism" },
+    [K.Cooking]        = {  2550, "Cooking" },
+    [K.Mining]         = {  2575, "Mining" },
+    [K.Tailoring]      = {  3908, "Tailoring" },
+    [K.Engineering]    = {  4036, "Engineering" },
+    [K.Enchanting]     = {  7411, "Enchanting" },
+    [K.Fishing]        = {  7620, "Fishing" },
+    [K.Skinning]       = {  8613, "Skinning" },
+    [K.Jewelcrafting]  = { 25229, "Jewelcrafting" },
+  }
+
+  for k, v in pairs(taughtas) do
+    K.professions[k] = GetSpellInfo(v[1]) or v[2]
+  end
+end
+
+--
+-- The two a character chooses between, in the order to show them in. The
+-- secondary ones everybody may learn and so are nobody's choice to record.
+--
+K.PrimaryProfessions = {
+  K.Alchemy,
+  K.Blacksmithing,
+  K.Enchanting,
+  K.Engineering,
+  K.Herbalism,
+  K.Jewelcrafting,
+  K.Leatherworking,
+  K.Mining,
+  K.Skinning,
+  K.Tailoring,
+}
+
+--
 -- Many mods need to know the different class colors. We set up three tables
 -- here. The first is percentage-based RGB values, the second is decimal,
 -- with all numbers between 0 and 255 and the third is with text strings

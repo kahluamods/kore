@@ -623,6 +623,36 @@ local function check_tooltip_title(frame, cfg, title)
   end
 end
 
+--
+-- Some widgets draw outside their own frame. A slider is a Blizzard Slider
+-- whose backdrop is the bar, so the bar is all the frame can ever be, yet the
+-- widget also puts a label over it and a value box under it. A dropdown with
+-- a label above is the same shape. The frame cannot grow to cover them
+-- without stretching the artwork it owns, which is Blizzard's and not ours to
+-- re-anchor.
+--
+-- So the frame stays the size of its own piece and GetHeight is taught what
+-- the whole widget occupies, because that is the question a column asks. The
+-- widget is placed by the top of everything it draws, which newobj's second
+-- height element already arranges by pushing the frame down past its label.
+--
+local function drawn_extent(frame, above, below)
+  local above = above or 0
+  local below = below or 0
+
+  if (above == 0 and below == 0) then
+    return
+  end
+
+  local realheight = frame.GetHeight
+
+  frame.drawnabove = above
+  frame.drawnbelow = below
+  frame.GetHeight = function(this)
+    return realheight(this) + this.drawnabove + this.drawnbelow
+  end
+end
+
 local function parent_StartMoving(this)
   local pf = this:GetParent()
   pf:StartMoving()
@@ -662,28 +692,6 @@ local INSET_BACKDROP = {
 }
 
 --
--- A panel is three rings deep on every side. The frame handed back is the
--- outer box and the size the caller asked for is that outer size:
---
---   cfg.padding        space between the frame edge and the artwork, so that
---                      a panel stands clear of its neighbours and of the
---                      window. Two panels side by side each give up this
---                      much, so the space between them is twice it and no
---                      separate gutter is needed anywhere.
---   INSET_BORDER       the artwork itself. The border texture is cut into
---                      16 pixel tiles but the line inside one sits 4 in,
---                      which is what this records.
---   cfg.inner_padding  space inside the artwork before the usable area, so
---                      that widgets do not sit hard against the border.
---
--- So a 100x100 panel with the defaults has its artwork box from 4,4 to 96,96
--- and ret.content, the part a caller can use, from 10,10 to 90,90.
---
-KUI.INSET_BORDER = 4
-KUI.INSET_PADDING = 4
-KUI.INSET_INNER_PADDING = 2
-
---
 -- The space between one widget and the next. A panel laying out a column
 -- walks down it with
 --
@@ -703,6 +711,52 @@ KUI.INSET_INNER_PADDING = 2
 KUI.WIDGET_GAP = 4
 
 --
+-- The space between the parts of one widget: a checkbox and the words beside
+-- it, a dropdown and the label over it. Nothing a caller places is separated
+-- by this, and nothing inside a widget is separated by WIDGET_GAP. They are
+-- deliberately two numbers even when they hold the same value, because they
+-- answer different questions -- how far apart are two things the user thinks
+-- of as separate, against how close together are the pieces of one thing --
+-- and tuning either must not disturb the other.
+--
+KUI.INTERNAL_GAP = 4
+
+--
+-- What a dropdown wants after it on top of the standard gap. Its artwork is
+-- a tray drawn wider and taller than the frame it belongs to, and the eye
+-- reads the tray rather than the frame, so a dropdown followed by the same
+-- gap as a checkbox looks crowded where the checkbox looks right.
+--
+-- A column that has just placed a dropdown steps by
+--
+--   ypos = ypos - dd:GetHeight() - KUI.WIDGET_GAP - KUI.DROPDOWN_ADD_GAP
+--
+KUI.DROPDOWN_ADD_GAP = 2
+
+--
+-- A panel is three rings deep on every side. The frame handed back is the
+-- outer box and the size the caller asked for is that outer size:
+--
+--   cfg.padding        space between the frame edge and the artwork, so that
+--                      a panel stands clear of its neighbours and of the
+--                      window. Two panels side by side each give up this
+--                      much, so the space between them is twice it and no
+--                      separate gutter is needed anywhere.
+--   INSET_BORDER       the artwork itself. The border texture is cut into
+--                      16 pixel tiles but the line inside one sits 4 in,
+--                      which is what this records.
+--   cfg.inner_padding  space inside the artwork before the usable area. The
+--                      border is the panel's neighbour as far as the first
+--                      widget is concerned, so this is the standard gap.
+--
+-- So a 100x100 panel with the defaults has its artwork box from 4,4 to 96,96
+-- and ret.content, the part a caller can use, from 12,12 to 88,88.
+--
+KUI.INSET_BORDER = 4
+KUI.INSET_PADDING = 4
+KUI.INSET_INNER_PADDING = KUI.WIDGET_GAP
+
+--
 -- What a dropdown costs beyond the words in it: the inset before the text and
 -- the arrow button after it, matching where CreateDropDown anchors its text.
 --
@@ -711,9 +765,36 @@ KUI.DROPDOWN_CHROME = 12 + 26
 --
 -- The box a checkbox draws, which its label starts to the right of. A caller
 -- laying checkboxes out in columns needs this to know what one costs beyond
--- the words in it.
+-- the words in it, and one laying them out in rows steps by this plus
+-- WIDGET_GAP like any other widget.
 --
-KUI.CHECKBOX_SIZE = 24
+-- CHECKBOX_ART is the size the artwork is drawn at for a box of CHECKBOX_SIZE,
+-- and is deliberately larger. Blizzard's checkbox texture carries a wide
+-- transparent margin and inks only the middle of whatever square it is given,
+-- so a frame the size of the texture is mostly empty air and stacking two of
+-- them a standard gap apart leaves a visibly enormous one. The texture is
+-- therefore drawn oversize and centred on the frame, hanging over every side,
+-- and the frame is the box you actually see. The words stand INTERNAL_GAP off
+-- that box.
+--
+-- The two are a ratio rather than a pair of sizes: a checkbox given a height
+-- draws its artwork in proportion to it, so asking for a bigger box gets a
+-- bigger box and the frame goes on being the size of what it draws.
+--
+KUI.CHECKBOX_SIZE = 16
+KUI.CHECKBOX_ART = 24
+
+--
+-- How far a checkbox's label is lifted off the vertical centre it would
+-- otherwise sit on. A font string is centred on its line box, which reserves
+-- room under the baseline for descenders whether the words have any or not,
+-- so a label reading "Ignore Item" hangs its g into that room and reads low
+-- beside one reading "Warrior", which does not. Lifting by half the descent
+-- centres the letters instead of the space they are allowed to occupy.
+--
+-- Zero centres on the line box, which is what Blizzard's own labels do.
+--
+KUI.CHECKBOX_LABEL_LIFT = 0
 
 --
 -- Either ring is a single number for all four sides, or a table naming any
@@ -1028,6 +1109,19 @@ function KUI:CreateInset(cfg, kparent)
   local p = padding_sides(cfg.padding, KUI.INSET_PADDING)
   local ip = padding_sides(cfg.inner_padding, KUI.INSET_INNER_PADDING)
 
+  --
+  -- A titled panel gives up its top padding, because the plate IS the top
+  -- padding: it is a real object occupying that edge, not something floating
+  -- above a margin. Left at the default the two both claim the edge and the
+  -- panel sits four lower than an untitled one beside it.
+  --
+  -- Only when the caller said nothing about padding. One that names it gets
+  -- exactly what it asked for.
+  --
+  if (cfg.title and cfg.padding == nil) then
+    p.top = 0
+  end
+
   frame.padding = p
   frame.inner_padding = ip
 
@@ -1080,6 +1174,8 @@ function KUI:CreateInset(cfg, kparent)
   if (th > 0) then
     pt = p.top + th / 2 - KUI.INSET_BORDER / 2
   end
+
+  frame.arttop = pt
 
   local xl = e.left and p.left or 0 - INSET_EDGE_TILE
   local xr = e.right and p.right or 0 - INSET_EDGE_TILE
@@ -1138,6 +1234,28 @@ function KUI:CreateInset(cfg, kparent)
 end
 
 --
+-- The y offset that puts something centred in a panel's CONTENT on the middle
+-- of the panel as you see it -- halfway between the two lines its artwork
+-- draws. Anchor with SetPoint("RIGHT", content, "RIGHT", x, KUI:PanelMiddle(content)).
+--
+-- The two are not the same. A panel's rings are not symmetric: a title makes
+-- the top one much the deeper of the two, and the lines themselves sit inside
+-- the artwork rather than at its edge. Centred in the content, a block of
+-- buttons in a titled panel reads several pixels low.
+--
+function KUI:PanelMiddle(content)
+  local ins = content and content.owninginset
+
+  if (not ins) then
+    return 0
+  end
+
+  local r = ins.rings
+
+  return (r.top - r.bottom - ins.arttop + ins.padding.bottom) / 2
+end
+
+--
 -- Called by both splits: if the frame they are being built in is the inside
 -- of a panel, that panel is a container rather than a leaf and should not be
 -- drawing a border of its own.
@@ -1163,15 +1281,18 @@ end
 -- cfg.titleSomething keys: it can be passed along untouched by anything that
 -- builds a panel on somebody else's behalf.
 --
--- A pane told not to draw a border is a container instead of a panel: all
--- three rings at zero, so what is put in it starts at the pane's own edge.
--- That is the same state SetBorderShown(false) reaches, said when the pane is
--- built rather than undone afterwards.
+-- A pane told not to draw gives up the artwork and the inner padding that
+-- measured the distance to it, there being nothing left to stand clear of.
+-- Its outer padding is position rather than border and is kept, so what is
+-- put in the pane sits where it would have, just without a line around it.
+--
+-- That leaves one ring, which the caller drops by asking for no padding on
+-- that pane. Both rings gone is a container: a frame whose content is the
+-- whole of it, for a pane that holds panels of its own rather than widgets.
 --
 local function pane_border(arg, border)
   if (border == false) then
     arg.inset_art = false
-    arg.padding = 0
     arg.inner_padding = 0
   end
 
@@ -1872,6 +1993,12 @@ function KUI:CreateEditBox(cfg, kparent)
         end
       end
     end
+    if (cfg.label.pos == "TOP") then
+      drawn_extent(frame, lh, 0)
+    elseif (cfg.label.pos == "BOTTOM") then
+      drawn_extent(frame, 0, lh)
+    end
+
     if (cfg.label.debug) then
       local ttt = frame:CreateTexture(nil, "ARTWORK")
       ttt:SetAllPoints(label)
@@ -1902,7 +2029,7 @@ end
 local function cb_OnMouseDown(this)
   if (this.enabled and this.text) then
     local t = this.text
-    t:SetPoint("LEFT", t.ipoints[1], t.ipoints[2], 1, -1)
+    t:SetPoint("LEFT", t.ipoints[1], t.ipoints[2], t.ipoints[3] + 1, t.ipoints[4] - 1)
   end
 end
 
@@ -1915,7 +2042,7 @@ local function cb_OnMouseUp(this)
     end
     if (this.text) then
       local t = this.text
-      t:SetPoint("LEFT", t.ipoints[1], t.ipoints[2], 0, 0)
+      t:SetPoint("LEFT", t.ipoints[1], t.ipoints[2], t.ipoints[3], t.ipoints[4])
     end
     this:Throw("OnClick", this.checked)
     this:Throw("OnValueChanged", this.checked, true, this.groupname and this.value or nil)
@@ -1926,7 +2053,7 @@ local function cb_SetText(this, text)
   if (this.text) then
     this.text:SetText(text or "")
     if (this.autosize) then
-      this:SetWidth(this.text:GetStringWidth() + 36)
+      this:SetWidth(this.text:GetStringWidth() + this.boxsize + KUI.INTERNAL_GAP + 12)
     end
     if (this.centerx) then
       local pw = floor(this:GetWidth() / -2)
@@ -1953,13 +2080,31 @@ local function cb_OnEnable(this, event, onoff)
   end
 end
 
-local function kui_checkradio(cfg, kparent, size, dh)
+local function kui_checkradio(cfg, kparent, size, dh, art)
   local dw = size
   if (cfg.label) then
     dw = 200
   end
   local frame, parent, width, height = newobj(cfg, kparent, dw, dh, cfg.name, "Button")
 
+  --
+  -- The box is the frame's height and the artwork is drawn in proportion to
+  -- it, rather than both being fixed. A caller asking for a bigger checkbox
+  -- gets a bigger checkbox, not the same one loose in a taller frame, so the
+  -- frame is the size of what is drawn whatever height is asked for.
+  --
+  -- The box is square, so an unlabelled checkbox that was not given a width
+  -- takes its height for one; a labelled one is as wide as its words need.
+  --
+  local box = height
+  local artbox = box * (art or size) / size
+  local over = (artbox - box) / 2
+
+  if (not cfg.label and not cfg.width) then
+    frame:SetWidth(box)
+  end
+
+  frame.boxsize = box
   frame.checked = cfg.checked or false
   frame.autosize = cfg.autosize
   frame:HookScript("OnMouseDown", cb_OnMouseDown)
@@ -1967,14 +2112,14 @@ local function kui_checkradio(cfg, kparent, size, dh)
   frame:EnableMouse(true)
 
   local bg = frame:CreateTexture(nil, "ARTWORK")
-  bg:SetWidth(size)
-  bg:SetHeight(size)
-  bg:SetPoint("LEFT", frame, "LEFT", 0, 0)
+  bg:SetWidth(artbox)
+  bg:SetHeight(artbox)
+  bg:SetPoint("LEFT", frame, "LEFT", 0 - over, 0)
 
   local check = frame:CreateTexture(nil, "OVERLAY")
   frame.check = check
-  check:SetWidth(size)
-  check:SetHeight(size)
+  check:SetWidth(artbox)
+  check:SetHeight(artbox)
   check:SetPoint("CENTER", bg, "CENTER", 0, 0)
   if (not frame.checked) then
     check:Hide()
@@ -1994,20 +2139,28 @@ local function kui_checkradio(cfg, kparent, size, dh)
     frame.text = text
     local dh = "LEFT"
     text:ClearAllPoints()
+    --
+    -- The words stand a standard gap off the box the frame reserves, not off
+    -- the artwork, which hangs over it and is mostly margin. ipoints carries
+    -- the x that anchor was made with, so that the press-and-release nudge
+    -- below can put it back.
+    --
+    local lift = KUI.CHECKBOX_LABEL_LIFT
+
     if (cfg.label.pos == "LEFT") then
       bg:ClearAllPoints()
-      bg:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
-      text:SetPoint("RIGHT", bg, "LEFT", -4, 0)
-      text:SetPoint("LEFT", frame, "LEFT", 0, 0)
-      text.ipoints = { frame, "LEFT" }
+      bg:SetPoint("RIGHT", frame, "RIGHT", over, 0)
+      text:SetPoint("RIGHT", bg, "LEFT", over - KUI.INTERNAL_GAP, lift)
+      text:SetPoint("LEFT", frame, "LEFT", 0, lift)
+      text.ipoints = { frame, "LEFT", 0, lift }
       dh = "RIGHT"
       if (cfg.autosize == nil) then
         frame.autosize = false
       end
     else
-      text:SetPoint("LEFT", bg, "RIGHT", 0, 0)
-      text:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
-      text.ipoints = { bg, "RIGHT" }
+      text:SetPoint("LEFT", bg, "RIGHT", KUI.INTERNAL_GAP - over, lift)
+      text:SetPoint("RIGHT", frame, "RIGHT", 0, lift)
+      text.ipoints = { bg, "RIGHT", KUI.INTERNAL_GAP - over, lift }
       if (cfg.autosize == nil) then
         frame.autosize = true
       end
@@ -2048,7 +2201,8 @@ local function cb_SetChecked(self, onoff, nothrow)
 end
 
 function KUI:CreateCheckBox(cfg, kparent)
-  local frame, bg, check = kui_checkradio(cfg, kparent, KUI.CHECKBOX_SIZE, KUI.CHECKBOX_SIZE)
+  local frame, bg, check = kui_checkradio(cfg, kparent, KUI.CHECKBOX_SIZE, KUI.CHECKBOX_SIZE,
+    KUI.CHECKBOX_ART)
 
   bg:SetTexture("Interface/Buttons/UI-CheckBox-Up")
   bg:SetTexCoord(0, 1, 0, 1)
@@ -2444,6 +2598,15 @@ function KUI:CreateSlider(cfg, kparent)
     mintxt:SetPoint("TOPLEFT", frame, "TOPRIGHT", 4, -4)
     maxtxt:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 4, 4)
     editbox:SetPoint("LEFT", frame, "RIGHT", 4, 0)
+  end
+
+  --
+  -- A horizontal slider is a bar with its label over it and its value box
+  -- under it, and the bar is the only part the frame can be. The min and max
+  -- captions share the value box's row and so cost nothing further.
+  --
+  if (orientation == "HORIZONTAL") then
+    drawn_extent(frame, frame.label and frame.label:GetHeight() or 0, editbox:GetHeight())
   end
 
   mintxt:SetText(tostring(minval))
@@ -2847,8 +3010,15 @@ local function build_page(frame, cfg)
   -- top bar: the same rectangles rather than the same numbers written down
   -- twice, which is how they came to disagree.
   --
+  -- cfg.padding insets it. A page that puts widgets straight onto its content
+  -- wants it, because nothing else is standing them off the dialog's edge; a
+  -- page that declares a split does not, because the split's panels bring
+  -- their own padding and this would be added to it.
+  --
+  local pp = padding_sides(cfg.padding, 0)
   local pcf = MakeFrame("Frame", pf:GetName() .. "Content", pf)
-  pcf:SetAllPoints(frame.content)
+  pcf:SetPoint("TOPLEFT", frame.content, "TOPLEFT", pp.left, 0 - pp.top)
+  pcf:SetPoint("BOTTOMRIGHT", frame.content, "BOTTOMRIGHT", 0 - pp.right, pp.bottom)
   pcf.pagename = pg.name
   pg.content = pcf
 
@@ -2919,10 +3089,11 @@ local function build_tab(frame, pg, cfg)
     end
   end
 
+  local sp = padding_sides(cfg.padding, 0)
   local scf = MakeFrame("Frame",
     pg.content:GetName() .. "Sub" .. tab.name, stcontent)
-  scf:SetPoint("TOPLEFT", stcontent, "TOPLEFT", 0, 0)
-  scf:SetPoint("BOTTOMRIGHT", stcontent, "BOTTOMRIGHT", 0, 0)
+  scf:SetPoint("TOPLEFT", stcontent, "TOPLEFT", sp.left, 0 - sp.top)
+  scf:SetPoint("BOTTOMRIGHT", stcontent, "BOTTOMRIGHT", 0 - sp.right, sp.bottom)
   scf.pagename = pg.name
   scf.tabname = tab.name
   scf:Hide()
@@ -3439,6 +3610,25 @@ function KUI:CreateTabbedDialog(cfg, kparent)
   --
   if (frame.portrait) then
     frame.portrait:SetTexture(cfg.tltexture or "Interface/FriendsFrame/FriendsFrameScrollIcon")
+
+    --
+    -- A texture cannot be clicked, so an invisible button is laid over the
+    -- portrait and handed back for a caller that wants the corner to mean
+    -- something. It throws OnDoubleClick only: a single click on a window's
+    -- own badge is how you drag the window, and taking that away to make the
+    -- badge a button would be a poor trade.
+    --
+    local pb = MakeFrame("Button", nil, frame)
+    pb:SetAllPoints(frame.portrait)
+    pb:EnableMouse(true)
+    pb:RegisterForClicks("AnyUp")
+    pb.events = {}
+    pb.Catch = BC.Catch
+    pb.Throw = BC.Throw
+    pb:SetScript("OnDoubleClick", function(this, ...)
+      this:Throw("OnDoubleClick", ...)
+    end)
+    frame.portraitbutton = pb
   end
 
 
@@ -5587,6 +5777,12 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
           end
         end
       end
+
+      if (cfg.label.pos == "BOTTOM") then
+        drawn_extent(frame, 0, label:GetHeight())
+      elseif (cfg.label.pos ~= "LEFT" and cfg.label.pos ~= "RIGHT") then
+        drawn_extent(frame, label:GetHeight(), 0)
+      end
     end
   else -- Not the container portion of a dropdown
     if (not toplevel) then
@@ -5632,16 +5828,10 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     end
 
     frame.timeout = cfg.timeout or 0
-    if (cfg.border == "THIN") then
-      frame.border = 1
-    elseif (cfg.border == "THICK") then
+    if (cfg.border == "THICK") then
       frame.border = 2
     else
-      if (ispopup) then
-        frame.border = 1
-      else
-        frame.border = 2
-      end
+      frame.border = 1
     end
 
     frame.lastpos = {}
