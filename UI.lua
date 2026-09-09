@@ -82,8 +82,7 @@ end
 --
 -- What cfg.blackbg fills a window with. It is painted black by the caller, so
 -- all this has to be is a tile that covers -- which the stock dialog grounds
--- do not do on their own. The custom tile this replaced was 32x32 of pure
--- black, so a white fill painted black is the same pixels.
+-- do not do on their own.
 --
 -- The stippled rock a tabbed dialog is filled with is not this: that comes
 -- from ButtonFrameTemplate, which brings its own.
@@ -92,28 +91,22 @@ local WINDOW_BG = "Interface/Buttons/WHITE8X8"
 
 local borders = {
   { -- Thin
-    bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-    edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-    tileSize = 16,
-    edgeSize = 16,
+    bgFile = "Interface/Tooltips/UI-Tooltip-Background", edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+    tileSize = 16, edgeSize = 16,
     insets = { left = 4, right = 4, top = 4, bottom = 4 },
     offset = 6,
   },
   { -- Thick
-    bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
-    edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
-    tileSize = 32,
-    edgeSize = 32,
+    bgFile = "Interface/DialogFrame/UI-DialogBox-Background", edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
+    tileSize = 32, edgeSize = 32,
     insets = { left = 8, right = 8, top = 8, bottom = 8 },
     offset = 12,
   }
 }
 
 local cfbackdrop = {
-  bgFile = "Interface/ChatFrame/ChatFrameBackground",
-  edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-  tile = true, tileSize = 16, edgeSize = 16,
-  insets = { left = 4, right = 4, top = 4, bottom = 4 }
+  bgFile = "Interface/ChatFrame/ChatFrameBackground", edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+  tile = true, tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 }
 }
 
 KUI.emptydropdown = {
@@ -154,9 +147,9 @@ KUI.emptydropdown = {
 --   IsSelected(value) returns true if the specified value is currently
 --     selected, false if it is not, or nil if no such value could be found.
 --
-local MODE_SINGLE       = 1
-local MODE_COMPACT      = 2
-local MODE_MULTI        = 3
+local MODE_SINGLE  = 1
+local MODE_COMPACT = 2
+local MODE_MULTI   = 3
 
 local function fixframelevels(parent, ...)
   local l = 1
@@ -235,34 +228,26 @@ function KUI:MeasureStrWidth(str, font)
 end
 
 --
--- The dwidth a dropdown needs to hold the longest of the things it can show,
--- without eliding any of them and without the guessed round number that is
--- otherwise always either too wide or, in some locale nobody tested, too
--- narrow.
+-- The dwidth a dropdown needs to hold the longest of the things it can show, without eliding any of them and without the
+-- guessed round number that is otherwise always either too wide or, in some locale nobody tested, too narrow.
 --
--- It has to be asked for rather than worked out inside CreateDropDown,
--- because plenty of dropdowns are made empty and filled in later -- a config
--- selector knows nothing at all when it is built -- and one of those would
--- size itself to nothing. A caller that knows the whole set up front, which
--- is any dropdown over a fixed vocabulary, can use this.
+-- It has to be asked for rather than worked out inside CreateDropDown, because plenty of dropdowns are made empty and filled
+-- in later -- a config selector knows nothing at all when it is built -- and one of those would size itself to nothing. A
+-- caller that knows the whole set up front, which is any dropdown over a fixed vocabulary, can use this.
 --
 function KUI:DropDownWidth(strings, font)
-  return self:WidestString(strings, font or "GameFontHighlightSmall")
-    + KUI.DROPDOWN_CHROME
+  return self:WidestString(strings, font or "GameFontHighlightSmall") + KUI.DROPDOWN_CHROME
 end
 
 --
--- How wide the widest of a set of strings comes out in FONT, and which one it
--- was. This is what a column of labelled widgets is asking for: give every
--- label this width and their widgets line up down one edge, instead of each
--- starting wherever its own word happens to end.
+-- How wide the widest of a set of strings comes out in FONT, and which one it was. This is what a column of labelled widgets
+-- is asking for: give every label this width and their widgets line up down one edge, instead of each starting wherever its
+-- own word happens to end.
 --
--- Measuring rather than declaring a number is the point of it. Which string
--- is the longest is a question about the locale, and a width that lines up
--- perfectly in one language is crooked in the next.
+-- Measuring rather than declaring a number is the point of it. Which string is the longest is a question about the locale,
+-- and a width that lines up perfectly in one language is crooked in the next.
 --
--- FONT defaults to GameFontNormal, which is what a label is drawn in unless
--- it says otherwise.
+-- FONT defaults to GameFontNormal, which is what a label is drawn in unless it says otherwise.
 --
 function KUI:WidestString(strings, font)
   local widest = 0
@@ -285,7 +270,9 @@ function KUI:GetFontColor(font, rgbtab)
     self.strwidth:SetFontObject(font)
     self.lastfont = font
   end
+
   local r,g,b,a = self.strwidth:GetTextColor()
+
   if (rgbtab) then
     return { r = r, g = g, b = b, a = a or 1 }
   else
@@ -297,6 +284,7 @@ function KUI:GetWidgetNum(wtype)
   if (not self.wcounters[wtype]) then
     self.wcounters[wtype] = 0
   end
+
   self.wcounters[wtype] = self.wcounters[wtype] + 1
   return self.wcounters[wtype]
 end
@@ -305,6 +293,7 @@ function KUI:GetFramePos(frame, tbl)
   local w, h = frame:GetWidth() or 0, frame:GetHeight() or 0
   local t, b = frame:GetTop() or 0, frame:GetBottom() or 0
   local l, r = frame:GetLeft() or 0, frame:GetRight() or 0
+
   if (tbl) then
     return { w=w, h=h, t=t, b=b, l=l, r=r }
   else
@@ -334,10 +323,9 @@ function BC.Catch(self, event, handler)
 end
 
 --
--- For each event we throw, we check two places for a handler. The first
--- is an actual function of the event name itself in the self object.
--- This is intended for internal use and should not be overwritten. The
--- second is a user-defined hander that they install with Catch().
+-- For each event we throw, we check two places for a handler. The first is an actual function of the event name itself in
+-- the self object. This is intended for internal use and should not be overwritten. The second is a user-defined hander that
+-- they install with Catch().
 --
 function BC.Throw(self, event, ...)
   local ok,rv,fail
@@ -509,6 +497,7 @@ local function newobj(cfg, kparent, defwt, defht, fname, ftype, template)
   if (cfg.template) then
     template = cfg.template
   end
+
   if (template == "") then
     template = nil
   end
@@ -519,6 +508,7 @@ local function newobj(cfg, kparent, defwt, defht, fname, ftype, template)
   else
     defw = defwt
   end
+
   if (type(defht) == "table") then
     defh = defht[1]
     ly = defht[2]
@@ -529,9 +519,8 @@ local function newobj(cfg, kparent, defwt, defht, fname, ftype, template)
   local parent
 
   --
-  -- If defh and defw are both 0 it means we have a somewhat special case
-  -- here, and kparent isn't a typical KahLua KoreUI return, but instead
-  -- any simple frame. Set parent accordingly.
+  -- If defh and defw are both 0 it means we have a somewhat special case here, and kparent isn't a typical KahLua KoreUI
+  -- return, but instead any simple frame. Set parent accordingly.
   --
   if (defh == 0 and defw == 0) then
     parent = kparent
@@ -573,8 +562,8 @@ local function newobj(cfg, kparent, defwt, defht, fname, ftype, template)
   end
 
   --
-  -- If defh and defw are both 0, it means we have a "special" case on our
-  -- hands, where the calling function will do all the placement.
+  -- If defh and defw are both 0, it means we have a "special" case on our hands, where the calling function will do all the
+  -- placement.
   --
   if (defw ~= 0 and defh ~= 0) then
     if (cfg.x) then
@@ -614,6 +603,7 @@ local function newobj(cfg, kparent, defwt, defht, fname, ftype, template)
     ttt:SetAllPoints(frame)
     ttt:SetColorTexture(0.3, 0.3, 0.3, 0.5)
   end
+
   return frame, parent, width, height
 end
 
@@ -624,17 +614,14 @@ local function check_tooltip_title(frame, cfg, title)
 end
 
 --
--- Some widgets draw outside their own frame. A slider is a Blizzard Slider
--- whose backdrop is the bar, so the bar is all the frame can ever be, yet the
--- widget also puts a label over it and a value box under it. A dropdown with
--- a label above is the same shape. The frame cannot grow to cover them
--- without stretching the artwork it owns, which is Blizzard's and not ours to
--- re-anchor.
+-- Some widgets draw outside their own frame. A slider is a Blizzard Slider whose backdrop is the bar, so the bar is all the
+-- frame can ever be, yet the widget also puts a label over it and a value box under it. A dropdown with a label above is the
+-- same shape. The frame cannot grow to cover them without stretching the artwork it owns, which is Blizzard's and not ours
+-- to re-anchor.
 --
--- So the frame stays the size of its own piece and GetHeight is taught what
--- the whole widget occupies, because that is the question a column asks. The
--- widget is placed by the top of everything it draws, which newobj's second
--- height element already arranges by pushing the frame down past its label.
+-- So the frame stays the size of its own piece and GetHeight is taught what the whole widget occupies, because that is the
+-- question a column asks. The widget is placed by the top of everything it draws, which newobj's second height element
+-- already arranges by pushing the frame down past its label.
 --
 local function drawn_extent(frame, above, below)
   local above = above or 0
@@ -672,60 +659,41 @@ end
 --
 -- A recessed panel, the way Blizzard's own windows divide themselves up.
 --
--- This is what replaced the divider-and-tee idiom. A divider has to meet the
--- border it runs into, so its end caps have to be drawn for that particular
--- border, and the moment a split went into a window bordered any other way
--- there was no join to be had at any offset. An inset carries its own corners
--- and meets nothing, so there is nothing to align and nothing to get wrong.
--- It is also stock art, which is the more important half: Blizzard does not
--- break its own templates.
---
--- The frame returned is the panel. Put widgets in ret.content, which is the
--- area inside its border -- anything anchored to the panel itself sits on top
--- of the artwork.
+-- The frame returned is the panel. Put widgets in ret.content, which is the area inside its border -- anything anchored to
+-- the panel itself sits on top of the artwork.
 --
 local INSET_BACKDROP = {
-  bgFile = "Interface/ChatFrame/ChatFrameBackground",
-  edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-  tile = true, tileSize = 16, edgeSize = 16,
-  insets = { left = 4, right = 4, top = 4, bottom = 4 }
+  bgFile = "Interface/ChatFrame/ChatFrameBackground", edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+  tile = true, tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 }
 }
 
 --
--- The space between one widget and the next. A panel laying out a column
--- walks down it with
+-- The space between one widget and the next. A panel laying out a column walks down it with
 --
 --   ypos = ypos - widget:GetHeight() - KUI.WIDGET_GAP
 --
--- and that is the whole of it: no per-panel constant, and nothing that has to
--- know what kind of widget it just placed. That works only because a widget's
--- frame is the size of the box it draws -- an edit box is 20 because
--- InputBoxTemplate draws 20, a dropdown is 24 because its artwork is opaque
--- for 24. A frame with dead space in it forces every caller to correct for it
--- by eye, and then the gaps down a column are even in the source and uneven on
--- the screen.
+-- and that is the whole of it: no per-panel constant, and nothing that has to know what kind of widget it just placed. That
+-- works only because a widget's frame is the size of the box it draws -- an edit box is 20 because InputBoxTemplate draws
+-- 20, a dropdown is 24 because its artwork is opaque for 24. A frame with dead space in it forces every caller to correct
+-- for it by eye, and then the gaps down a column are even in the source and uneven on the screen.
 --
--- So: if a layout needs a number that is not this one, the widget is lying
--- about its size. Fix the widget.
+-- So if a layout needs a number that is not this one, the widget is lying about its size. Fix the widget.
 --
 KUI.WIDGET_GAP = 4
 
 --
--- The space between the parts of one widget: a checkbox and the words beside
--- it, a dropdown and the label over it. Nothing a caller places is separated
--- by this, and nothing inside a widget is separated by WIDGET_GAP. They are
--- deliberately two numbers even when they hold the same value, because they
--- answer different questions -- how far apart are two things the user thinks
--- of as separate, against how close together are the pieces of one thing --
--- and tuning either must not disturb the other.
+-- The space between the parts of one widget: a checkbox and the words beside it, a dropdown and the label over it. Nothing a
+-- caller places is separated by this, and nothing inside a widget is separated by WIDGET_GAP. They are deliberately two
+-- numbers even when they hold the same value, because they answer different questions -- how far apart are two things the
+-- user thinks of as separate, against how close together are the pieces of one thing -- and tuning either must not disturb
+-- the other.
 --
 KUI.INTERNAL_GAP = 4
 
 --
--- What a dropdown wants after it on top of the standard gap. Its artwork is
--- a tray drawn wider and taller than the frame it belongs to, and the eye
--- reads the tray rather than the frame, so a dropdown followed by the same
--- gap as a checkbox looks crowded where the checkbox looks right.
+-- What a dropdown wants after it on top of the standard gap. Its artwork is a tray drawn wider and taller than the frame it
+-- belongs to, and the eye reads the tray rather than the frame, so a dropdown followed by the same gap as a checkbox looks
+-- crowded where the checkbox looks right.
 --
 -- A column that has just placed a dropdown steps by
 --
@@ -734,93 +702,88 @@ KUI.INTERNAL_GAP = 4
 KUI.DROPDOWN_ADD_GAP = 2
 
 --
--- A panel is three rings deep on every side. The frame handed back is the
--- outer box and the size the caller asked for is that outer size:
+-- A panel is three rings deep on every side. The frame handed back is the outer box and the size the caller asked for is
+-- that outer size:
 --
---   cfg.padding        space between the frame edge and the artwork, so that
---                      a panel stands clear of its neighbours and of the
---                      window. Two panels side by side each give up this
---                      much, so the space between them is twice it and no
---                      separate gutter is needed anywhere.
---   INSET_BORDER       the artwork itself. The border texture is cut into
---                      16 pixel tiles but the line inside one sits 4 in,
+--   cfg.padding        space between the frame edge and the artwork, so that a panel stands clear of its neighbours and
+--                      of the window. Two panels side by side each give up this much, so the space between them is twice
+--                      it and no separate gutter is needed anywhere.
+--   INSET_BORDER       the artwork itself. The border texture is cut into 16 pixel tiles but the line inside one sits 4 in,
 --                      which is what this records.
---   cfg.inner_padding  space inside the artwork before the usable area. The
---                      border is the panel's neighbour as far as the first
---                      widget is concerned, so this is the standard gap.
+--   cfg.inner_padding  space inside the artwork before the usable area. The border is the panel's neighbour as far as the
+--                      first widget is concerned, so this is the standard gap.
 --
--- So a 100x100 panel with the defaults has its artwork box from 4,4 to 96,96
--- and ret.content, the part a caller can use, from 12,12 to 88,88.
+-- So a 100x100 panel with the defaults has its artwork box from 4,4 to 96,96 and ret.content, the part a caller can use,
+-- from 12,12 to 88,88.
 --
 KUI.INSET_BORDER = 4
 KUI.INSET_PADDING = 4
 KUI.INSET_INNER_PADDING = KUI.WIDGET_GAP
 
 --
--- The height of a dropdown's box, which is what CreateDropDown gives the
--- frame. A caller putting a dropdown on a row beside something shorter needs
--- this to work out how far to drop the shorter thing so that the two sit on
--- one centre line.
+-- The height of a dropdown's box, which is what CreateDropDown gives the frame. A caller putting a dropdown on a row beside
+-- something shorter needs this to work out how far to drop the shorter thing so that the two sit on one centre line.
 --
 KUI.DROPDOWN_HEIGHT = 24
 
 --
--- What a dropdown costs beyond the words in it: the inset before the text and
--- the arrow button after it, matching where CreateDropDown anchors its text.
+-- The strip a scroll list keeps on its right for the bar, which is wider than the bar's own slider.
+-- UIPanelScrollBarTemplateLightBorder hangs 18 wide buttons off a 16 wide slider and draws a border beyond those again, so
+-- what you see is several pixels proud of the slider on each side and the strip has to hold all of it.
+--
+-- It is a number to taste rather than a derivation: a strip exactly as wide as the bar draws leaves it sitting clear of
+-- whatever the list is inside, and a little narrower puts it back against that edge, which is where it looks like it
+-- belongs.
+--
+KUI.SCROLLBAR_COMPENSATE = 22
+
+--
+-- What a dropdown costs beyond the words in it: the inset before the text and the arrow button after it, matching where
+-- CreateDropDown anchors its text.
 --
 KUI.DROPDOWN_CHROME = 12 + 26
 
 --
--- How far a dropdown's end caps hang outside the frame, so that the box the
--- user sees begins where the frame begins. The LabelFrame slice Kore cuts its
--- caps from carries a soft margin before the border inks, exactly as it does
--- above and below, and Blizzard's own use of the texture answers it the same
--- way, anchoring the cap outside the frame rather than trimming the texture.
+-- How far a dropdown's end caps hang outside the frame, so that the box the user sees begins where the frame begins. The
+-- LabelFrame slice Kore cuts its caps from carries a soft margin before the border inks, exactly as it does above and below,
+-- and Blizzard's own use of the texture answers it the same way, anchoring the cap outside the frame rather than trimming
+-- the texture.
 --
--- Without this a dropdown disagrees with itself: a label above one starts at
--- the frame's left edge and the box under it starts inside that, and a column
--- of dropdowns and checkboxes has two left edges in it.
+-- Without this a dropdown disagrees with itself: a label above one starts at the frame's left edge and the box under it
+-- starts inside that, and a column of dropdowns and checkboxes has two left edges in it.
 --
 KUI.DROPDOWN_ART_BLEED = 3
 
 --
--- The box a checkbox draws, which its label starts to the right of. A caller
--- laying checkboxes out in columns needs this to know what one costs beyond
--- the words in it, and one laying them out in rows steps by this plus
--- WIDGET_GAP like any other widget.
+-- The box a checkbox draws, which its label starts to the right of. A caller laying checkboxes out in columns needs this to
+-- know what one costs beyond the words in it, and one laying them out in rows steps by this plus WIDGET_GAP like any other
+-- widget.
 --
--- CHECKBOX_ART is the size the artwork is drawn at for a box of CHECKBOX_SIZE,
--- and is deliberately larger. Blizzard's checkbox texture carries a wide
--- transparent margin and inks only the middle of whatever square it is given,
--- so a frame the size of the texture is mostly empty air and stacking two of
--- them a standard gap apart leaves a visibly enormous one. The texture is
--- therefore drawn oversize and centred on the frame, hanging over every side,
--- and the frame is the box you actually see. The words stand INTERNAL_GAP off
--- that box.
+-- CHECKBOX_ART is the size the artwork is drawn at for a box of CHECKBOX_SIZE, and is deliberately larger. Blizzard's
+-- checkbox texture carries a wide transparent margin and inks only the middle of whatever square it is given, so a frame the
+-- size of the texture is mostly empty air and stacking two of them a standard gap apart leaves a visibly enormous one. The
+-- texture is therefore drawn oversize and centred on the frame, hanging over every side, and the frame is the box you
+-- actually see. The words stand INTERNAL_GAP off that box.
 --
--- The two are a ratio rather than a pair of sizes: a checkbox given a height
--- draws its artwork in proportion to it, so asking for a bigger box gets a
--- bigger box and the frame goes on being the size of what it draws.
+-- The two are a ratio rather than a pair of sizes. A checkbox given a height draws its artwork in proportion to it, so
+-- asking for a bigger box gets a bigger box and the frame goes on being the size of what it draws.
 --
 KUI.CHECKBOX_SIZE = 16
 KUI.CHECKBOX_ART = 24
 
 --
--- How far a checkbox's label is lifted off the vertical centre it would
--- otherwise sit on. A font string is centred on its line box, which reserves
--- room under the baseline for descenders whether the words have any or not,
--- so a label reading "Ignore Item" hangs its g into that room and reads low
--- beside one reading "Warrior", which does not. Lifting by half the descent
--- centres the letters instead of the space they are allowed to occupy.
+-- How far a checkbox's label is lifted off the vertical centre it would otherwise sit on. A font string is centred on its
+-- line box, which reserves room under the baseline for descenders whether the words have any or not, so a label reading
+-- "Ignore Item" hangs its g into that room and reads low beside one reading "Warrior", which does not. Lifting by half the
+-- descent centres the letters instead of the space they are allowed to occupy.
 --
 -- Zero centres on the line box, which is what Blizzard's own labels do.
 --
 KUI.CHECKBOX_LABEL_LIFT = 0
 
 --
--- Either ring is a single number for all four sides, or a table naming any
--- of left, right, top and bottom with anything left out taken as none. Left
--- out altogether the ring is the framework default.
+-- Either ring is a single number for all four sides, or a table naming any of left, right, top and bottom with anything left
+-- out taken as none. Left out altogether the ring is the framework default.
 --
 local function padding_sides(spec, def)
   if (type(spec) == "table") then
@@ -836,25 +799,19 @@ local function padding_sides(spec, def)
 end
 
 --
--- Which of a panel's four edges draw. cfg.inset_art left out, or true, is all
--- four, which is what almost every panel wants. A table names the sides that
--- differ and anything not named still draws, so { top = false } reads as
--- "everything but the top" -- the shape a panel wants when it sits directly
--- under a tab strip, where a line across the top cuts the tab off from the
--- space it belongs to. cfg.inset_art = false draws nothing at all.
+-- Which of a panel's four edges draw. cfg.inset_art left out, or true, is all four, which is what almost every panel wants.
+-- A table names the sides that differ and anything not named still draws, so { top = false } reads as "everything but the top".
 --
--- Suppressing an edge only stops it being drawn. Both paddings belong to the
--- panel rather than to the border and are kept, so the content sits where it
--- would have, four pixels further out.
+-- Suppressing an edge only stops it being drawn. Both paddings belong to the panel rather than to the border and are kept,
+-- so the content sits where it would have, four pixels further out.
 --
 -- A container is all three rings at zero and nothing more:
 --
 --   { inset_art = false, padding = 0, inner_padding = 0 }
 --
--- is a frame whose content is the whole of it. SetBorderShown(false) is that
--- same state arrived at later rather than a different thing, and it exists
--- because a panel usually cannot know it is a container when it is made: the
--- splits find out only when they are built inside one.
+-- is a frame whose content is the whole of it. SetBorderShown(false) is that same state arrived at later rather than a
+-- different thing, and it exists because a panel usually cannot know it is a container when it is made. The splits find out
+-- only when they are built inside one.
 --
 local INSET_SIDES = { "left", "right", "top", "bottom" }
 
@@ -873,47 +830,41 @@ local function inset_edges(spec)
 end
 
 --
--- A border is eight pieces of one texture and there is no way to leave one of
--- them out, so an edge that is not wanted is put out of sight instead. The
--- artwork lives in a frame that clips its children and a suppressed side is
--- anchored a whole edge tile beyond it, where it is cut away. The background
--- goes with it, so the panel still fills right to that edge and simply has no
--- line drawn on it.
+-- A border is eight pieces of one texture and there is no way to leave one of them out, so an edge that is not wanted is put
+-- out of sight instead. The artwork lives in a frame that clips its children and a suppressed side is anchored a whole edge
+-- tile beyond it, where it is cut away. The background goes with it, so the panel still fills right to that edge and simply
+-- has no line drawn on it.
 --
 local INSET_EDGE_TILE = 16
 
 --
--- A TITLE PLATE: words on a small plate, which is how anything in this
--- toolkit says what it is. A panel hangs one on its top edge, a dialog hangs
--- one off the top of its border. They are the same object built by the same
--- code, and only where it is hung differs.
+-- A TITLE PLATE is words on a small plate, which is how anything in this toolkit says what it is. A panel hangs one on its top
+-- edge, a dialog hangs one off the top of its border. They are the same object built by the same code, and only where it is
+-- hung differs.
 --
--- Everything about a title is one table, rather than a handful of
--- cfg.titleSomething keys spread through the host widget's own options:
+-- Everything about a title is one table, rather than a handful of cfg.titleSomething keys spread through the host widget's
+-- own options:
 --
 --   { text, style, width, height, padding, font, bordercolor }
 --
--- A title is one thing with several properties and reads as one, and having a
--- shape of its own it can be handed along untouched by anything that builds
--- one widget on behalf of another -- which is what the splits do with their
--- panes, and CreatePopupList with its dialog. A bare string is that table
--- with only its text filled in, which is what nearly every caller wants.
+-- A title is one thing with several properties and reads as one, and having a shape of its own it can be handed along
+-- untouched by anything that builds one widget on behalf of another -- which is what the splits do with their panes, and
+-- CreatePopupList with its dialog. A bare string is that table with only its text filled in, which is what nearly every
+-- caller wants.
 --
 -- Two styles:
 --
---   THIN is the toolkit's thin grey-bordered plate -- the same backdrop
---   CreateStringLabel draws with border = true. It is what one section of a
---   page wants, and is what a panel takes if it says nothing.
+--   THIN is the toolkit's thin grey-bordered plate -- the same backdrop CreateStringLabel draws with border = true. It is
+--   what one section of a page wants, and is what a panel takes if it says nothing.
 --
---   THICK is the stock dialog header, the ornate gold plate a window title
---   sits in, for something that is a whole thing in its own right. It is
---   built from three pieces of one texture: a centre that stretches and an
---   end cap at each side that does not, which is why a THICK plate can never
---   be narrower than its two caps. It is what a dialog takes if it says
+--   THICK is the stock dialog header, the ornate gold plate a window title sits in, for something that is a whole thing in
+--   its own right. It is built from three pieces of one texture: a centre that stretches and an end cap at each side that
+--   does not, which is why a THICK plate can never be narrower than its two caps. It is what a dialog takes if it says
 --   nothing.
 --
--- One table rather than seven file locals: Lua 5.1 allows a chunk two hundred
--- of those and this file is close enough to the ceiling to care.
+-- One table rather than seven file locals: Lua 5.1 allows a chunk two hundred of those and this file is close enough to the
+-- ceiling to care.
+--
 local TITLE = { CAP = 30 }
 
 TITLE.STYLES = {
@@ -922,15 +873,12 @@ TITLE.STYLES = {
 }
 
 --
--- Width of the plate for the text in it: what the string measures plus a
--- margin each side.
+-- Width of the plate for the text in it: what the string measures plus a margin each side.
 --
--- On a THICK plate the caps are ornament flaring off the ends rather than
--- room for words, so the margin is measured against the centre they sit
--- either side of and the two of them are added on top of it. Measured against
--- the whole plate instead, a title only a little wider than sixty pixels
--- would be left with a centre narrower than itself and would run out into
--- the wings.
+-- On a THICK plate the caps are ornament flaring off the ends rather than room for words, so the margin is measured against
+-- the centre they sit either side of and the two of them are added on top of it. Measured against the whole plate instead, a
+-- title only a little wider than sixty pixels would be left with a centre narrower than itself and would run out into the
+-- wings.
 --
 function TITLE.measure(this)
   local w = ceil(this.text:GetStringWidth()) + (2 * this.pad)
@@ -943,10 +891,9 @@ function TITLE.measure(this)
 end
 
 --
--- Not called SetWidth: that is a real frame method and this is not it. What
--- is set here is the plate as a whole, and on a THICK one only the centre
--- stretches -- the caps are anchored to its ends and follow it out, so all
--- that changes is what is left when they have taken their thirty pixels each.
+-- Not called SetWidth: that is a real frame method and this is not it. What is set here is the plate as a whole, and on a
+-- THICK one only the centre stretches -- the caps are anchored to its ends and follow it out, so all that changes is what is
+-- left when they have taken their thirty pixels each.
 --
 function TITLE.setwidth(this, width)
   this:SetWidth(width)
@@ -960,9 +907,8 @@ function TITLE.settext(this, text)
   this.text:SetText(text or "")
 
   --
-  -- A plate given an explicit width keeps it whatever it is later told to
-  -- say, because the caller sized it to fit a column or a neighbour rather
-  -- than to fit these particular words.
+  -- A plate given an explicit width keeps it whatever it is later told to say, because the caller sized it to fit a column
+  -- or a neighbour rather than to fit these particular words.
   --
   if (this.auto) then
     TITLE.setwidth(this, TITLE.measure(this))
@@ -970,11 +916,9 @@ function TITLE.settext(this, text)
 end
 
 --
--- Build one. SPEC is the table or string above, or nil for no plate at all.
--- DEFSTYLE is only the fallback: a spec naming a style gets that style, so a
--- panel can ask for THICK and a dialog for THIN. The plate is returned
--- unanchored, because where it hangs is the whole of what the host widget has
--- left to decide.
+-- Build one. SPEC is the table or string above, or nil for no plate at all. DEFSTYLE is only the fallback: a spec naming a
+-- style gets that style, so a panel can ask for THICK and a dialog for THIN. The plate is returned unanchored, because where
+-- it hangs is the whole of what the host widget has left to decide.
 --
 function TITLE.plate(parent, spec, defstyle)
   if (spec == nil) then
@@ -1043,9 +987,8 @@ function TITLE.plate(parent, spec, defstyle)
 end
 
 --
--- The host's half of it: hand the plate on to whoever asks the widget for it,
--- so that ret.title, ret.titletext and ret:SetTitleText mean the same thing
--- on a panel and on a dialog.
+-- The host's half of it: hand the plate on to whoever asks the widget for it, so that ret.title, ret.titletext and
+-- ret:SetTitleText mean the same thing on a panel and on a dialog.
 --
 function TITLE.attach(frame, plate)
   frame.title = plate
@@ -1057,17 +1000,14 @@ function TITLE.attach(frame, plate)
 end
 
 --
--- A panel names itself on a plate straddling its top edge: centred
--- horizontally, and hung so that the panel's own top border runs through the
--- middle of it. Straddling is the whole point -- a plate sitting wholly above
--- the panel is a caption floating in the window, and one sitting wholly
--- inside it is just a widget somebody put there. On the line it belongs to
--- the panel and says what the panel is. The plate is opaque, so the border
--- stops at its edges instead of being drawn through the words.
+-- A panel names itself on a plate straddling its top edge: centred horizontally, and hung so that the panel's own top border
+-- runs through the middle of it. Straddling is the whole point -- a plate sitting wholly above the panel is a caption
+-- floating in the window, and one sitting wholly inside it is just a widget somebody put there. On the line it belongs to
+-- the panel and says what the panel is. The plate is opaque, so the border stops at its edges instead of being drawn through
+-- the words.
 --
--- Returns the plate's height, which is what the panel below it has to make
--- room for; zero when there is no title at all, which leaves every
--- measurement below exactly as it was.
+-- Returns the plate's height, which is what the panel below it has to make room for; zero when there is no title at all,
+-- which leaves every measurement below exactly as it was.
 --
 function TITLE.panel(frame, cfg, p)
   local plate = TITLE.plate(frame, cfg.title, "THIN")
@@ -1092,9 +1032,8 @@ function KUI:CreateInset(cfg, kparent)
   frame.artframe = art
 
   --
-  -- Without clipping there is nowhere for a suppressed edge to go but over
-  -- the panel next door, so on a client that cannot clip every edge draws.
-  -- A border too many is a cosmetic loss; artwork loose in the window is not.
+  -- Without clipping there is nowhere for a suppressed edge to go but over the panel next door, so on a client that cannot
+  -- clip every edge draws. A border too many is a cosmetic loss; artwork loose in the window is not.
   --
   local canclip = art.SetClipsChildren and true or false
 
@@ -1106,10 +1045,9 @@ function KUI:CreateInset(cfg, kparent)
   frame.edges = canclip and inset_edges(cfg.inset_art) or inset_edges(true)
 
   --
-  -- CreateFrame raises on a template it does not know rather than returning
-  -- nil, so the stock inset is tried behind a pcall and a plainer backdrop
-  -- stands in where there is no such template. A flatter panel is a great
-  -- deal better than an addon that will not load.
+  -- CreateFrame raises on a template it does not know rather than returning nil, so the stock inset is tried behind a pcall
+  -- and a plainer backdrop stands in where there is no such template. A flatter panel is a great deal better than an addon
+  -- that will not load.
   --
   local ok, inner = pcall(MakeFrame, "Frame", nil, art, "InsetFrameTemplate")
 
@@ -1122,22 +1060,19 @@ function KUI:CreateInset(cfg, kparent)
   frame.inset = inner
 
   --
-  -- cfg.padding is not cfg.inset: the splits already use that name for the
-  -- margin they leave on the *outside* of themselves, and one key cannot
-  -- mean both.
+  -- cfg.padding is not cfg.inset. The splits already use that name for the margin they leave on the *outside* of themselves,
+  -- and one key cannot mean both.
   --
   local e = frame.edges
   local p = padding_sides(cfg.padding, KUI.INSET_PADDING)
   local ip = padding_sides(cfg.inner_padding, KUI.INSET_INNER_PADDING)
 
   --
-  -- A titled panel gives up its top padding, because the plate IS the top
-  -- padding: it is a real object occupying that edge, not something floating
-  -- above a margin. Left at the default the two both claim the edge and the
-  -- panel sits four lower than an untitled one beside it.
+  -- A titled panel gives up its top padding, because the plate IS the top padding. It is a real object occupying that edge,
+  -- not something floating above a margin. Left at the default the two both claim the edge and the panel sits four lower
+  -- than an untitled one beside it.
   --
-  -- Only when the caller said nothing about padding. One that names it gets
-  -- exactly what it asked for.
+  -- Only when the caller said nothing about padding. One that names it gets exactly what it asked for.
   --
   if (cfg.title and cfg.padding == nil) then
     p.top = 0
@@ -1149,10 +1084,8 @@ function KUI:CreateInset(cfg, kparent)
   local th = TITLE.panel(frame, cfg, p)
 
   --
-  -- What each side gives up in total, which is what the panel's usable area is
-  -- inset by. Both paddings are the panel's own and apply whatever it is
-  -- drawing; a side with no border on it gives up the four pixels of border
-  -- and nothing else.
+  -- What each side gives up in total, which is what the panel's usable area is inset by. Both paddings are the panel's own
+  -- and apply whatever it is drawing. A side with no border on it gives up the four pixels of border and nothing else.
   --
   local rings = {}
 
@@ -1163,11 +1096,9 @@ function KUI:CreateInset(cfg, kparent)
   end
 
   --
-  -- A title pushes the panel down under itself. The panel's top edge falls
-  -- half a plate below the top of the frame, so that the border runs through
-  -- the middle of the plate, and the content clears the whole plate rather
-  -- than just the border: along that edge the plate has taken the border's
-  -- place, and everything it covers goes with it.
+  -- A title pushes the panel down under itself. The panel's top edge falls half a plate below the top of the frame, so that
+  -- the border runs through the middle of the plate, and the content clears the whole plate rather than just the border:
+  -- along that edge the plate has taken the border's place, and everything it covers goes with it.
   --
   if (th > 0) then
     rings.top = p.top + th + ip.top
@@ -1176,19 +1107,16 @@ function KUI:CreateInset(cfg, kparent)
   frame.rings = rings
 
   --
-  -- What the top edge still owes the title once the panel has stopped being a
-  -- panel. A container gives up nothing on any side, but a plate is a real
-  -- object hanging off the top of the frame and content laid over it would
-  -- simply be on top of the words.
+  -- What the top edge still owes the title once the panel has stopped being a panel. A container gives up nothing on any
+  -- side, but a plate is a real object hanging off the top of the frame and content laid over it would simply be on top of
+  -- the words.
   --
   frame.titlering = (th > 0) and (p.top + th) or 0
 
   --
-  -- Where the panel's own top edge goes. With a title it drops half a plate,
-  -- so that the line it draws runs through the middle of the plate -- less
-  -- half a border, because that line is not the inset frame's edge: the
-  -- border is INSET_BORDER of artwork with the line down the middle of it, so
-  -- the edge has to sit that much higher for the line to come out level.
+  -- Where the panel's own top edge goes. With a title it drops half a plate, so that the line it draws runs through the
+  -- middle of the plate -- less half a border, because that line is not the inset frame's edge: the border is INSET_BORDER
+  -- of artwork with the line down the middle of it, so the edge has to sit that much higher for the line to come out level.
   --
   local pt = p.top
 
@@ -1210,33 +1138,28 @@ function KUI:CreateInset(cfg, kparent)
   frame.content = content
 
   --
-  -- The artwork sits one frame deeper than the panel, inside the frame that
-  -- clips it, so the content has to be lifted clear of it by hand or the
-  -- border draws over everything placed in the panel.
+  -- The artwork sits one frame deeper than the panel, inside the frame that clips it, so the content has to be lifted clear
+  -- of it by hand or the border draws over everything placed in the panel.
   --
   content:SetFrameLevel(frame:GetFrameLevel() + 3)
 
   --
-  -- A back pointer so that a split created inside this panel can find it and
-  -- turn its border off. See SetBorderShown.
+  -- A back pointer so that a split created inside this panel can find it and turn its border off. See SetBorderShown.
   --
   content.owninginset = frame
 
   --
-  -- Panels are meant to be siblings, never nested. An inset drawn inside
-  -- another inset gives a doubled border and a very busy window, which is
-  -- what happens the moment one split is placed inside another -- and Konfer
-  -- nests them two and three deep. So a panel that turns out to be a
-  -- container for further panels stops drawing itself and becomes plain
-  -- space, leaving only the innermost ones visible.
+  -- Panels are meant to be siblings, never nested. An inset drawn inside another inset gives a doubled border and a very
+  -- busy window, which is what happens the moment one split is placed inside another -- and Konfer nests them two and three
+  -- deep. So a panel that turns out to be a container for further panels stops drawing itself and becomes plain space,
+  -- leaving only the innermost ones visible.
   --
   frame.SetBorderShown = function(this, onoff)
     this.inset:SetShown(onoff and this.drawart)
 
     --
-    -- A container is not a panel at all: it holds panels, which bring their
-    -- own padding, so it gives up nothing on any side and the content is the
-    -- whole of it.
+    -- A container is not a panel at all: it holds panels, which bring their own padding, so it gives up nothing on any side
+    -- and the content is the whole of it.
     --
     local rg = this.rings
     local l = onoff and rg.left or 0
@@ -1255,14 +1178,12 @@ function KUI:CreateInset(cfg, kparent)
 end
 
 --
--- The y offset that puts something centred in a panel's CONTENT on the middle
--- of the panel as you see it -- halfway between the two lines its artwork
--- draws. Anchor with SetPoint("RIGHT", content, "RIGHT", x, KUI:PanelMiddle(content)).
+-- The y offset that puts something centred in a panel's CONTENT. Achors with
+-- SetPoint("RIGHT", content, "RIGHT", x, KUI:PanelMiddle(content)).
 --
--- The two are not the same. A panel's rings are not symmetric: a title makes
--- the top one much the deeper of the two, and the lines themselves sit inside
--- the artwork rather than at its edge. Centred in the content, a block of
--- buttons in a titled panel reads several pixels low.
+-- The two are not the same. A panel's rings are not symmetric: a title makes the top one much the deeper of the two, and the
+-- lines themselves sit inside the artwork rather than at its edge. Centred in the content, a block of buttons in a titled
+-- panel reads several pixels low.
 --
 function KUI:PanelMiddle(content)
   local ins = content and content.owninginset
@@ -1277,9 +1198,8 @@ function KUI:PanelMiddle(content)
 end
 
 --
--- Called by both splits: if the frame they are being built in is the inside
--- of a panel, that panel is a container rather than a leaf and should not be
--- drawing a border of its own.
+-- Called by both splits: if the frame they are being built in is the inside of a panel, that panel is a container rather
+-- than a leaf and should not be drawing a border of its own.
 --
 local function unborder_parent(parent)
   if (parent and parent.owninginset) then
@@ -1288,9 +1208,8 @@ local function unborder_parent(parent)
 end
 
 --
--- Say that a pane is going to hold panels of its own rather than content, so
--- it should not draw itself. The splits do this to their parent already; this
--- is for code laying panels out by hand.
+-- Say that a pane is going to hold panels of its own rather than content, so it should not draw itself. The splits do this
+-- to their parent already; this is for code laying panels out by hand.
 --
 function KUI:UseAsContainer(frame)
   unborder_parent(frame)
@@ -4257,12 +4176,12 @@ function KUI:CreateScrollList(cfg, kparent)
 
   --
   -- Held one clear of the left edge so that a selected row's highlight does
-  -- not sit flush against whatever the list is inside. Twenty is reserved on
-  -- the right for the scrollbar, which lives in that strip.
+  -- not sit flush against whatever the list is inside, and SCROLLBAR_COMPENSATE
+  -- clear on the right for the scrollbar, which lives in that strip.
   --
   frame:ClearAllPoints()
   frame:SetPoint("TOPLEFT", parent, "TOPLEFT", 1, 0)
-  frame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -20, 0)
+  frame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0 - KUI.SCROLLBAR_COMPENSATE, 0)
   frame:SetScrollChild(content)
   frame:EnableMouseWheel(true)
   scrollbar:EnableMouseWheel(true)
