@@ -757,10 +757,31 @@ KUI.INSET_PADDING = 4
 KUI.INSET_INNER_PADDING = KUI.WIDGET_GAP
 
 --
+-- The height of a dropdown's box, which is what CreateDropDown gives the
+-- frame. A caller putting a dropdown on a row beside something shorter needs
+-- this to work out how far to drop the shorter thing so that the two sit on
+-- one centre line.
+--
+KUI.DROPDOWN_HEIGHT = 24
+
+--
 -- What a dropdown costs beyond the words in it: the inset before the text and
 -- the arrow button after it, matching where CreateDropDown anchors its text.
 --
 KUI.DROPDOWN_CHROME = 12 + 26
+
+--
+-- How far a dropdown's end caps hang outside the frame, so that the box the
+-- user sees begins where the frame begins. The LabelFrame slice Kore cuts its
+-- caps from carries a soft margin before the border inks, exactly as it does
+-- above and below, and Blizzard's own use of the texture answers it the same
+-- way, anchoring the cap outside the frame rather than trimming the texture.
+--
+-- Without this a dropdown disagrees with itself: a label above one starts at
+-- the frame's left edge and the box under it starts inside that, and a column
+-- of dropdowns and checkboxes has two left edges in it.
+--
+KUI.DROPDOWN_ART_BLEED = 3
 
 --
 -- The box a checkbox draws, which its label starts to the right of. A caller
@@ -2053,7 +2074,18 @@ local function cb_SetText(this, text)
   if (this.text) then
     this.text:SetText(text or "")
     if (this.autosize) then
-      this:SetWidth(this.text:GetStringWidth() + this.boxsize + KUI.INTERNAL_GAP + 12)
+      local w = this.text:GetStringWidth() + this.boxsize + KUI.INTERNAL_GAP + 12
+      --
+      -- A ceiling rather than a size: the frame is as wide as its words need
+      -- until they need more than this, and from there it stops growing and
+      -- the words are cut off at the edge. That is what a translated label
+      -- wants -- snug in the language that fits and never wide enough to
+      -- push what stands beside it off the panel in the one that does not.
+      --
+      if (this.maxwidth and w > this.maxwidth) then
+        w = this.maxwidth
+      end
+      this:SetWidth(w)
     end
     if (this.centerx) then
       local pw = floor(this:GetWidth() / -2)
@@ -2107,6 +2139,7 @@ local function kui_checkradio(cfg, kparent, size, dh, art)
   frame.boxsize = box
   frame.checked = cfg.checked or false
   frame.autosize = cfg.autosize
+  frame.maxwidth = cfg.maxwidth
   frame:HookScript("OnMouseDown", cb_OnMouseDown)
   frame:HookScript("OnMouseUp", cb_OnMouseUp)
   frame:EnableMouse(true)
@@ -2167,6 +2200,19 @@ local function kui_checkradio(cfg, kparent, size, dh, art)
     end
     text:SetJustifyH(cfg.label.justifyh or dh)
     text:SetJustifyV(cfg.label.justifyv or "MIDDLE")
+
+    --
+    -- A caller that fixed this frame's width, or put a ceiling on it, has
+    -- said the words live inside that, so they are cut off at its edge rather
+    -- than wrapped. Wrapping is much the worse of the two failures: the frame
+    -- goes on reporting the height it was given while the words grow
+    -- downwards out of it and through whatever is drawn underneath. A frame
+    -- free to size itself grows to fit its words and has nothing to overflow,
+    -- so it keeps the default.
+    --
+    if (not frame.autosize or frame.maxwidth) then
+      text:SetWordWrap(false)
+    end
   end
 
   frame.SetText = cb_SetText
@@ -5583,7 +5629,12 @@ end
 -- the child: StopTimeoutCounter() when the cursor moves into a child frame
 -- and StartTimeoutCounter() when it leaves.
 --
-local function create_dd_sa(cfg, parent, toplevel, ispopup)
+-- This assigns the local forward declared above dd_refresh_frame, which is
+-- what builds a submenu and therefore has to be able to reach this while
+-- being written before it. Declaring it local again here would make a second
+-- local and leave the one that function closed over nil.
+--
+function create_dd_sa(cfg, parent, toplevel, ispopup)
   assert(cfg, "dropdown config must be provided")
   assert(cfg.name, "you must provide a frame name")
   assert(cfg.items, "dropdown items must be provided ("..cfg.name..")")
@@ -5626,23 +5677,23 @@ local function create_dd_sa(cfg, parent, toplevel, ispopup)
     -- it lie, and every caller then compensates by eye with a constant of its
     -- own -- which is what everything anchored inside here used to do.
     --
-    frame, ppf = newobj(cfg, parent, 100, 24, cfg.name .. "DDContainer")
+    frame, ppf = newobj(cfg, parent, 100, KUI.DROPDOWN_HEIGHT, cfg.name .. "DDContainer")
     frame:SetWidth(cfg.dwidth)
-    frame:SetHeight(24)
+    frame:SetHeight(KUI.DROPDOWN_HEIGHT)
 
     local lt = frame:CreateTexture(frame:GetName() .. "Left", "ARTWORK")
     lt:SetTexture(tn)
     lt:SetTexCoord(0.125, 0.2109375, 0.25, 0.75)
     lt:SetWidth(12)
     lt:SetHeight(32)
-    lt:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 2)
+    lt:SetPoint("TOPLEFT", frame, "TOPLEFT", 0 - KUI.DROPDOWN_ART_BLEED, 2)
 
     local rt = frame:CreateTexture(frame:GetName() .. "Right", "ARTWORK")
     rt:SetTexture(tn)
     rt:SetTexCoord(0.78128, 0.875, 0.25, 0.75)
     rt:SetWidth(12)
     rt:SetHeight(32)
-    rt:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 2)
+    rt:SetPoint("TOPRIGHT", frame, "TOPRIGHT", KUI.DROPDOWN_ART_BLEED, 2)
 
     local mt = frame:CreateTexture(frame:GetName() .. "Middle", "ARTWORK")
     mt:SetTexture(tn)

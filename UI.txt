@@ -375,7 +375,20 @@ tooltips.
 cfg.autosize [boolean]
   Usually labels do not form part of the width or height of the widget. However, labels are so intrinsic to this widget type
   that they do. Set this to true if the containing frame is to be sized when the label of the box changes or is set, false if
-  the size is to remain exactly as specified. Defaults to false.
+  the size is to remain exactly as specified. Defaults to true for a label to the right of the box and false for one to its
+  left.
+
+  Note that cfg.width only survives if autosize is false. An autosizing widget measures its words when the label is set,
+  which happens as it is built, and overwrites whatever width it was given.
+
+cfg.maxwidth [number]
+  A ceiling on how wide an autosizing widget will grow. Without it the frame is exactly as wide as its words need, however
+  wide that turns out to be; with it the frame stops there and the words are cut off at the edge instead. This is what a
+  translated label wants - snug in the language that fits, and never, in the language that does not, wide enough to push
+  whatever stands beside it off the panel.
+
+  Cutting off is only possible because the label does not wrap, so a widget given either cfg.maxwidth or a fixed width turns
+  wrapping off. One left free to size itself grows to fit its words and has nothing to overflow, so it keeps it.
 
 cfg.checked [boolean]
   Set to true if the box should start out in the checked state, false if not.
@@ -429,7 +442,12 @@ This widget supports tooltips.
 cfg.autosize [boolean]
   Usually labels do not form part of the width or height of the widget. However, labels are so intrinsic to this widget type
   that they do. Set this to true if the containing frame is to be sized when the label of the box changes or is set, false if
-  the size is to remain exactly as specified. Defaults to false.
+  the size is to remain exactly as specified. Defaults to true for a label to the right of the box and false for one to its
+  left.
+
+cfg.maxwidth [number]
+  A ceiling on how wide an autosizing widget will grow, exactly as described for KUI:CreateCheckBox above. Radio buttons and
+  check boxes are built by the same code and size themselves the same way.
 
 cfg.group [string]
   The name of the radio button group to which this radio button belongs.
