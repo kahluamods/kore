@@ -564,6 +564,22 @@ K.cyan = function (str)
   return "|cff00ffff" .. str .. "|r"
 end
 
+--
+-- TEXT, or DATA when there is no TEXT, as a link carrying KIND and DATA, for a string label with an onlink handler to catch
+-- (see KUI:CreateStringLabel). It is WoW's own link escape, the one item links use, with KIND:DATA as the part a click
+-- hands back, so KIND may not contain a colon although DATA may. On a client whose frames cannot carry links it is plain
+-- white text instead, so that nothing looks clickable that is not.
+--
+function K.Link(kind, data, text)
+  local shown = text or data
+
+  if (not UIParent.SetHyperlinksEnabled) then
+    return K.white(shown)
+  end
+
+  return "|cff71d5ff|H" .. kind .. ":" .. data .. "|h" .. shown .. "|h|r"
+end
+
 function K.printf(...)
   local first = ...
   local frame = DEFAULT_CHAT_FRAME

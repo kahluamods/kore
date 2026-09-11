@@ -290,6 +290,15 @@ cfg.autosize [boolean]
 cfg.border [boolean]
   If set to true, surrounds the label with a thin (tooltip style) border.
 
+cfg.onlink [function]
+  Makes links in the label's text clickable: function(label, kind, data, text, button), called with the KIND and DATA the
+  link was made with by K.Link in Kore, the words it shows and the mouse button. WoW gives an addon no way to open a
+  browser or a mail program, so what a click usually does is put the address somewhere the user can copy it from. Taken
+  once when the label is made. A client whose frames cannot carry links gets no handler, and K.Link draws plain text there.
+
+    text = strfmt("Visit %s for more.", K.Link("url", "https://example.com")),
+    onlink = function(label, kind, data) ... end,
+
 ret:SetText(string)
   Sets the label's string to the one specified.
  

@@ -46,16 +46,6 @@ KC.debug_id = KORECOMMS_MAJOR
 --
 KC.WIRE_VERSION = 1
 
---
--- The channels a caller's config can talk on. This is the only field
--- KoreComms interprets in a config table, and it has just two meaningful
--- values: the guild addon channel, or the group the player is currently in.
--- Anything absent or unrecognised is treated as CHANNEL_OTHER, so a caller
--- that knows nothing about channels still gets sensible group-local delivery.
---
-KC.CHANNEL_GUILD = 1
-KC.CHANNEL_OTHER = 2
-
 local K, KM = LibStub:GetLibrary("Kore")
 assert(K, "KoreComms requires Kore")
 assert(tonumber(KM) >= 1, "KoreComms requires Kore r1 or later")
@@ -101,16 +91,16 @@ local rshift = bit.rshift
 local MakeFrame= KUI.MakeFrame
 
 --
--- Every Konfer-family *addon* that has registered with Kore, keyed by its
--- addon handle. RegisterComms() records the addon here, and uses it to
+-- Every table that has registered to talk on the wire, keyed by the handle in
+-- its comms descriptor. RegisterComms() records it here, and uses it to
 -- recognise a repeat registration.
 --
--- Do not confuse this with the loot distribution policies -- Suicide Kings,
--- EP/GP, DKP, PUG. Those are not addons and they do not appear here: they
--- register with the Konfer addon itself, through its konfer:RegisterPolicy(),
--- because Konfer is the system that knows about distribution policy. Kore
--- deliberately does not, so that the looting mechanics it provides stay
--- policy-agnostic.
+-- What a registered table is, this library neither knows nor cares. An addon
+-- registers itself; an addon that is several things at once may register each
+-- of them, and each is then a separate endpoint with a prefix of its own. A
+-- message sent by one reaches only the tables subscribed to that same prefix
+-- on other clients, so where a message came from is a fact of its arrival and
+-- nothing in it has to say so.
 --
 -- Kept on KC rather than in _G so that the name "Konfer" in the global
 -- namespace belongs to the Konfer addon alone. LibStub hands back the same
@@ -210,6 +200,9 @@ function KC:OldProtoDialog()
   dlg:Show()
 end
 
+-- What goes in the envelope's config field when the sender gave no config.
+local NO_CONFIG = "0"
+
 --
 -- This is the function that is responsible for creating all internal addon
 -- messages we send. It implements all and any "protocol" we want to use to
@@ -268,7 +261,16 @@ local function send_addon_msg(self, cfg, cmd, prio, dist, target, ...)
     return nil
   end
 
-  local cfg = cfg or self.currentid or "0"
+  --
+  -- The config id is the caller's, carried exactly as given and never looked
+  -- at here. Whether a message has one, and what it means, is the business of
+  -- whoever sends and receives it.
+  --
+  -- The envelope always has a field for it, so a message sent without one
+  -- carries NO_CONFIG there and comm_received() hands the receiver nil. That
+  -- makes NO_CONFIG a value no caller may use as a config id of its own.
+  --
+  local cfg = cfg or NO_CONFIG
   local prio = prio or "ALERT"
   local fs = strfmt("%02x:%s:%s:", proto, rcmd, cfg)
   local crc = H:CRC32(fs, nil, false)
@@ -387,34 +389,28 @@ local function comm_received(self, prefix, msg, dist, snd, dispatcher)
     return
   end
 
+  -- The sender gave no config, so neither does the receiver get one.
+  if (cfg == NO_CONFIG) then
+    cfg = nil
+  end
+
   dispatcher(self, sender, proto, cmd, cfg, LS:Deserialize(inflated))
 end
 
 --
--- Send to whichever channel the config named by CFG asks for. Which of RAID
--- or PARTY CHANNEL_OTHER resolves to comes from KoreParty, and is further
--- constrained by the raid and party flags in the caller's descriptor.
+-- Send to the group the player is in. Whether that is RAID or PARTY comes
+-- from KoreParty, and is further constrained by the raid and party flags in
+-- the caller's descriptor. CFG rides in the envelope and nothing else.
 --
 local function send_to_raid_or_party_am_c(self, cfg, cmd, prio, ...)
-  local cfg = cfg or self.currentid
-  local channel = KC.CHANNEL_OTHER
-
-  if (cfg and self.configs and self.configs[cfg]) then
-    channel = self.configs[cfg].channel or KC.CHANNEL_OTHER
-  end
-
   local dist = nil
 
-  if (channel == KC.CHANNEL_GUILD and K.player.is_guilded) then
-    dist = "GUILD"
-  else
-    if (KRP.in_party and self.comms.party) then
-      dist = "PARTY"
-    end
+  if (KRP.in_party and self.comms.party) then
+    dist = "PARTY"
+  end
 
-    if (KRP.in_raid and self.comms.raid) then
-      dist = "RAID"
-    end
+  if (KRP.in_raid and self.comms.raid) then
+    dist = "RAID"
   end
 
   if (not dist) then
@@ -703,9 +699,22 @@ local function kk_version_check_reply(self, sender, version)
 end
 
 --
--- Register a new addon (like Konfer) with the base Konfer system. The single
--- argument to this function is a table with various parameters, as described
--- below. Returns a handle to the mod, which is a table.
+-- Register a table to talk on the wire. KMOD is the table and KMOD.comms
+-- describes it:
+--
+--   handle   Unique among everything registered. The registry is keyed by
+--            it, and it names the frames this library builds on KMOD's
+--            behalf, so it must be usable as the start of a frame name.
+--   title    What those frames call KMOD.
+--   raid     True if KMOD may send to a raid.
+--   party    True if KMOD may send to a party.
+--
+-- Returns that descriptor, which is what the registry holds, and returns the
+-- one already registered if the handle is taken rather than registering twice.
+--
+-- KMOD supplies protocol and CHAT_MSG_PREFIX, and subscribes to that prefix
+-- itself with K.RegisterComm once it is ready to hear anything. Everything it
+-- sends goes out under that prefix and nothing else.
 --
 function KC.RegisterComms(kmod)
   local targ = kmod.comms
@@ -720,7 +729,6 @@ function KC.RegisterComms(kmod)
 
   assert(kmod.protocol)
 
-  kmod.comms = targ
   kmod.CSendAM = send_to_raid_or_party_am_c
   kmod.SendAM = send_to_raid_or_party_am
   kmod.CSendGuildAM = send_to_guild_am_c
@@ -736,4 +744,6 @@ function KC.RegisterComms(kmod)
   kmod.KonferCommReceived = comm_received
 
   registry[targ.handle] = targ
+
+  return targ
 end

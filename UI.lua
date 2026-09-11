@@ -1786,6 +1786,25 @@ function KUI:CreateStringLabel(cfg, kparent)
   frame:SetText(cfg.text or "")
   frame:SetEnabled(cfg.enabled)
 
+  --
+  -- A label whose text holds links made by K.Link catches clicks on them when it is given somewhere to send them. The
+  -- handler is taken now rather than read from CFG at click time, callers being in the habit of reusing one table for
+  -- the next widget they make. A client whose frames cannot carry links gets none, and K.Link has drawn none there.
+  --
+  local onlink = cfg.onlink
+
+  if (onlink and frame.SetHyperlinksEnabled) then
+    frame:SetHyperlinksEnabled(true)
+    frame:EnableMouse(true)
+    frame:SetScript("OnHyperlinkClick", function(this, link, text, button)
+      local _, _, kind, data = strfind(link, "^([^:]+):(.*)$")
+
+      if (kind) then
+        onlink(this, kind, data, text, button)
+      end
+    end)
+  end
+
   return frame
 end
 
@@ -4209,6 +4228,15 @@ function KUI:CreateScrollList(cfg, kparent)
   frame.visibleslots = 0
   frame.itemcount = 0
   frame.pixeloffset = 0
+
+  --
+  -- Whether the bar is wanted is decided in sl_updatevals, which only runs on
+  -- UpdateList. A list is built empty and may never be updated at all, so it
+  -- starts with the bar hidden rather than with whatever the stock template
+  -- left showing: an empty list wearing a scroll bar is a lie about having
+  -- something to scroll to.
+  --
+  scrollbar:Hide()
 
   --
   -- Half the bar's height is half a page, which reads as a page turn on a list
