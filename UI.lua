@@ -6355,3 +6355,18 @@ function KUI:CreatePopupList(cfg, parent)
 
   return ret
 end
+
+--
+-- How to make the plastic look from Claude
+--
+-- local white = f:CreateTexture(nil, "ARTWORK")
+-- white:SetAllPoints(f)
+-- white:SetTexture(KIT)
+-- white:SetTexCoord(unpack(skin.button_white))
+-- 
+-- local chroma = f:CreateTexture(nil, "ARTWORK", nil, 1)   -- one sub-layer above
+-- chroma:SetAllPoints(f)
+-- chroma:SetTexture(KIT)
+-- chroma:SetTexCoord(unpack(skin.button_chroma))
+-- chroma:SetBlendMode("ADD")
+-- 
