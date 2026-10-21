@@ -1,0 +1,36 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+
+<Script file="Libs\LibStub.lua"/>
+<Script file="Libs\CallbackHandler-1.0.lua"/>
+<Script file="Libs\AceAddon-3.0.lua"/>
+<Script file="Libs\AceLocale-3.0.lua"/>
+<Script file="Libs\AceEvent-3.0.lua"/>
+<Script file="Libs\ChatThrottleLib.lua"/>
+<Script file="Libs\AceTimer-3.0.lua"/>
+<Script file="Libs\AceComm-3.0.lua"/>
+<Script file="Libs\AceDB-3.0.lua"/>
+<Script file="Libs\LibSerialize.lua"/>
+<Script file="Libs\LibDeflate.lua"/>
+<Script file="Libs\LibJsonLua.lua"/>
+
+<Script file="Locales\Kore-enUS.lua"/>
+<Script file="Locales\Kore-deDE.lua"/>
+<Script file="Locales\Kore-frFR.lua"/>
+
+<Script file="Kore.lua"/>
+
+<Script file="Hash.lua"/>
+<Script file="UI.lua"/>
+<Script file="UIKit.lua"/>
+<Script file="Party.lua"/>
+<Script file="Loot.lua"/>
+<Script file="UserDB.lua"/>
+<Script file="UserUI.lua"/>
+<Script file="UserEditor.lua"/>
+<Script file="UserOffers.lua"/>
+<Script file="Comms.lua"/>
+<Script file="CharInfo.lua"/>
+<Script file="Dialogs.lua"/>
+
+</Ui>

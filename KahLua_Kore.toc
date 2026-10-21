@@ -1,0 +1,16 @@
+## Interface: 120100, 11509, 20506, 38002, 40402, 50504, 16001
+## Title: Kore Libraries |cffff2222-K-|r
+## IconTexture: Interface\AddOns\KahLua_Kore\Textures\KoreIcon
+## Group: KahLua
+## Notes: Core libraries for all KahLua mods.
+## Author: Cruciformer
+## Version: @revision@
+## X-email: me@cruciformer.com
+## X-Credits: Ace3 development team
+## X-Category: Library
+## X-License: Apache
+## X-git: git@github.com:kahluamods/kore
+## SavedVariables: KoreDB
+## RequiredDeps: KahLua
+
+Kore.xml

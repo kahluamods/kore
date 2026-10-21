@@ -1,0 +1,3037 @@
+KahLua Kore - User Interface (KoreUI)
+======================================
+
+KoreUI is a library of useful user interface management functions used by all KahLua modules. While it was originally
+designed to be tightly coupled with the rest of KahLua Kore (Kore), it provides functionality that is useful and
+traditionally fairly difficult to work with using the standard Blizzard code. Therefore, I have made it possible for this
+portion of Kore to be packaged as a stand-alone library so that other addon authors can more easily create their won user
+interfaces. The parts that are most likely to interest other users is the tabbed dialog code, the dropdown menu code and the
+popup menu code. That is the vast majority of the KoreUI code anyway, the rest of it is mostly just a thin wrapper on top of
+normal Blizzard frame types.
+
+KoreUI functions are divided into three main groups:
+1.  Individual widgets (buttons, edit boxes etc).
+2.  Container widgets (dialogs and tabbed dialogs).
+3.  Utilities (string measurement etc).
+
+1.  Basic Usage
+===============
+
+Almost all KoreUI functions take two and only two arguments: a configuration table and the parent frame to which the widget
+is to be attached, which if not specified defaults to UIParent. For example, to create a button, you could use:
+
+  local button = KUI:CreateButton ({text = "Push me!"})
+
+All options to KoreUI widgets and functions are passed through the first argument, which is a Lua table with a number of
+named elements that control what KoreUI does. There are some elements common to all or most widgets, and some widgets have
+extra elements to control their behaviour. The common elements all widgets share are:
+
+cfg.name [string]
+  The name of the widget or container. Certain widget types must have a name, others its optional. Where a name is mandatory
+  it is discussed in the widget type.
+
+cfg.x, cfg.y [number or string]
+  Where to position this object relative to its parent. Internally KoreUI performs the following actions:
+
+    frame:SetPoint ("LEFT", parent, "LEFT", x, 0)
+    frame:SetPoint ("TOP, parent, "TOP, 0, y)
+
+  x can also be the string "CENTER" in which case the widget will be centered horizontally withing the parent, and y can be
+  the string "MIDDLE" to be centered vertically. If either x or y are not specified then that particular point ("LEFT" for x,
+  "TOP" for y) are not set by KoreUI and you will need to place the returned frame yourself.
+
+cfg.width, cfg.height [number]
+  Override the default widget width and height. Each widget type has a default, and this allows you to set your own values.
+
+cfg.enabled [boolean]
+  Most widgets support this element, and if set, sets the default state of the element. If not specified it defaults to true.
+  If you want the widget to start out life disabled, set this to false.
+
+cfg.label [table]
+  Many widgets allow you to set a lable for the widget. If the widget type uses labels, this is how you set its value and
+  properties. This element is a table which can contain the following elements:
+  text
+    The actual text of the label. Must be specified if the label element appears in the config table.
+  font
+    The name of the font to use for the label. Depending on the widget type this has different default values if not specified.
+  color
+    The color for the lable. This is a table with 4 named values: r, g, b and a for the red, green, blue and alpha channels
+    respectively. if a is omitted it defaults to 1. The values for r, g and b must be between 0 and 1.
+  width - width
+  height - height
+  pos
+    Where to position the label with regards to the UI element itself. Not all widgets support all values but most do. The
+    possible values are "TOP" to place the label above the widget, "BOTTOM" to display it below, "LEFT" to display it to the
+    left, and "RIGHT" to display it to the right.
+  justifyh, justifyv
+    How the text is justified in the label frame horizontally and vertically. justifyh defaults to "LEFT" for most widgets,
+    and justifyv defaults to "MIDDLE".
+
+cfg.parent [table]
+  If you need the widget to have a specific parent, set it here. Otherwise the parent passed as the argument to the widget
+  creation function is used. If the parent frame passed to the creation function is a KoreUI container widget and it has a
+  member called "content", then this is set as the actual parent.
+
+cfg.level [number]
+  Set the frame level to the value indicated. Not often used but its here if you need it. The level must be no greater than
+  128 above the parent's frame level.
+
+cfg.canmove [boolean]
+  Some widget types, and especially the container types, allow you to mark the container as movable. Set this to true if you
+  want the user to be able to move the thing, false if not. If set to true, will cause the OnStartMoving and OnStopMoving
+  events to fire when moving starts and stops.
+
+cfg.canresize [boolean or string]
+  Some widget types and containers support resizing. If you want to allow resizing, set this to boolean true if you want
+  resizing in both the vertical and horizontal planes. If you only want to allow vertical resizing, set this to "HEIGHT", and
+  if you only want to allow horizontal resizing set this to "WIDTH". The string "BOTH" has the same meaning as boolean true
+  (resizing in both planes).
+
+cfg.minheight, cfg.maxheight [number]
+  If cfg.canresize enables window resizing, then these two values give the minimum and maximum height that the widget or
+  container can be resized to.
+
+cfg.minwidth, cfg.maxwidth [number]
+  If cfg.canresize enables window resizing, then these two values give the minimum and maximum width that the widget or
+  container can be resized to.
+
+cfg.tooltip [table]
+  Some widgets support setting a tooltip that will be displayed when the mouse enters them. For those widgets, you set the
+  tooltip text and title using this table. It can have the following three members:
+  title
+    The title for the tooltip, displayed at the top of the tooltip using HIGHLIGHT_FONT_COLOR. By special dispensation, if
+    this is the string "$$" then it will be replaced by the title text of the enclosing widget.
+  text
+    The substantive text for the tooltip, displayed using NORMAL_FONT_COLOR. This can have embedded newlines.
+  func
+    custom placement function. if this is set then the tooltip is anchored to the widget by default, with its topleft set to
+    just to the right of the widget's topleft. you can change this placement and the frame it is anchored to in the function.
+    it is passed a single argument, the widget frame pointer.
+
+cfg.tint, cfg.accent, cfg.gem [table]
+cfg.tintflat, cfg.markcolour [boolean]
+cfg.parts [table]
+  The colours the widget and everything under it wear. Every widget and container takes them. See section 2.
+
+2.  The Kit and its Colours
+===========================
+
+Everything KoreUI draws is a piece of one texture sheet, KoreUIKit, and UIKit.lua is the generated map of where each piece
+lies on the sheet and how it may be drawn. Nothing of Blizzard's is drawn but tooltips, fonts and whatever icons a caller
+puts in. The textures live in KUI.TEXTURE_PATH, which is Kore's own Textures folder whether Kore is installed as an addon of
+its own or embedded in a mod.
+
+The kit is drawn in gold metal and black enamel. A tinted piece is two layers, a white one and a chroma one added over it,
+and the chroma layer wears a colour, so gold metal becomes ruby or sapphire metal while the black enamel stays black. A flat
+piece wears its colour on both layers and reads as one coloured object, which is what stones and fills want. A piece with
+colours of its own, such as a checkbox's tick or the close button, keeps them. A glow is light added over whatever is under
+it.
+
+2.1 The three colours
+---------------------
+
+A window wears three colours, and any frame can set any of them for itself and everything under it:
+
+cfg.tint [table]
+  The colour of the window's metal, which is its rims, buttons, tabs, plaques and almost every other piece in it.
+
+cfg.accent [table]
+  The colour of what marks the window as its own, which is its portrait's frame and the plaque its title sits in.
+
+cfg.gem [table]
+  The colour of every stone set in the window, and of the fill in its selected page and tab buttons.
+
+A colour is a table of r, g and b, each from 0 to 1. Every piece finds its colour by walking up from the frame it is drawn on
+to the nearest frame that set one, so a checkbox deep inside a window wears the window's colours without every widget
+between having to pass them on. The tint comes from the nearest frame that sets either a tint or an accent, so a frame that
+names only an accent wears it as its tint too. With nothing set anywhere above it, a piece wears the kit's defaults.
+
+The palette. Every colour the kit knows is named, the names all begin COLOR_, and nothing anywhere writes one out as
+numbers. A colour is recognisable as one by its name, and grepping for the prefix finds the lot.
+
+KUI.COLOR_REDGOLD
+  { r = 1.0, g = 0.59, b = 0.0 }, the fully saturated form of the gold the kit is drawn in. A tinted piece wearing it is its
+  drawing exactly.
+
+KUI.COLOR_GOLD
+  { r = 1.0, g = 0.80, b = 0.0 }, the yellower gold the kit writes in. The colour of a title on its plaque, which sets it
+  rather than taking whatever its font carries, so anything drawn to match a title can be exactly it.
+
+KUI.COLOR_SAPPHIRE
+  { r = 0.031, g = 0.4, b = 1.0 }, the colour of the stones. An accent never stands in for the gem colour, so the stones are
+  sapphire in a window of any accent unless that window names a gem colour of its own.
+
+KUI.COLOR_BLACK   KUI.COLOR_RED     KUI.COLOR_GREEN  KUI.COLOR_YELLOW
+KUI.COLOR_BLUE    KUI.COLOR_MAGENTA KUI.COLOR_CYAN   KUI.COLOR_WHITE
+  The eight a terminal has, at full strength. Nothing the kit draws is any of these; they are here so that a caller wanting
+  a plain primary says which one rather than carrying a row of ones and zeroes, and so that two places wanting the same red
+  are demonstrably wanting the same red.
+
+KUI.COLOR_EMERALD  { r = 0.000, g = 1.000, b = 0.478 }
+KUI.COLOR_AZURE    { r = 0.000, g = 0.323, b = 1.000 }
+KUI.COLOR_PURPLE   { r = 0.517, g = 0.000, b = 1.000 }
+KUI.COLOR_AMBER    { r = 1.000, g = 0.550, b = 0.000 }
+KUI.COLOR_RUBY     { r = 1.000, g = 0.000, b = 0.067 }
+  The stones, each named for what it is rather than for whoever wears it. Every one is fully saturated with its brightest
+  channel at one, because the kit multiplies its drawing by a colour and multiplying can only darken: a colour given any
+  less to start with comes out dull rather than coloured. Anything at all may use them.
+
+  Azure is neither the sapphire above nor the plain blue: it is bluer than the stones and lighter than the primary, which is
+  what makes it a colour of its own rather than either of them at a different strength.
+
+The defaults. Which of the palette the kit reaches for when nobody has said. These are what the kit uses and what a caller
+should use; the palette entries themselves are the answer to "which colour is that", not to "what should this be". A piece
+falling back is asking for the default, and what the default happens to be is one line rather than a decision repeated
+everywhere something falls back.
+
+KUI.DEFAULT_ARTWORK_COLOR
+  What a piece and a word wear with no colour named anywhere above them: the tint and the accent of anything nobody gave
+  one, and the colour every title is written in. COLOR_GOLD today.
+
+KUI.DEFAULT_FILL_COLOR
+  What fills a stone, and the selected page and tab buttons with it, wherever no gem colour was named. COLOR_SAPPHIRE today.
+
+KUI.DEFAULT_CHANGED_COLOR
+  What a widget's value is written in while it differs from what is saved, which ret:SetChanged turns on. COLOR_CYAN today.
+
+cfg.tintflat [boolean]
+  Draw the tint flat, multiplying both layers of every tinted piece by it. A dark tint added to the metal in the usual way
+  gives light steel, and only multiplying makes it dark. It is inherited like the colours. An accent standing in for the
+  tint is always drawn the usual way.
+
+ret:SetTint(r, g, b)
+ret:SetAccent(r, g, b)
+ret:SetGem(r, g, b)
+  Change a frame's own colour after it is made, and redraw every piece under it. Each takes a colour table or three numbers,
+  one number alone being a grey, and nil takes the frame's own colour away so that it wears whatever is above it again. Every
+  widget and container has these.
+
+2.2 Parts
+---------
+
+Which of the three colours a piece wears depends on the part it plays. cfg.parts on any frame changes that for the frame and
+everything under it, as a table of part names to "tint", "accent" or "gem". The parts and what they wear unless told
+otherwise are:
+
+  gem       "gem"     a stone set in a plaque, a tab, a page button, a slider's knob or a scrollbar's thumb
+  titlegem  "accent"  the stone in the plaque a tabbed dialog's title sits in
+  portrait  "accent"  the frame round a tabbed dialog's portrait
+  title     "accent"  the plaque a tabbed dialog's title sits in
+  plaque    "tint"    the plaque over a panel or a dialog
+  glow      "tint"    the glow under a menu row the pointer is on, or a list row where the list asks for the glow
+  rowrim    "tint"    the ring round the selected row of a list
+  tabfill   "gem"     the fill in a selected page or tab button
+  buttonfill "gem"    the fill in a button's or a closed dropdown's dark middle, unless cfg.buttonfill turns it off
+  mark      "tint"    the orb in a radio button, and a tick or cross told to wear a window colour
+
+A piece that plays no part, or one not named here, wears the tint. So a window whose panel plaques wear its accent is
+
+  KUI:CreateTabbedDialog({ ..., accent = red, parts = { plaque = "accent" } })
+
+cfg.markcolour [boolean]
+  A checkbox's tick or cross and a menu item's check keep their own green or red. Set this to false on the checkbox, the menu
+  or any frame above them and they wear the mark part's colour instead, their brightness multiplied by it. It is inherited,
+  so true on a frame inside one that said false gives that frame's marks their own colours back.
+
+cfg.buttonfill [boolean or table]
+  How the dark middle of every button and every closed dropdown made on this frame or under it is filled. Every one is filled
+  unless told otherwise, with the buttonfill part's colour, the gem colour unless cfg.parts says otherwise, darkened by
+  KIT.FILL_SHADE, which is the fill a selected page or tab button wears. So a dialog of any kind has sapphire buttons without
+  asking. A colour table fills it with exactly that colour. False gives no fill, and true gives the part's fill back under a
+  frame that said false. Left out, the frames above decide, and with none of them saying, the fill is on. It is read when the
+  button or dropdown is made. A disabled one shows no fill and greys like any other.
+
+2.3 Disabled pieces
+-------------------
+
+A piece on a disabled widget wears a dim grey drawn flat, whatever its window's colours, so that it sits back from everything
+that can be used, and shows no hovered or pressed look. A piece with colours of its own is desaturated and dimmed to half its
+brightness. The words on a widget are dimmed by the widget itself, usually to half their colour.
+
+2.4 Pieces of your own
+----------------------
+
+piece = KUI:CreatePiece(frame, name, opts)
+  A piece of the kit called NAME, as UIKit.lua names it, drawn on FRAME. OPTS may be left out, or have any of:
+
+    layer      the draw layer, "ARTWORK" if not given
+    sublevel   the sublevel of its lowest texture. A tinted piece uses that one and the three above it, so no more than 4.
+    flat       true for the flat look
+    part       which part in section 2.2 it plays, and so which colour it wears
+    accent     a colour it wears whatever its window's
+    shade      what its colour is multiplied by, below 1 to darken it
+    intensity  how strong a glow is
+    accented   true for a piece with colours of its own that is to wear its window's colour instead
+    states     { normal, hover, pressed }, each { r, g, b }, what the piece's drawing is multiplied by in each state. Above
+               one brightens. Left out it is the kit's own, measured from its buttons: a few percent, which a small piece
+               such as a stone barely shows. The close button uses { 1, 1.5, 0.8 } in every channel.
+
+  A piece draws nothing until it has a box. piece:SetBox(region, l, t, r, b, thick) anchors the box to REGION inset by L, T,
+  R and B and lays the piece out. Or piece:Box() hands back the box, an empty texture to anchor like any region, and the
+  caller calls piece:Layout(thick) once it is placed. THICK is how many pixels across the piece is drawn along its short
+  side, which fixes how big its ends are, only the runs between them stretching. Left out, the piece is drawn at the size it
+  was drawn at.
+
+  A piece also has SetShown, Show, Hide and IsShown, SetAlpha, SetEnabled, and SetAccent(colour), which gives it a colour it
+  wears whatever its window's or with nil takes that away again.
+
+  w, h = piece:natural() is the size the piece was drawn at, for one that is to keep its own shape at some other size. A
+  piece is drawn into whatever box it is given and will stretch to fill it, so fitting one to a space it does not share the
+  proportions of means sizing the bounded side yourself and taking the other from this.
+
+    local w, h = tick:natural()
+    box:SetSize(14, 14 * h / w)     -- as wide as there is room for, as tall as that makes it
+
+    local fill = KUI:CreatePiece(bar, "TimerFill", { layer = "ARTWORK", accent = { r = 0, g = 1, b = 0 } })
+    fill:SetBox(bar, 0, 0, 0, 0)
+
+colour = KUI:GetAccent(frame)
+  The accent FRAME wears, which is its own, that of the nearest frame above it that has one, or KUI.DEFAULT_ARTWORK_COLOR.
+
+mark = KUI:RowHighlight(row)
+  Give ROW, a button in a scroll list or on a scroll frame's canvas, the mark its list shows while the pointer is on it, and
+  return the mark. That is a faint fill, the lighter charcoal or what a list made with cfg.highlight = "DARK" or "GRAIN"
+  asks for, or the kit's glow in a list made with cfg.highlight = "GLOW" (see KUI:CreateScrollList). ROW must already be
+  parented inside the list, since that is where it finds out which. KUI.NewItemHelper does this for the rows it makes.
+
+KUI:RowSelected(row, onoff)
+  Mark ROW selected the way its list marks a selection, the whole fill with a ring in the window's tint or a stronger
+  glow, or take the mark away. KUI.HighlightItemHelper does this for a scroll list.
+
+indent = KUI:SetRowTree(row, kind, x, lead)
+  Draw ROW, a row of the caller's own making in a scroll list, as part of a tree, exactly as a column list's row:SetTree
+  does: KIND is nil, "branch" or "end", X is where the row's words start when it is in no tree, and LEAD stands the whole
+  connector in from there. Answers how far past X the words should now start, 0 for no connector, which the caller moves
+  them by. A column list's rows and KUI.NewItemHelper's do all of this for themselves.
+
+icon = KUI:CreateRoleIcon(frame, size)
+  A SIZE square texture on FRAME for showing somebody's role, the game's own group finder icons from
+  KUI.ROLE_ICON_TEXTURE, which every client has: a shield for a tank, a cross for a healer and a sword for everybody else,
+  melee, ranged and caster alike. They are the one piece of Blizzard's art KoreUI draws, because they are what a player
+  already reads as those roles. Anchor it wherever it goes.
+
+  icon:SetRole(role) takes a K.ROLE_ number and shows its icon, or hides for K.ROLE_UNSET or nil. A hidden icon keeps its
+  place, so a column of them down a list lines up whatever is in each. KU:UserRoles(name) answers the two roles a person
+  plays, main spec and off spec.
+
+kind = KUI:RoleIconKind(role)
+  Which icon a K.ROLE_ number draws as, "tank", "healer" or "damage", or nil for none. Two roles answering the same draw the
+  same icon, which is how a caller showing two of them tells that the second would say nothing the first has not.
+
+coord = KUI:RoleIconCoord(kind)
+  Where the icon for KIND, "tank", "healer" or "damage", is in KUI.ROLE_ICON_TEXTURE, as a table of left, right, top and
+  bottom, which is what a menu item's iconcoord takes. Nil for any other kind.
+
+3.  Utility functions
+=====================
+
+These functions do not take the usual configuration table and parent as their arguments. They are simply useful functions
+used throughout the KoreUI internals and useful outside too.
+
+width, height = KUI:MeasureStrWidth (str, font)
+  Measures and returns the absolute width and height of the specified string when using the specified font. If no font is
+  specified then this defaults to the last font used in a call to this or GetFontColor below.
+
+width, str = KUI:WidestString (strings, font)
+  Measures every string in the list and returns how wide the widest of them comes out, and which one it was. Font defaults to
+  GameFontNormal, which is what a label is drawn in unless it says otherwise.
+
+  This is what a column of labelled widgets is asking for. A label sized to its own words puts its widget wherever that
+  particular word happens to end, so a stack of them comes out ragged; give every label this one width and their widgets line
+  up down a single edge:
+
+    local lw = KUI:WidestString({ L["User Name"], L["User Class"] })
+    ... label = { text = L["User Name"], pos = "LEFT", width = lw } ...
+
+  Measuring rather than declaring a number is the point. Which of the strings is the longest is a question about the locale,
+  and a width that lines up perfectly in one language is crooked in the next.
+
+width = KUI:DropDownWidth(strings, font)
+  The dwidth a dropdown needs to hold the longest of the things it can show: KUI:WidestString plus KUI.DROPDOWN_CHROME, which
+  is the inset before the text and the arrow button after it. Font defaults to GameFontHighlightSmall, which is what a
+  dropdown draws its value in.
+
+  Use it instead of picking a round number, which is always either too wide or, in some locale nobody tested, too narrow.
+  CreateDropDown cannot do this for itself: plenty of dropdowns are made empty and filled in later - a config selector knows
+  nothing when it is built - and one of those would size itself to nothing. A caller that knows the whole vocabulary up front
+  can use this.
+
+width = KUI:CharsWidth(chars, font)
+width = KUI:DropDownCharsWidth(chars, font)
+  How wide a box has to be to show that many characters of it, the second adding a dropdown's chrome as DropDownWidth does.
+  Nothing is drawn in a fixed width font, so this is that many of a middling letter (KUI.WIDTH_SPECIMEN) rather than a
+  promise about a particular word: something in narrow letters leaves room to spare and something in capitals is cut off.
+
+  That is the bargain every width short of the longest thing that could ever be in the box makes, and it is the right one for
+  a box holding a name, where the longest possible name is half a line wide and nobody is called that. A dropdown sized this
+  way still shows every name whole in its menu, which is sized by its own items rather than by the box above them.
+
+KUI.WIDGET_GAP
+  The space between one widget and the next, and the only spacing number a panel should need. Walk down a column with
+
+    local ypos = 0
+    ... first widget at y = ypos ...
+    ypos = ypos - first:GetHeight() - KUI.WIDGET_GAP
+    ... second widget at y = ypos ...
+
+  and nothing has to know what kind of widget it just placed.
+
+  That works because a widget's frame is the size of the box it draws. An edit box is 20 tall because its text field is drawn
+  20 tall, and a dropdown is 24 because its pill is. If a column needs some number other than this one to look even, the
+  widget is lying about its size. Fix the widget, not the panel.
+
+  A few widgets draw outside their own frame and cannot do otherwise. A slider's frame is the track its knob runs along, yet
+  the widget also puts a label over it and a value box under it, and a dropdown or edit box with a TOP or BOTTOM label is the
+  same shape. For these the frame stays the size of the piece it owns and GetHeight reports the whole
+  widget, because that is the question a column asks. cfg.y is likewise the top of everything drawn, not the top of the
+  frame, so the widget above is clear of the label rather than under it.
+
+KUI.DROPDOWN_ADD_GAP
+  What a dropdown wants after it on top of the standard gap. It is 0, the pill being drawn exactly the size of its frame. It
+  stays a number of its own so that a dropdown can be given more room than a checkbox if the eye asks for it, without every
+  column that places one having to change. A column that has just placed one steps by
+
+    ypos = ypos - dd:GetHeight() - KUI.WIDGET_GAP - KUI.DROPDOWN_ADD_GAP
+
+KUI.INTERNAL_GAP
+  The space between the parts of one widget. A checkbox and the words beside it, a dropdown and the label over it. Nothing a
+  caller places is separated by this, and nothing inside a widget is separated by WIDGET_GAP.
+
+  They are two numbers even when they hold the same value, because they answer different questions - how far apart are two
+  things the user thinks of as separate, against how close together are the pieces of one thing - and tuning either must not
+  disturb the other.
+
+KUI.CHECKBOX_SIZE
+  The box a checkbox or a radio button draws, which is 16. The kit's pieces are cut tight to what they draw, so the box is
+  the whole of its artwork and a checkbox spaces like any other widget.
+
+  A caller laying checkboxes out in columns wants CHECKBOX_SIZE + INTERNAL_GAP, which is what one costs to the left of its
+  words.
+
+  A checkbox given cfg.height draws a box that size, so asking for a bigger box gets a bigger box rather than the same one
+  loose in a taller frame. An unlabelled checkbox given no width takes its height for one, the box being square.
+
+KUI.CHECKBOX_LABEL_LIFT
+  How far a checkbox's label is lifted off the vertical centre of its box. A font string is centred on its line box, which
+  keeps room under the baseline for descenders whether the words have any or not, so a label with a g in it reads low beside
+  one without. Lifting by half the descent centres the letters instead. It is 0, which centres on the line box the way
+  Blizzard's own labels do.
+
+KUI.DROPDOWN_HEIGHT
+  The height of a dropdown's pill and so of its frame, which is 24. A caller putting a dropdown on a row beside something
+  shorter needs it to drop the shorter thing onto the same centre line.
+
+KUI.DROPDOWN_TEXT_LEFT
+KUI.DROPDOWN_TEXT_RIGHT
+KUI.DROPDOWN_CHROME
+  Where a dropdown's words sit inside its pill. They stand 14 in from the left, clear of the rounded end, and 30 in from the
+  right, clear of the end and of the chevron just inside it. DROPDOWN_CHROME is the two together, which is what a dropdown
+  costs beyond its words and what KUI:DropDownWidth adds to them.
+
+KUI.SCROLLBAR_WIDTH
+KUI.SCROLLBAR_COMPENSATE
+  How wide a scroll bar is, which is 16, and the strip a scroll list keeps on its right to hold it, which is 20. The strip is
+  the bar and the space between the bar and the rows, so a row laid out to the list's own width stands clear of the bar.
+
+r, g, b, a = KUI:GetFontColor (font)
+rgbtable = KUI:GetFontColor (font, true)
+  Returns the default colors for the given font, either as a set of 4 values, or as a table containing the members r, g, b
+  and a with those colors, if the second argument to the function was true. If no font is specified, defaults to the last
+  font pased to this function or to MeasureStrWidth above.
+
+  This is the one way to learn what colour a font draws in. Blizzard's templates name their colour (GameFontNormal is
+  NORMAL_FONT_COLOR) rather than giving it as numbers, and such a font, and every font string made from it, answers
+  GetTextColor with white whatever it draws in. So never ask a font string its colour to remember it: ask this.
+
+w, h, t, b, l, r = KUI:GetFramePos (frame)
+postable = KUI:GetFramePos (frame, true)
+  Returns the width, height, top, bottom, left and right position of the given frame, or a table with these values named w,
+  h, t, b, l and r if the second argument is true,
+
+frame = KUI.MakeFrame (type, name, parent, template)
+  A drop-in replacement for CreateFrame() that simply securely hooks the SetFrameLevel() function and ensures that all
+  children of a frame have their levels adjusted if you change the frame level.
+
+level = KUI:HighestFrameLevel (frame, skip)
+  The highest frame level anywhere in FRAME, its own and every frame under it. SKIP, when given, is left out along with
+  everything under it.
+
+KUI:SetFrameLevelKeeping (frame, level)
+  Put FRAME at LEVEL with every frame under it the same distance above it as before. Use this rather than SetFrameLevel to
+  move anything built out of KoreUI widgets. MakeFrame's hook puts every child one level above its parent, which flattens the
+  frames deliberately set higher, such as a panel's plaque over its content, and on a deep frame it sets the same frames
+  again and again. This measures first and sets every level past the hook.
+
+Windows
+  Every dialog and tabbed dialog made straight onto UIParent is a window, and windows stack as whole things: two that overlap
+  lie one over the other rather than through each other. Each shown window has a band of frame levels of its own, starting
+  KUI.WINDOW_LEVEL_GAP (32) above the highest level in the window below, the lowest at KUI.WINDOW_LEVEL_BASE (10). The gap is
+  room for a popup a window raises over itself. Showing a window brings it to the front, and so does a click anywhere in it,
+  so a dialog opened from a window always opens over it.
+
+KUI:RaiseWindow (win)
+  Bring window WIN to the front.
+
+KUI:SetWindowOrder (list)
+  Stack the windows in LIST in that order, the first lowest, under every window LIST does not name. For an addon whose
+  windows should start in an order of its own. Showing or clicking one still brings it to the front.
+
+4.  Return Values
+=================
+
+The return value from most of the widget creation functions is a frame of the specified type, or a generic frame if it is a
+container. Thus all of the functions available to frames of the given type are available to call. There are also a few
+functions or values stored in this return value which you can use. The two most important of these are :Catch() and :Throw(),
+which are the mechanism used to receive and dispatch events respectively.
+
+ret:Catch (event, handler)
+  Catches the named event and calls the given handler. If no handler is specified, returns the current handler for the event,
+  if any. The handler can either be a function or a string which names a function. If you use a string the function must
+  either be a member of the return value (ret), or a global function. Event handlers can return values to the caller. The
+  first return value is a boolean which indicates that the handler failed in some way. Return true for an error, or nil or
+  false if there was no error. Return any other values after this first value.
+
+  Please refer to each widget type to see what events it throws which you may want to catch. There are some standard events
+  which are thrown if you call certain functions. These events are described here. All events take as their first argument
+  the name of the event, followed by any additional arguments specific to the event.
+
+  OnWidthSet(this, event, width)
+    Thrown when you call :SetWidth() on a widget and its width changes.
+
+  OnHeightSet(this, event, height)
+    Thrown when you call :SetHeight() on a widget and its height changes.
+
+  OnEnable(this, event, onoff)
+    Thrown when you enable or disable the widget, either by calling :Enable() or :Disable() directly, or by calling
+    :SetEnabled(), which is discussed below. onoff is set to true if the widget is being enabled or false if it is being
+    disabled.
+
+  OnShow(this, event)
+    Thrown when the widget is shown by calling :Show(). This is not quite the same thing as hooking the OnShow script.
+
+  OnHide(this, event)
+    Thrown when the widget is hidden by calling :Hide(). This is not quite the same thing as hooking the OnHide script.
+
+  OnValueChanged(this, event, newval, user, ...)
+    For many widget types that store a value, this is thrown whenever the value of the widget changes. Exactly how and when
+    this is called depends on the widget type and is discussed below. user is set to true if this was the result of actual
+    user interaction, false if it was the result of a programatic change. This event may fire multiple times for the same
+    "action". For example, it may fire once with user set to false (as it sets the value) and then again with user set to
+    true if the change was the result of the user clicking or changing the element.
+
+ret:Throw(event, ...)
+  Used to throw an event for the widget. You can use this as a way of controlling your widgets with custom events. Takes any
+  number of arguments all of which are pased unprocessed to any handlers.
+
+ret:SetEnabled(onoff)
+  If the widget is to be enabled, pass the value of true, or pass the value false to disable the widget. ONOFF is tested for
+  truth, so nil disables, as the game's own SetEnabled does. Throws "OnEnable" for the widget, once. A widget whose cfg says
+  nothing about cfg.enabled starts out enabled.
+
+ret:SetShown(onoff)
+  Pass true to show the widget, false to hide it. As with SetEnabled, nil hides. Throws "OnShow" or "OnHide".
+
+ret:SetChanged(onoff)
+  Say whether the widget's value differs from what is saved. While it does, its value is written in
+  KUI.DEFAULT_CHANGED_COLOR: a checkbox's words, a dropdown's shown value, a slider's number, an edit box's text. The widget
+  keeps the colour through any later SetEnabled, dimmed with everything else when it is disabled. It never decides this for
+  itself; the caller, which knows what is saved, turns it on and off. A widget with no words takes the flag and shows nothing.
+
+ret:SetTint(r, g, b)
+ret:SetAccent(r, g, b)
+ret:SetGem(r, g, b)
+  Change the colours the widget and everything under it wear. See section 2.1.
+
+5.  Widgets
+===========
+
+This section discusses the basic KoreUI widgets that are usually placed within containers or your own frames. These are the
+basic "building blocks" of a user interface. All of these widgets take the same two parameters: the config table and the
+parent, which defaults to UIParent if not specified. If the parent specified is a KoreUI container object and that container
+has a "content" member, then the actual low level frame parent is set to that content frame, not to the outer containing
+frame of the container widget. If the widget throws any extra events they are displayed as throw:EVENTNAME(args).
+
+In discussing each widget type below, the convention is to use cfg.ELEMENTNAME to describe elements of the config table
+passed as the first argument, and ret.VALUE or ret:FUNCTION to describe values or functions found in the returned frame.
+
+5.1 KUI:CreateStringLabel
+-------------------------
+
+Creates a simple frame with a text string inside it. Since this entire widget type is a label, the various label members
+discussed in section 1 above are all part of the base configuration table, not in a label element. This widget supports
+tooltips.
+
+cfg.autosize [boolean]
+  Enabled by default. If set to false the string label remains the exact height and width specified in cfg. Otherwise, it
+  adjusts the frame size and string width to accomodate the string.
+
+cfg.border [boolean]
+  If set to true, surrounds the label with the kit's thin border in the tint. The frame is bigger than the words by the
+  border's offset, 6 pixels, on every side.
+
+cfg.bordercolor [table]
+  { r, g, b } the border wears instead of the tint.
+
+cfg.onlink [function]
+  Makes links in the label's text clickable: function(label, kind, data, text, button), called with the KIND and DATA the
+  link was made with by K.Link in Kore, the words it shows and the mouse button. WoW gives an addon no way to open a
+  browser or a mail program, so what a click usually does is put the address somewhere the user can copy it from. Taken
+  once when the label is made. A client whose frames cannot carry links gets no handler, and K.Link draws plain text there.
+
+    text = strfmt("Visit %s for more.", K.Link("url", "https://example.com")),
+    onlink = function(label, kind, data) ... end,
+
+ret:SetText(string)
+  Sets the label's string to the one specified.
+ 
+ret:SetTextColor(r, g, b, a)
+  Sets the color of the label to the colors specified, all in the range 0 to 1.
+
+ret.label [FontString]
+  Low level pointer to the actual label created by the call to CreateFontString().
+
+Example:
+
+  local cfg = {
+    x = "CENTER", y = 0, width = 200, autosize = false, border = true, color = { r = 1, g = 1, b = 0 },
+    justifyh = "CENTER", text = "My string label", font = "GameFontHighlight",
+  }
+  local mystr = KUI:CreateStringLabel(cfg, myframe)
+
+5.2 KUI:CreateEditBox
+---------------------
+
+Creates an input box into which the user can type text or numbers. The default width and height are 200 and 20, 20 being the
+height the kit's text field is drawn at, and a taller frame draws a taller field. Please note that the width and height do
+not take the label into account. These values control only the width and height of the edit box itself. This widget
+supports tooltips.
+
+The field lights up while it has the keyboard, and selects all of its text when it takes the keyboard so that typing replaces
+it.
+
+cfg.len [number]
+  Sets the maximum number of characters the user can type in the edit box. This defaults to 128.
+
+cfg.charwidth [number]
+  Makes the box wide enough to show this many characters, chrome included, instead of cfg.width. This is how much shows, and
+  cfg.len is how much may be typed: a name box that shows 15 and takes 30 is the usual shape, a long realm name running past
+  the end of the box as it is typed. See KUI:CharsWidth for what a character is worth here.
+
+cfg.numeric [boolean]
+  Set to true if the input to this field should be only numbers. Defaults to false.
+
+cfg.taborder [number]
+  Where this field stands in its window's tab order. Tab moves the keyboard to the next field in the same window and
+  Shift-Tab to the one before, wrapping round at either end and passing over any that is hidden or disabled. Left out, it is
+  the place of the field made before it in the same window plus one, so a window's fields are tabbed through in the order
+  they were made unless it says otherwise. Fields given the same place go in the order they were made. A field's window is
+  the outermost dialog or tabbed dialog it is inside, each keeping an order of its own.
+
+cfg.font [string]
+  Sets the name of the font for the text inside the edit box. Defaults to "ChatFontNormal".
+
+cfg.color [RGB table]
+  Sets the color of the text inside the edit box.
+
+cfg.label [table]
+  Standard label as described in section 1 above. The label position defaults to "LEFT".
+
+cfg.initialvalue [string]
+  Sets the initial value of the edit box.
+
+ret.label [FontString]
+  Low level access to the label, if any. This is the return value from CreateFontString().
+
+ret.lrgb [RGB table]
+  The label colors.
+
+ret.trgb [RGB table]
+  The actual text colors.
+
+throw:OnEnterPressed(value)
+  Thrown when Enter is pressed. value is the value of the edit box at the time that enter was pressed. This sets the "saved
+  value" of the edit box, If a user presses Escape while changing set, the edit box contents are set back to the last "saved
+  value". If the handler for this event returns true, which signals an error, then the input focus remains in the edit box.
+  Otherwise, focus is cleared.
+
+throw:OnEscapePressed()
+  Thrown if the user presses Escape while entering text. When the edit box value is restored to its last "saved value", this
+  will also throw an OnValueChanged() event.
+
+throw:OnValueChanged(this, event, value, user)
+  Thrown whenever the value of the edit box changes. This will be thrown when the value of the edit box is set with
+  :SetText() or when the last saved value is restored if a user presses Escape. It is also thrown on every change the user
+  makes as they type, each keystroke that adds or removes a character. user is set to true if this is the result of a user
+  change, false if programatic.
+
+Example:
+
+  local cfg = {
+    x = 0, y = -24, numeric = true, width = 32, len = 4, label = { text = "Enter a number" },
+  }
+  local myeb = KUI:CreateEditBox(cfg, myframe)
+
+5.2.1 KUI:CreateTextArea
+------------------------
+
+Somewhere to write more than a line. An edit box is one line, drawn as the kit's text field, which is a strip scaling as one
+piece and so can only ever be the height its artwork is. A text area is any size you anchor it to: it wears the panel rim
+over a panel's ground instead, sliced and therefore right at every size, and that well is the sunken border round it.
+
+The words do not push the box open as they fill it. They scroll, which is why this is a widget of its own rather than a flag
+on an edit box: a box that scrolls is a scroll frame with the box inside it, that box grows to its text and the frame shows a
+window on it. So what you anchor is the well, and everything an edit box answers to the well answers by passing it on to the
+box inside. The caret is kept in sight as you type or move it, the wheel scrolls wherever the pointer is over it, and a click
+in the empty part of the well puts the keyboard in the box.
+
+Anchor it on all four sides to make it a gap in a panel, or give it a width and a height as usual. cfg.lines in place of a
+height makes it as tall as that many lines of its font, with the margin between the words and the rim above and below them.
+
+It takes cfg.font, cfg.color, cfg.initialvalue and cfg.tooltip exactly as an edit box does, and cfg.len, which is 0 -- as
+much as anybody cares to type -- rather than 128. It has no label, having no line to put one beside.
+
+ret.editbox [frame], ret.scroll [frame]
+  The box itself and the window on it, for the rare caller that needs one of them. Everything ordinary is on the widget:
+  SetText, GetText, SetFocus, ClearFocus and SetEnabled.
+
+throw:OnValueChanged(this, event, value, user)
+  As an edit box, on every change. Enter is a new line and never commits, so there is no OnEnterPressed and no saved value.
+
+throw:OnEscapePressed(value)
+  Escape leaves the box rather than undoing it, the value having been reported as it was typed.
+
+Example:
+
+  local note = KUI:CreateTextArea({ name = "MyNote", font = "GameFontHighlightSmall" }, mypanel.content)
+  note:ClearAllPoints()
+  note:SetPoint("TOPLEFT", mypanel.content, "TOPLEFT", 0, ypos)
+  note:SetPoint("BOTTOMRIGHT", mypanel.content, "BOTTOMRIGHT", 0, 0)
+
+5.3 KUI:CreateCheckBox
+----------------------
+
+Creates a checkbox that can have a boolean on/off state. When on, it has a check mark in a little box. When off, the check
+mark is hidden. Check box labels can only appear to the "LEFT" or "RIGHT" of the box. If you need labels to appear above or
+below a check box for some reason (it looks terrible visually) then set your own label manualy with KUI:CreateStringLabel().
+The box is KUI.CHECKBOX_SIZE and the frame is as tall as the box. It is as wide as the box without a label, and 200 wide with
+one until autosizing fits it to the words. This widget supports tooltips.
+
+The box wears the tint. The mark is a green tick, or a red cross, unless cfg.markcolour says otherwise (see section 2.2).
+
+cfg.mark [string]
+  "CROSS" for a cross rather than a tick, for a box where ticking it takes something away.
+
+cfg.autosize [boolean]
+  Usually labels do not form part of the width or height of the widget. However, labels are so intrinsic to this widget type
+  that they do. Set this to true if the containing frame is to be sized when the label of the box changes or is set, false if
+  the size is to remain exactly as specified. Defaults to true for a label to the right of the box and false for one to its
+  left.
+
+  Note that cfg.width only survives if autosize is false. An autosizing widget measures its words when the label is set,
+  which happens as it is built, and overwrites whatever width it was given.
+
+cfg.maxwidth [number]
+  A ceiling on how wide an autosizing widget will grow. Without it the frame is exactly as wide as its words need, however
+  wide that turns out to be; with it the frame stops there and the words are cut off at the edge instead. This is what a
+  translated label wants - snug in the language that fits, and never, in the language that does not, wide enough to push
+  whatever stands beside it off the panel.
+
+  Cutting off is only possible because the label does not wrap, so a widget given either cfg.maxwidth or a fixed width turns
+  wrapping off. One left free to size itself grows to fit its words and has nothing to overflow, so it keeps it.
+
+cfg.checked [boolean]
+  Set to true if the box should start out in the checked state, false if not.
+
+ret:SetText(text)
+  Sets the checkbox label to the specified text, and resizes the whole frame if cfg.autosize was true.
+
+ret:GetChecked()
+  Returns true or false if the button is or is not checked.
+
+ret:SetChecked(onoff)
+  Sets the checked state to on (if onoff is true) or off (if it is false).
+
+ret:ToggleChecked()
+  Toggles the current checked state.
+
+ret.text [FontString]
+  Low level pointer to the label, if any.
+
+ret.rgb [RGB table]
+  The color of the lable, if any.
+
+throw:OnClick(checked)
+  Throws when the button is clicked. checked is set to the current state of the button after the click was processed (in
+  other words after the state was changed and the new current value set).
+
+throw:OnValueChanged(onoff, user)
+  Thrown whenever the state of the button changes. onoff is set to false if the button is unchecked, true if it is checked.
+  user is true if this was the result of a user action, false otherwise. May fire multiple times
+
+Example:
+
+  local cfg = {
+    x = 0, y = 0, checked = true, label = { text = "Option 1" },
+  }
+  local mycb = KUI:CreateCheckBox(cfg, myframe)
+  mycb:Catch("OnValueChanged", function(this, event, onoff)
+    print("Option 1 set to " .. tostring(onoff))
+  end)
+
+5.4 KUI:CreateRadioButton
+-------------------------
+
+Radio buttons are a group of buttons which have a mutually exclusive choice (i.e. only one button in a radio group can be
+selected or checked at a time). For this reason, a mandatory element in the config table is the "group" element that groups
+all radio buttons in a group together. In order for radio buttons to work, all of the radio buttons must share a common
+parent. That parent can contain any number of radio button groups, but still, each group can only ever have one of its
+buttons pressed at a time. The default width and height are both 16.  Adjust the width for a label if you will be using one.
+This widget supports tooltips.
+
+The ring wears the tint. The orb that lights it while the button is the one chosen plays the mark part, drawn flat.
+
+cfg.autosize [boolean]
+  Usually labels do not form part of the width or height of the widget. However, labels are so intrinsic to this widget type
+  that they do. Set this to true if the containing frame is to be sized when the label of the box changes or is set, false if
+  the size is to remain exactly as specified. Defaults to true for a label to the right of the box and false for one to its
+  left.
+
+cfg.maxwidth [number]
+  A ceiling on how wide an autosizing widget will grow, exactly as described for KUI:CreateCheckBox above. Radio buttons and
+  check boxes are built by the same code and size themselves the same way.
+
+cfg.group [string]
+  The name of the radio button group to which this radio button belongs.
+
+cfg.groupparent [table]
+  Set this to an explicit parent that contains the radio button group. If not set this defaults to the parent specified in
+  the call. If that parent is some type of container and does not itself contain all of the radio buttons in the group, use
+  this to set a top level parent that will contain all of the radio buttons. If you set this you may also need to set the
+  getbutton element below.
+
+cfg.checked [boolean]
+  Set to true if this radio button should be selected by default, false otherwise.
+
+cfg.value [anything]
+  Set the value for this particular radio button. Each button in the group must have a unique value (not enforced).
+
+cfg.func [function]
+  A convenience function that is called whenever the value of a radio group changes. In order for this to have any meaning,
+  all of the buttons in a group should use the same function. This is essentially just a convenient way of attaching an
+  OnValueChanged event to each radio button in a group. It is called with the button, the event name, whether the button is
+  on or off, whether the user changed it, and the button's value, exactly as an OnValueChanged handler is:
+
+    local function radiofunc(this, event, onoff, user, value)
+       ...
+    end
+
+cfg.getbutton [function]
+  Function that takes the radio button frame as its only argument. This function must return a pointer to the parent that
+  contains the radio group. This really is very rarely used, and the best way to understand why it is necessary is to look at
+  the internals of KoreUI. Not for the weak of heart.
+
+ret:SetChecked()
+  Sets this specific radio button to the one and only one in the group that is checked. This will cause OnValueChanged events
+  to be fired both for the button being checked and for the button that is currently checked becoming unchecked. There is NO
+  guarantee of the order in which these two events fire.
+
+ret:SetValue(value, nothrow)
+  Sets the value for the entire radio group to the value specified. Essentially this just searches through all of the radio
+  buttons in the group until it finds one with a matching value, and if that was not already set, set it to the current
+  checked button. This will also cause OnValueChanged events to fire for both the new button and the previously selected one.
+  Note that each button in the radio group gets this function. Regardless of which button's function you call it will set the
+  value for the entire group. If nothrow is true, do not throw an OnValueChanged event.
+
+ret:GetValue()
+  Searches the radio group for the currently selected button and return its value.
+
+throw:OnValueChanged(onoff, user, value)
+  Thrown when a buttons state changes. onoff is true if this is the currently selected button, false otherwise. value is the
+  value of the button. user is whether this was a user initiated change or a programatic one.
+
+Example:
+
+  local cfg = {
+    x = 0, y = 0, group = "mygroup", value = 1, checked = true, label = { text = "Exclusive option 1" },
+  }
+  local myrb1 = KUI:CreateRadioButton(cfg, myparent)
+  cfg.y = -16
+  cfg.value = 2
+  cfg.label.text = "Exclusive option 2"
+  cfg.checked = false
+  local myrb2 = KUI:CreateRadioButton(cfg, myparent)
+  cfg.y = -32
+  cfg.value = 3
+  cfg.label.text = "Exclusive option 3"
+  local myrb3 = KUI:CreateRadioButton(cfg, myparent)
+  print ("Current option: " .. tostring(myrb3:GetValue()))
+
+5.4.1 KUI:CreateRadioGroup
+--------------------------
+
+A list of choices in, one widget out. It makes a radio button for each choice, puts them in a group of their own whose name
+nobody has to invent, lays them out, and throws one event when the choice changes. The buttons are exactly the ones
+KUI:CreateRadioButton makes by hand and ret.buttons is the list of them, so anything not covered here can be done to them
+directly.
+
+What this saves over building them yourself is the group name, the placement, and the fact that one click moves two buttons
+and each of them says so, the button being checked saying so twice over. A group says it once.
+
+cfg.items [table]
+  The choices, in order, each of them a table.
+
+    text [string]
+      The words beside the button.
+
+    value [anything]
+      What this choice is worth, which is what ret:GetValue answers and what ret:SetValue looks for. Each choice needs its
+      own, which is not enforced.
+
+    tooltip [table]
+      Tooltip for this choice. See section 1.
+
+    enabled [boolean]
+      Whether this choice can be picked, true when it is not said. A choice disabled here stays disabled when the group as a
+      whole is enabled, the group's word being about the group and not about that choice.
+
+cfg.font [string]
+  The font of the choices' words, which is a radio button's own, GameFontHighlight, when it is not given. The group's label
+  has a font of its own, in cfg.label.
+
+cfg.spacing [number]
+  Puts the choices along one row, each as wide as its own words, and this far past the words of the choice before it however
+  long those are.
+
+cfg.positions [table]
+  Puts the choices along one row at places of your choosing, for when they have to line up with something: one number for
+  each choice, its distance from the start of the row. The row starts at cfg.x, where a label to the left starts too, so the
+  first position has to leave the label and KUI.INTERNAL_GAP room, which is asserted. A choice's words are cut off
+  KUI.WIDGET_GAP short of the next position rather than wrapped or run into it.
+
+  Give one of cfg.spacing and cfg.positions, not both. With neither the choices are a column, one under another.
+
+cfg.width [number]
+  The usual. Left out, the group is as wide as its choices.
+
+cfg.height [number]
+  The usual. Left out, the group is as tall as its choices, which is KUI.CHECKBOX_SIZE for a row and KUI.CHECKBOX_SIZE a
+  choice with KUI.WIDGET_GAP between them for a column, and the rings of its group box where it has one.
+
+cfg.title [string or table]
+  Puts the choices in a KUI:CreateGroupBox, the thin border with its heading set into the line, which is what a few controls
+  under a heading of their own wear everywhere else here. This is that widget's title in full, its six locations included,
+  and the group is then that group box, so ret.content, ret.rings and ret:SetTitleText are all there as described under
+  KUI:CreateGroupBox. Without a title the group is a plain frame with nothing drawn round it. Ignored where cfg.label is
+  given.
+
+cfg.label [table]
+  The other way to name the group, and the one that wins where both are given: words beside or above a plain frame, as an
+  edit box's label is. It takes text, font, color, width, height, justifyh, justifyv and pos, which is "LEFT" (the default)
+  or "TOP". To the left the words start at cfg.x, level with the first row of choices, and the choices stand
+  KUI.INTERNAL_GAP past them. On top the choices start a line lower. The label is the group's, so ret:SetEnabled greys it
+  with the choices.
+
+cfg.initialvalue [anything]
+  The choice to start on, exactly as ret:SetValue would set it, and without throwing.
+
+cfg.enabled [boolean]
+  Whether the group starts enabled. Defaults to true.
+
+ret:GetValue()
+  The value of the choice currently made, or nil if none has been.
+
+ret:SetValue(value, nothrow)
+  Make the choice with that value. A value none of the choices offers changes nothing, the same as a dropdown told to select
+  an item it does not have. Throws OnValueChanged with user false unless nothrow is true.
+
+ret:SetEnabled(onoff)
+  Grey the whole group, its heading or label included where it has one. A choice disabled in its own item table stays
+  disabled.
+
+ret.buttons [table]
+  The radio buttons, in the order the choices were given.
+
+ret.label [FontString]
+  The label's words, where it has one.
+
+throw:OnValueChanged(value, user)
+  Thrown once when the choice changes. value is the new value and user is true when somebody clicked it, false when it was
+  set in code. A click on the choice already made throws nothing.
+
+Example:
+
+  local rg = KUI:CreateRadioGroup({
+    x = 0, y = 0, spacing = 16, title = { text = "Loot method", location = "topleft" },
+    initialvalue = "sk",
+    items = {
+      { text = "Suicide Kings", value = "sk" },
+      { text = "EP / GP", value = "epgp" },
+      { text = "DKP", value = "dkp" },
+      { text = "Loot council", value = "lc", enabled = false },
+    },
+  }, myparent)
+  rg:Catch("OnValueChanged", function(this, evt, value, user)
+    ...
+  end)
+
+5.5 KUI:CreateSlider
+--------------------
+
+This widget type allows you to create either a vertical or horizontal slider that lets you drag a thumbnail to increase and
+decrease the slider value in defined increments between a given minimum and maximum value. A horizontal slider has a default
+width of 200 and height of 16, and a vetical slider has a default width of 16 and height of 200. This widget supports tooltips.
+
+The slider is the kit's track with a knob running along it, and the knob carries a stone in the gem colour. The mouse wheel
+moves it a step at a time.
+
+cfg.orientation [string]
+  Either "HORIZONTAL" or "VERTICAL". Defaults to "HORIZONTAL".
+
+cfg.minval [number]
+  Sets the minimum value for the slider. Defaults to 0.
+
+cfg.maxval [number]
+  Sets the maximum value for the slider. Defaults to 100.
+
+cfg.step [number]
+  Sets the increment that the slider can change by. Defaults to 1.
+
+cfg.initialvalue [number]
+  Sets the initial value. Defaults to minval if not specified.
+
+cfg.minmaxfont [string]
+  Name of the font to use to display the minimum and maximum values. Defaults to "GameFontHighlightSmall".
+
+cfg.minmaxcolor [RGB table]
+  Sets the color for the minimum and maximum values. Defaults to whatever the color is for the font.
+
+cfg.editfont [string]
+  Sets the font for the edit box that appears in the middle of the slider where the user can manually type in a value.
+  Defaults to "GameFontHighlightSmall".
+
+cfg.editcolor [RGB table]
+  Sets the color of the edit box text. Defaults to whatever the default color for the font is.
+
+cfg.label [table]
+  Only valid for HORIZONTAL sliders. Sets the title of the slider that is always displayed above the slider (the pos element is ignored).
+
+throw:OnValueChanged(value, user)
+  Thrown when the value changes by whatever mechanism.
+
+ret.editbox [table]
+  Pointer to the raw edit box.
+
+ret.mintxt [FontString]
+  Pointer to the raw font string for the minimum value.
+
+ret.maxtxt [FontString]
+  Pointer to the raw font string for the maximum value.
+
+ret.mrgb [RGB table]
+  Colors for the minumuma nd maximum strings.
+
+ret.ergb [RGB table]
+  Colors for the edit box.
+
+ret.label [FontString]
+  Pointer to the raw label font string.
+
+ret.lrgb [RGB table]
+  Colors for the label.
+
+ret.track [table]
+ret.knob [table]
+  The kit pieces the track and the knob are drawn with.
+
+ret:ChangeMinMax(newmin, newmax)
+  Change the minimum and maximum values. A value outside the new range becomes the new maximum.
+
+Example:
+
+  local cfg = {
+    x = 0, y = -60, initialvalue = 42, label = { text = "My Slider", justifyh = "CENTER" },
+  }
+  local myslider = KUI:CreateSlider(cfg, parent)
+
+5.6 KUI:CreateButton
+--------------------
+
+Creates a push button, one of the kit's button shapes with its words over it. The default width and height are 100 and 24,
+and a taller button draws its shape taller. The shape wears the tint, lights up while the pointer is on it and darkens while
+it is pressed. This widget supports tooltips.
+
+cfg.style [string]
+  The button's shape, which is "ROUNDED" (the default), "POINTED", "FINIAL" or "STRAIGHT".
+
+cfg.buttonfill [boolean or table]
+  Whether the button's dark middle is filled, and with what. Inherited from the frames above when left out, and filled when
+  none of them says. See section 2.2.
+
+cfg.hook [boolean]
+  When set to true, hook the OnClick script rather than setting it, so that a handler already on the button still runs and
+  the OnClick event is thrown after it. If this is nil or false, set an OnClick script that will :Throw() an OnClick event.
+
+cfg.doubleclick [boolean]
+  Throw OnDoubleClick as well as OnClick, exactly as KUI:CreateImageButton's below, and off by default for the same reason:
+  the game gives the second click of a pair to OnDoubleClick instead of OnClick.
+
+cfg.text [string]
+  Text to display on the button (if any).
+
+throw:OnClick(button, down)
+  Thrown when the button is clicked. BUTTON is the name of the button that was pressed, and DOWN is true if the button is
+  being pressed, false or nil if it is being released.
+
+5.6.1 KUI:CreateImageButton
+---------------------------
+
+A button whose face is a picture rather than a word: an icon, a card, one cell of a sprite sheet. A button's shape is no use
+for any of those, so this widget draws what it is given. It throws OnClick and supports tooltips exactly as KUI:CreateButton
+does.
+
+The picture fills the button. Nothing here scales it or preserves its shape. You set the size, and if the aspect ratio
+matters you work it out, because only you know which of the two dimensions you are fitting into.
+
+cfg.texture [string]
+  Path to the image.
+
+cfg.texcoord [table]
+  { left, right, top, bottom } to show part of the texture rather than all of it - one cell of a sprite sheet, or an edge
+  trimmed away. Defaults to the whole thing.
+
+cfg.color [table]
+  { r, g, b, a } applied to the texture. Useful for tinting a plain white image, or for a placeholder drawn from a solid colour.
+
+cfg.text [string]
+cfg.font [string]
+cfg.textx, cfg.texty [number]
+cfg.justifyh [string]
+  An optional caption drawn over the picture, for a button whose picture does not say enough by itself or has not been drawn
+  yet. The font string is made either way, so a button reused for several things can be given text later.
+
+cfg.piece [string]
+  A piece of the kit to draw as the button's face, over the picture if there is one. The piece fills the button and lights up
+  while the pointer is on it, darkens while it is pressed and dims when the button is disabled, the way every control in the
+  kit does.
+
+cfg.highlight [string or false]
+  Texture drawn over the button while the pointer is on it, blended ADD. Left out, the button gets the kit's glow over its
+  picture in the tint instead, unless it has cfg.outline or cfg.piece, which light it their own way. false for no highlight
+  at all.
+
+cfg.outline [table]
+  { r, g, b } of the rims drawn around the outside of the button, which is what makes it a button that can be selected. While
+  it is selected it wears the kit's selected card rim in this colour. While the pointer is on it and it is not selected it
+  wears a thinner rim, and while the pointer is on it, selected or not, a glow over its picture in the same colour, which is
+  all a selected button has to show that it has been seen. A button that is never selected does not ask for one and gets none
+  of them.
+
+cfg.outlinesize [number]
+  How far those rims stand out beyond the button on each side. Defaults to 2.
+
+cfg.push [boolean]
+  Whether the picture shifts a pixel down and right while the button is held, which is what makes it feel like a button
+  rather than a picture. Defaults to true; set false for something that should not move.
+
+cfg.hook [boolean]
+  As for KUI:CreateButton.
+
+cfg.doubleclick [boolean]
+  Throw OnDoubleClick as well as OnClick, for a button where a second click is a second intention rather than a repeat of the
+  first - pick this one, then go into it. Off by default, and deliberately so: WoW gives the second click of a pair to
+  OnDoubleClick INSTEAD of OnClick, so a button that asks for this and then ignores the event has every other click go
+  missing.
+
+ret:SetTexture(texture, texcoord)
+  Change the picture, and its texture coordinates. Either may be nil.
+
+ret:SetSelected(boolean)
+  Show or hide the selected rim. Does nothing if no cfg.outline was given.
+
+ret.image [table]
+  The texture itself, for anything this does not cover - desaturation, a different blend mode, an animation.
+
+ret.art [table]
+  The piece given by cfg.piece, if any.
+
+A disabled image button is desaturated rather than greyed, which is what Blizzard does to an icon that cannot be used.
+
+5.7 KUI:CreateDropDown
+----------------------
+
+Custom replacement for the notoriously confusing Blizzard dropdown menu code. A KUI dropdown is the kit's rounded button
+shape, a pill with a chevron just inside its right hand end, and the whole pill is what the pointer clicks. The menu that
+drops down is a near-black ground inside one of the kit's borders, each item lit by the kit's row glow while the pointer is
+on it. This widget type must be given a name. Drop down menus can be
+either a simple single level drop down, or any of the items on the menu can be a submenu, with no restriction other than a
+practical one of how deep you can stack submenus. Submenus will automatically close the dropped down portion when the mouse
+leaves it for any length of time (which is configurable). This widget has two distinct portions. The first is the "static"
+portion that has the push button for displaying the drop down menu, and the string which has the current value or title, and
+the second portion is the actual menu that drops down below it when you press the drop down button. In this discussion, the
+first is refered to as the static portion and the second as the menu portion. This widget supports tooltips for the static
+portion, as well as individual tooltips for each menu item.
+
+The menu portion lifts itself above every frame in the window it is part of each time it opens, the same way a popup list
+does, so it always covers whatever it is dropped over. A fixed number of levels above its own button will not do it: a
+window's panels nest deep enough that the widgets inside them stand above any number picked, so a menu dropped near the top
+of a panel would be drawn under the widgets below it and under the next panel down. Nothing is asked of the caller for
+this, and a dropdown placed straight on UIParent, having no window to be lifted within, keeps the levels it was built with.
+
+Note that if a given menu has too many items to fit in the specified or calculated minimum / maximum height and width of the
+menu, the code will provide a thin scroll thumb in the left margin of the menu, which can be dragged or scrolled using the
+mouse wheel.
+
+cfg.name [string]
+  Name of the dropdown. Must be provided for all dropdowns, including submenus.
+
+cfg.items [table]
+  Menu items for the dropdown. See below for details. Must be provided. If you need to create an empty dropdown that you will
+  populate later, set this to KUI.emptydropdown.
+
+cfg.dwidth [number]
+  The width of the static user-interface portion of the dropdown. Must be provided. KUI:DropDownWidth works out the width a
+  dropdown over a fixed set of choices needs. The height is always KUI.DROPDOWN_HEIGHT.
+
+cfg.label [table]
+  Label for the dropdown menu. The label position defaults to "TOP". Above or below, it is a heading and is as wide as its
+  words, whatever ret.label:SetText later gives it, unless it is given a width. Beside the dropdown it keeps the width it
+  measured, the dropdown being placed from it.
+
+cfg.justifyh [string]
+  Justification for the static text portion. Defaults to "LEFT".
+
+cfg.border [string]
+  Sets the border style. Values are "THIN" (the default) for the kit's thin menu border, or "THICK" for its heavier window
+  border. This is the border used for the menu portion.
+
+cfg.mode [string]
+  Sets the "mode" for the dropdown. Can have one of three possible values: "SINGLE" (the default if no mode is specified) for
+  a dropdown menu that allows you to select a single value from a list of choices and shows it in the static portion, "MULTI"
+  which allows you to check multiple options, or "COMPACT", which selects a single value like "SINGLE" but always shows
+  cfg.title in the static portion rather than the value. These values set the default for each item's "keep" option. See
+  below for details.
+
+cfg.arg [anything]
+  Argument that is set for each menu item as its "tlarg" element.
+
+cfg.func [function (tbf, created)]
+  Function that is called with the item being clicked or created, and a boolean indicating if the function is being called
+  because the item was just created. The tbf parameter is the full item frame, with all of its values, as specified below.
+
+cfg.itemheight [number]
+  Optional. If set, sets the default height for each item so that you do not need to specify it for each and every item. An
+  individual item may still override this default by specifying a height.
+
+cfg.timeout [number]
+  Sets how long the mouse cursor must be out of the bounds of the static or menu portions before the dropdown is
+  automatically closed. Defaults to 0, which closes it as soon as the cursor leaves. A menu that has just opened never
+  closes this way until the cursor has been in it, so moving from the button to the menu cannot close it. Until then it
+  stays open until the button is pressed again, another dropdown opens, or Escape is pressed. A popup menu follows the
+  same rule.
+
+cfg.minheight, cfg.maxheight [number]
+  If the menu portion is to be resizable, sets the minimum and maximum height of the menu, respectively. See section 1 for details.
+
+cfg.minwidth, cfg.maxwidth [number]
+  If the menu portion is to be resizable, sets the minimum and maximum width of the menu. See section 1 for details.
+
+cfg.canresize [boolean or string]
+  Allow or disallow resizing. See section 1 above for details.
+
+cfg.title [table]
+  Same type of table as a label, and must be provided for MULTI and COMPACT mode dropdowns. With a SINGLE mode dropdown the
+  static text is set to the currently selected item, so there this is what the box says while nothing is selected: the name
+  of the thing it is for, drawn in the title's font and colour the way a MULTI dropdown wears its own, rather than in the
+  white a value comes out in. It is not an item and cannot be chosen, and it is gone the moment there is a value. That is
+  what a dropdown with no label beside it wants, and it is nothing at all if you leave it out. It shows the item's words the way a button shows
+  its own, white and gold while the pointer is on it, or in the item's own color where it was given one. Several items can
+  be checked in a MULTI mode
+  dropdown and a COMPACT one keeps its value to itself, so for those the static text box permanently shows this title
+  instead.
+
+  A box with nothing to show falls back to the head of its own list when that item is a title item, which is a SINGLE
+  dropdown with nothing chosen yet, or a COMPACT or MULTI one given no title. A title item is not one of the choices, it
+  names the list it heads, so the box says that rather than standing empty. See menu.title under 5.7.1.
+
+cfg.initialvalue [anything]
+  The value of the item to select when the dropdown is made, exactly as ret:SetValue would.
+
+cfg.width [number]
+  Set the width of this dropdown menu. If this is not set, then the default width of the dropdown is set to be just wide
+  enough to contain the widest text or frame item.
+
+cfg.height [number]
+  Sets the height of this dropown menu. If this is not set, then the height of the dropdown is set to be high enough to cover
+  all of the items, or 300, whichever is less. If the height required to show all of the items is greater than this value,
+  then the dropdown will be scrollable.
+
+ret:SetJustification(how)
+  How to justify the text in the static portion of the dropdown. Defaults to "LEFT".
+
+ret:UpdateItems(newitemtable)
+  Updates the menu portion to have the new items specified. This must be the full list of items, there is no mechanism to
+  randomly insert or delete or modify items.
+
+ret:GetValue()
+  Returns the value of the currently selected item or nil if no item is selected.
+
+ret:SetValue(value, nothrow)
+  Sets the currently selected item to the first item that matches the specified value. Ideally, each item in a dropdown will
+  have a unique value. If not, there is no guarantee which item with the same value will actually become checked. If nothrow
+  is true, do not thow an OnValueChanged event.
+
+ret:Close()
+  Closes the dropdown menu and any submenus
+
+ret:StopTimeoutCounter()
+ret:StartTimeoutCounter()
+  Two functions to be called whenever the mouse enters or leaves the bounds of any portion of the dropdown.
+
+ret:SetText(text)
+ret:GetText()
+ret:SetTextColor(r, g, b, a)
+ret:GetTextColor()
+ret:SetFont(...)
+ret:GetFont()
+  Passed straight on to ret.text. On a MULTI or COMPACT dropdown SetText also replaces cfg.title's words, so the box keeps
+  saying it when it is given new items.
+
+ret.text [FontString]
+  Pointer to the raw font string that holds the displayed text string of the current value or title.
+
+ret.button [table]
+  Pointer to the raw button that when pressed, will cause the menu to drop down.
+
+ret.label [FontString]
+  Pointer to the low level font string for the label, if any.
+
+ret.labelcolor [RGB table]
+  Color values for the label.
+
+ret.toplevel [table]
+  Pointer to itself, as this is the top level of the dropdown.
+
+ret.dropdown [table]
+  The pointer to the top level drop down menu. This and all subsequent submenus all have the same values inside. The values
+  of this table are:
+
+  .toplevel [table]
+    Pointer to the very top level. Same as the return value from KUI:CreateDropDown().
+
+  .sframe [table]
+    Pointer to the scrolling frame that contains the items.
+
+  .cframe [table]
+    Pointer to the child frame which is set as the child of .sframe. This is the actual low level parent of all of the items.
+
+  .scrollbar [table]
+    Pointer to the scrollbar object that is positioned to the left of all of the items if it needs to scroll.
+
+  .iframes [table]
+    Table of each individual item frame.
+
+ret.current [table]
+  Pointer to the currently selected item's frame, or nil.
+
+ret.trgb
+  The color for the static text title if the mode is MULTI or COMPACT.
+
+throw:OnClick(dropdown, shown)
+  Thrown when the dropdown button is clicked and the dropdown either hidden or shown. DROPDOWN is the dropdown itself, and
+  SHOWN is true if the click opened the menu and false if it closed it or the menu had nothing in it to show.
+
+throw:OnItemChecked(item, value, checked)
+  Thrown when an item is checked on unchecked. ITEM is the item's frame and VALUE its value.
+
+throw:OnValueChanged(value, user)
+  Thrown when a new item is selected in a SINGLE or COMPACT drop down and the drop down value changes.
+
+5.7.1 Menu Item Table
+---------------------
+
+For a dropdown, you define the choices by passing an item table through the main config structure. This is a table of tables,
+each element of which desribes a single item on the menu. This section describes the various values that can be set for each
+item.
+
+Each item must be either a text item or a custom frame, not both. Thus you need provide only menu.frame or menu.text. It is
+an error to provide both, or neither.
+
+menu.name [string]
+  Individual item name, possibly used by the handler function.
+
+menu.func [function(item, created)]
+  Function that is passed the item frame and whether or not the item has just been created. This is called when the item is
+  clicked and when it is created. Optional.
+
+menu.arg [anything]
+  Presumably useful to the function above.
+
+menu.value [anything]
+  Unique value for the menu item.
+
+menu.tooltip [table]
+  Tooltip for this item. See section 1 for details.
+
+menu.color [RGB table or function]
+  Color for the menu item text. Can be a table or a function that returns a table.
+
+menu.title [boolean or function]
+  Whether or not this item is a title. Title items cannot be clicked on or checked. Can be a boolean or a function returning
+  a boolean. Title items are displayed in a different font ("GameFontNormalSmallLeft" by default). They are always both
+  nocheckable and nonclickable.
+
+  A title item at the head of the list is also what the dropdown's static text box shows when it has nothing else to show
+  there. See cfg.title under 5.7.
+
+menu.enabled [boolean or function]
+  Whether or not this item is enabled. Can be a boolean or a function that returns a boolean.
+
+menu.checked [boolean or function]
+  Whether or not this item should be checked. Can be a boolean or a function that returns a boolean.
+
+menu.group [string]
+  Makes a text item one of a radio group, named as a radio button's cfg.group is, in a MULTI dropdown or a popup menu. The
+  item is marked by the kit's radio ring rather than a tick, with the orb in it when it is the one chosen. Clicking it checks
+  it and unchecks every other item of the same group in the same menu, and OnItemChecked is thrown for each item that
+  changed, the one unchecked with checked false and the one chosen with checked true. Clicking the item already chosen
+  changes nothing, a radio group always having one chosen. Give exactly one item of a group checked. A SINGLE or COMPACT
+  dropdown is a radio group already, so there it only marks its items with radio rings, and which one is chosen is the
+  dropdown's value as it always is. On an item with menu.widget "radio" this is the radio button's own
+  group instead.
+
+menu.keep [boolean or function]
+  This can be a boolean or a function returning a boolean. If set to true, keep the dropdown menu open even after the item is
+  clicked. If set to false, close the dropdown when the item is clicked. The default value for this depends on the dropdown
+  type. For SINGLE and COMPACT mode dropdowns, this defaults to false. For MULTI mode dropdowns it defaults to true. However,
+  regardless of mode, if you explicitly set this for an item, it will be obeyed.
+
+menu.text [string or function]
+  Either a string or a function that returns a string. This element is mutually exclusive with menu.frame (see below). If
+  this is specified then this is a normal menu item or the text for a submenu. Unless other options below prevent it, a
+  normal menu item is both clickable and checkable. This is the most common type of menu item. By special dispensation, if
+  the string (or return value from the function) is a single hyphen ("-"), then this becomes a menu "spacer" item that is
+  neither clickable not checkable, and draws a faint hairline in the white of the menu's words between two sections of a
+  menu, centred, the same short way in from each side.
+  The default font for text items is "GameFontHighlightSmallLeft"
+
+menu.justifyh, menu.justifyv [string]
+  How a text item's words are justified. Default to "LEFT" and "MIDDLE".
+
+menu.clickable [boolean or function]
+  A boolean or a function returning a boolean. Defaults to true. If set to false, then this item is not clickable. This is
+  rarely used with text menu items but is more commonly used with custom frame menu items that are simply placing textures or
+  other content in the menu. A disabled item is never clickable.
+
+menu.checkable [boolean or function]
+  A boolean or a function returning a boolean. Defaults to true. Setting this to false means the item will not have a
+  checkmark ascociated with it. The checkmark is the kit's green tick unless cfg.markcolour says otherwise (see section 2.2).
+
+menu.icon [string or function]
+  The name of an icon or a function return such a name. This is forced to be a 16x16 sized icon. This icon will appear
+  between the checkmark (if any) and the left edge of the frame or text, with KUI.INTERNAL_GAP between it and the text.
+
+menu.secure [table or function]
+  The attributes of a SecureActionButtonTemplate, as attribute = value, or a function returning them, for an item that does
+  what only the game's own code may, which an item's func cannot because the game refuses the call to an addon. Making
+  somebody the main tank is { type = "maintank", action = "set", unit = "raid5" }. While the menu is shown the item is
+  covered by an invisible secure button carrying those attributes and acting as the mouse comes up. The click is the
+  button's, and the item then behaves as if clicked itself, closing the menu and running any func after the game has acted.
+  The buttons are KoreUI's, kept in a pool, and are put away when the menu hides, is built again or scrolls the item out of
+  sight. The game sets up no secure button in combat, so a secure item is dark there, and a menu holding one is closed as
+  combat begins.
+
+menu.iconcoord [table]
+  If menu.icon is set above, this can be a set of texture co-ordinates for the icon. This uses the 4-call version of
+  SetTexCoord(). The table can have members called left (defaults to 0), right (defaults to 1), top (defaults to 0) and
+  bottom (defaults to 1).
+
+menu.font [string or function]
+  Font to use for a title or text item. 
+
+menu.height [number]
+  Set this item to be this number of pixels high. If not set, inherits the containing menu's itemheight value. If the menu
+  does not have itemheight set then this value must be provided.
+
+menu.width [number]
+  Set this item to be this number of pixels wide. If not specified this defaults to the width of the text string or frame.
+
+menu.frame [table or function]
+  There may be times when you need a custom frame for a menu item to represent something in the menu other than a simple
+  checkbox choice. For these situations, you can provide your own frame that is placed in the menu by the KoreUI code. This
+  is rarely used for dropdown menus, but more commonly used for popup menus. This element must either be a frame or a
+  function that returns a frame. It is the responsibility of these custom frames to call the StartTimeoutCounter and
+  StopTimeoutCounter when the mouse leaves or enters the frame. In order to make it easier to insert custom frames, if you
+  set this element to be boolean true, then this will call an internal KoreUI function that allows you to place one of a
+  number of widgets on the menu. If you use this facility, then you must set the menu.widget element below to one of the
+  supported widget names, and provide any extra elements that widget may require as part of this menu item table. If you set
+  this to any other value then you need to manage the frame yourself.
+
+menu.widget [string]
+  If you are using a custom frame and you are using the internal KoreUI custom frame creation function (by setting menu.frame
+  to true), then this element tells KoreUI which widget type to create for the custom frame. For each of these widget types,
+  you may need to set extra elements in the menu item table to provide configuration options for the widget. Where this is
+  the case is is described along with the widget type. Note that using this feature requires the full KoreUI library. If you
+  have stripped out just the dropdown portion, you may not be able to use this feature. However, this document assumes you
+  are using the full KoreUI, so please note that these widget types use the widgets described above, so the purpose of the
+  extra values is not discussed here. Refer to the individual widget types above for details. The KoreUI widget type is
+  displayed in parentheses.
+
+  "radio" (KUI:CreateRadioButton)
+    This widget type creates a radio button. Extra item elements you need to provide are:
+    menu.group - the radio button group name
+
+  "slider" (KUI:CreateSlider)
+    Create a slider widget. The additional elements are:
+    menu.orientation - slider orientation (defaults to "VERTICAL")
+    menu.editfont - edit box font
+    menu.editcolor - edit box text color
+    menu.minmaxfont - minimum and maximum value font
+    menu.minmaxcolor - minimum and maximum value color
+    menu.minval - minimum slider value
+    menu.maxval - maximum slider value
+    menu.step - slider step increment
+    menu.initialvalue - initial slider value
+    menu.label - the text for the label. Note that this is not the full label table as described in the widget reference above.
+                 Rather, this is just the label.text portion of that table. The other lable values, such as label.font and
+                 label.color are already provided by menu.font and menu.color as described above.
+
+  "editbox" (KUI:CreateEditBox)
+    Create an edit box widget. Almost never used for dropdown menus but this is not uncommon with popup menus, which use this
+    same item description table. The extra values you can define for this widget are: menu.len - length of the string in the
+    edit box menu.numeric - true if this edit bo should accept numbers only menu.initialvalue - initial text box contents.
+
+  "button" (KUI:CreateButton)
+    Creates a simple push-button. The extra elements for this type are:
+    menu.label - the label text for the button.
+
+menu.submenu [table]
+  If set this ite becomes a submenu that will open when the mouse enters it. This table can have all of the values of the top
+  level dropdown config structure described in section 5.7 above. However, not all of those options are obeyed. Some are
+  forced to inherit the values set by the top level menu. Those elements that are obeyed are:
+  cfg.name, cfg.items, cfg.arg, cfg.func, cfg.itemheight, cfg.minwidth, cfg.minheight, cfg.maxwidth, cfg.maxheight,
+  cfg.canresize, cfg.width and cfg.height.
+
+  An item that opens a submenu is not itself checkable, unless it is one of a radio group (menu.group): then it keeps its
+  ring and is chosen by clicking it like any other of its group, the submenu saying more about that choice.
+
+As you can see several menu item elements can in fact be functions which return the value that is used as the element. In
+each case the function receives a single argument, which is the containing frame for the menu item (the entity which ends up
+in the iframes table). This has most of the values you can specify as elements to the menu item stored in it. However, you
+must be aware that these functions are called in the order they are documented above. So for example, menu.color is processed
+before menu.title, so a function handler for menu.color can not check to see if the item is a title or not. The only
+additional or changed entries in the item frame are:
+
+  ret.tlarg - set to the top level .arg value
+  ret.tlname - set to the top level menu name
+  ret.clickable - true or false. What menu.clickable came to.
+  ret.checkable - true or false. What menu.checkable came to.
+  ret.checked - true if the item is checked.
+
+This may seem like it is very complex. However, in practice, most of these options are not used, they are provided for very
+fine tuning of your user interface.
+
+5.8  KUI:CreatePopupMenu
+------------------------
+
+This is identical to KUI:CreateDropDown above in every way except that cfg.dwidth is not used, as there is no static portion.
+cfg.mode has no meaning either and is ignored. There are a few extra configuration elements for a popup menu:
+
+cfg.canmove [boolean]
+  True if the top level menu panel can be moved, false if its position remains static. It is dragged by its top border.
+
+cfg.strata [string]
+  Sets the strata for the popup. Defaults to "FULLSCREEN_DIALOG".
+
+cfg.escclose [boolean]
+  Set to true to close the popup when the user presses Escape. A dropdown's menu always closes on Escape.
+
+cfg.header [integer]
+cfg.footer [integer]
+  Optional integer values that indicate the number of pixels to reserve at the top and bottom of the popup window,
+  respectively. The popup window can never be resized to not include these two regions, so the common case is to keep them
+  small.
+
+ret.header [frame]
+ret.footer[frame]
+  The frames encompasing the header and footer. These will always be anchored to the top and bottom of the popup frame
+  respectively. The scrollable portion of the popup will lie between them.
+
+ret:UpdateItems(newitemtable)
+  Replaces the menu's items, exactly as a dropdown's does, so that one popup made once can be put up again with different
+  choices.
+
+throw:OnEnterCombat()
+throw:OnLeaveCombat()
+  Thrown when the player enters and leaves combat, for a popup that should not be used in combat.
+
+A popup menu is like a dropdown menu without the static portion and the dropdown menu button. In every regard, it is like the
+actual dropdown portion of a dropdown. However, the usage of the two is quite different. Popup menus are usually invoked by
+things like a minimap button or an LDB launcher or a command line. Dropdown menus however are usually bound to some sort of
+dialog box for setting configuration options. Also the use of widget frames for menu items is far more common for popup menus
+than for dropdown menus. Strictly speaking a popup menu is not a widget but a container. However, since they are so similar
+to a dropdown menu (they use the exact same code) they are lumped with widgets here.
+
+5.9 KUI:CreateInset
+-------------------
+
+Creates a recessed panel, the kit's panel rim in the tint around a ground a shade darker than the window it is in, the way
+Blizzard's own windows divide themselves up. The member list and the message of the day box in the Guild pane of the Social
+window are both insets.
+
+This is how KoreUI separates regions of a window. It replaced an older idiom of drawing divider lines with end caps, which
+could not work reliably. A divider has to meet the border it runs into, so its caps have to be drawn for that particular
+border, and a window bordered any other way had no join to be had at any offset. An inset carries its own corners and meets
+nothing, so there is nothing to align.
+
+Panels nest freely. A pane handed the remainder of a window and split again is how any layout deeper than two regions is
+built. What must never nest is the border. An inset drawn inside another gives a doubled border and a very busy window, so a
+panel that turns out to be a container for further panels stops drawing itself. Only the leaves draw, which is what makes the
+result read as a flat set of siblings however deep the frames actually go. The splits do this to their parent automatically;
+KUI:UseAsContainer is the same thing by hand.
+
+Put your widgets in ret.content, never in the panel itself, or they will sit on top of the border artwork.
+
+A panel is three rings deep on every side. The frame is the outer box and the width and height you ask for are that outer size:
+
+  cfg.padding        between the frame edge and the artwork
+  KUI.INSET_BORDER   the artwork itself, which is 4 pixels
+  cfg.inner_padding  between the artwork and the usable area
+
+So a 100x100 panel with the defaults has its artwork box from 4,4 to 96,96 and ret.content, the part you can use, from 12,12
+to 88,88.
+
+cfg.padding [number or table]
+  Space left between the panel's outer edge and its artwork, so that a panel stands clear of its neighbours and of the
+  window. Either a single number for all four sides, or a table with any of left, right, top and bottom - anything not named
+  is taken as zero. Left out altogether it is KUI.INSET_PADDING, which is 4.
+
+  Two panels placed side by side each give up this much, so the space between them is twice it. That is why nothing in KoreUI
+  has a gutter setting: the padding is the gutter, and there is one number to change.
+
+  Note this is not the same thing as cfg.inset on the splitters below, which is the margin left on the *outside* of the splitter.
+
+cfg.inner_padding [number or table]
+  Space left inside the artwork before the usable area starts, so that widgets do not sit hard against the border. Same forms
+  as cfg.padding. If omitted it is KUI.INSET_INNER_PADDING, which is KUI.WIDGET_GAP. As far as the first widget in a panel is
+  concerned the border is the neighbour it stands off, so it stands off it by the same amount it would any other.
+
+cfg.inset_art [boolean or table]
+  Which of the panel's four edges draw their border. Left out, or true, all four do, which is what almost every panel wants.
+  A table names only the sides that differ and anything not named still draws, so
+
+    inset_art = { top = false }
+
+  is "everything but the top". false draws nothing at all.
+
+  Suppressing an edge only stops it being drawn. Both paddings belong to the panel rather than to the border and are kept
+  either way, so a side with no border on it gives up those four pixels and nothing else. A panel under a tab strip with
+  { top = false } therefore has no line cutting the tab off from the space it opens on to, and the two read as one surface.
+
+  Drawing nothing is not by itself a container: a panel with no artwork still holds content, which still has to stand clear
+  of what is beside it. A container is all three rings at zero:
+
+    KUI:CreateInset({ inset_art = false, padding = 0, inner_padding = 0 })
+
+  which is a frame whose content is the whole of it.
+
+  A side that is not drawn takes its two corners with it, and the sides either side of it run on to the edge instead. The
+  panel's darker ground runs on to the edge of the frame on that side too, so a panel under a tab strip and the strip read as
+  one surface.
+
+cfg.title [string or table]
+  Words on a plate straddling one of the panel's own edges, hung so that the panel's border runs through the tips of the
+  plate's pointed ends. Straddling is the point. A plate wholly outside the panel is a caption floating in the window, and one
+  wholly inside it is just a widget somebody put there. On the line it belongs to the panel and says what the panel is. The
+  plate is drawn over the border, so the border stops at its edges rather than being drawn through the words.
+
+  A title costs content space on the edge it hangs on and on that edge alone. That edge of the frame becomes the outer edge of
+  the plate, the panel's own edge moves in to the tips of the plate's ends, and the content starts past the whole plate plus
+  the inner padding. So that ring is the padding, the whole plate and the inner padding, where it would otherwise have been
+  the padding, four pixels of border and the inner padding. A titled panel given no cfg.padding has no padding at all on that
+  edge, the plate standing in for it. Nothing else about the panel changes.
+
+  A string is the words alone, which is nearly always all anybody wants. A table says more.
+
+    text [string]
+      The words. Absent is an empty plate, which is only useful with a width.
+
+    location [string]
+      Which edge the plate hangs on and where along that edge it sits. One of "topleft", "topmiddle", "topright",
+      "bottomleft", "bottommiddle" or "bottomright", in whatever case you like. Left out, a title takes "topmiddle", where
+      every title in this toolkit hung before there was a choice.
+
+      A plate in the middle of an edge is centred on it. One at either end starts clear of the corner, which is as far in as
+      the rim draws its corner plus KUI.WIDGET_GAP, and the panel's own padding before that. An edge or a corner that draws
+      no rim has no corner to clear, so there the plate starts at the padding.
+
+      The plaque is never turned over. Its stone stands above it and is drawn no other way up, so a plate at the foot of a
+      panel keeps its stone inside the panel where one at the head keeps it outside. The room the panel gives up is measured
+      from the plate either way, so the arithmetic is right on both edges, but a foot title does reach further in than a head
+      title of the same style.
+
+      Everything this toolkit titles takes the same six places, in the same key, with the one exception of a tabbed dialog,
+      whose plaque is set into its top edge and takes only the three along it. See KUI:CreateTabbedDialog.
+
+    style [string]
+      Every plate is the kit's title plaque, with a star at each end and a stone set in the diamond on its top edge, and the
+      style says how big it is drawn:
+
+        "THIN"    32 tall, for one section of a page, and what a panel takes when it names no style
+        "THICK"   40 tall, for something that is a whole thing in its own right, and what a dialog takes
+        "WINDOW"  44 tall, the one set into the top edge of a tabbed dialog
+
+      A plaque is a strip whose ends and ornament are drawn at their own size, only the runs between them stretching, so it
+      can never be narrower than those. The plaque plays the plaque part and its stone the gem part, so they wear the tint
+      and the gem colour unless cfg.parts says otherwise (see section 2.2).
+
+    width [number]
+      Width of the whole plate, ends included. Left out, the plate measures itself against the words and keeps doing so every
+      time ret:SetTitleText changes them. Given, it is that wide and stays that wide whatever it is later told to say,
+      because you sized it to match a neighbour rather than its contents.
+
+    padding [number]
+      Space each side of the words when the plate measures itself. Ignored when a width was given, there being nothing left to decide.
+
+      The ends are ornament flaring off the plate rather than room for words, so this is measured from where they stop and
+      the ends are added on top of it. A width you give yourself is still the whole plate, ends included. Defaults to 8 for
+      THIN, 12 for THICK and 16 for WINDOW.
+
+    minwidth [number]
+      The least the words may measure before the padding and the ends are added. A short title, or a window naming only its
+      owner, then still gets a plate rather than a stub. Ignored when a width was given. THICK defaults to 100, being the
+      style a dialog takes; THIN and WINDOW default to none, a panel among other panels wanting to be no wider than it has
+      to be.
+
+      **Do not give a window title a width instead of this.** A number written down is a canyon around a short title and too
+      narrow for the same title in a language with longer words. The plate is as wide as its words need, with a floor under
+      it, so it follows whatever language it is in.
+
+    height [number]
+    font [string]
+      Override what the style says. The height is what the panel makes room for, so raising it pushes the content down.
+
+    customtitle [function]
+      Draw the innards of the plate yourself: customtitle(plate, box) -> boolean. BOX is a frame made for you, the plate's
+      whole rectangle between its two ends, from the top of its body under the diamond to its foot, which is what the words
+      are centred in. It is anchored and sized for you and follows the plate as it changes width, and it lies over the
+      plaque and under the words, which stay the plate's and go on measuring as ever. Answer true and the box is shown and
+      everything in it is yours; nothing here touches what you put there. Answer false and it is hidden and the plate is
+      plain. It is asked when the plate is made, whenever the plate changes width, and whenever you call ret:RedrawTitle. A
+      callback that raises has not taken the box.
+
+ret.title [table]
+ret.titletext [table]
+  The plate's frame and its font string, for anything this does not cover. Both are nil on a panel with no title.
+
+ret:SetTitleText(string)
+  Change the words. The plate re-measures itself unless it was given a width, or is held to one.
+
+ret:SetTitleWidth(width)
+  Hold the plate at WIDTH, ends included, whatever it is later told to say, as a plate made with a width is held, and change
+  it as often as you like. Nil lets it measure itself against its words again. For a title whose words change while it is
+  watched, a countdown, which would otherwise grow and shrink with every digit.
+
+ret:RedrawTitle()
+  Ask the plate's customtitle again, for a caller whose drawing has changed: a countdown moving on.
+
+ret:SetEnabled(onoff)
+ret:IsPanelEnabled()
+  Say whether what is in the panel can be used, and ask. A disabled panel dims its title the way a disabled control dims. Its
+  plaque and stone wear the kit's disabled grey, the stone's sparkle goes out, and its words turn grey with any colour codes
+  in them stripped. The words come back whole when the panel is enabled again, including whatever ret:SetTitleText gave it in
+  between. Nothing inside the panel is touched, its controls being enabled and disabled by their own rules, and a panel with
+  no title shows nothing. nil is the same as true.
+
+ret.content [table]
+  The frame covering the area inside the border and the padding. This is what you place widgets in.
+
+ret:SetBorderShown (boolean)
+  Turn the panel into a container, or back into the panel it was made as. This is the same state as the three rings being
+  declared at zero above; it exists because a panel usually cannot know it is a container when it is made. The splitters call
+  it on their own parent, having just discovered that it holds panels rather than content.
+
+  A container gives up nothing on any side, with one exception. A titled panel keeps the room its plate occupies, because the
+  plate is a real object hanging off the frame and content laid over it would be on top of the words. That room is kept on the
+  edge the title hangs on, wherever that is. So a titled container is a legitimate thing, a named region with panels inside
+  it, rather than a contradiction.
+
+offset = KUI:PanelMiddle(content)
+  The y offset that puts something centred in a panel's content frame on the middle of the panel as you SEE it - halfway
+  between the two lines its artwork draws:
+
+    thing:SetPoint("RIGHT", content, "RIGHT", x, KUI:PanelMiddle(content))
+
+  Those are not the same point. A panel's rings are not symmetric. A title makes its own edge much the deeper of the two,
+  since the whole plate comes out of that ring although half the plate hangs outside the line, so centred in the content a
+  block of buttons in a titled panel reads several pixels away from the title. Returns 0 for a frame that is not a panel's
+  content.
+
+  The rule's own weight needs no allowance and none is made. It is a band of artwork of the same thickness top and bottom,
+  so it moves both edges inward equally and leaves the middle where it was.
+
+KUI:UseAsContainer(frame)
+  Given the content frame of a panel, tells that panel it is a container rather than a leaf and should not draw itself. The
+  splitters call this on their own parent; hand-built layouts can call it directly.
+
+5.9.1 KUI:CreateSeparator
+-------------------------
+
+The kit's separator, a rule across whatever it is put in with a stone in the gem colour set in the diamond at its middle,
+and words centred under the rule heading what follows it. It divides one panel's column of widgets into sections, where a
+second panel would be a panel nested in a panel. The frame is the rule and the words together, so GetHeight is what a column
+steps down by.
+
+cfg.text [string]
+  The words under the rule. Left out, the separator is the rule alone and only KUI.SEPARATOR_THICK tall.
+
+cfg.font [string]
+  The font for the words. Defaults to "GameFontNormal".
+
+cfg.width [number]
+  Left out, the separator runs from cfg.x to the right hand edge of its parent.
+
+ret:SetText(string)
+  Change the words.
+
+ret.label [FontString]
+ret.art [table]
+ret.gem [table]
+  The words, the rule and its stone.
+
+KUI.SEPARATOR_THICK
+  How thick the rule is drawn, 12, which is the size the piece was drawn at.
+
+5.9.2 KUI:CreateGroupBox
+------------------------
+
+A box round a few of a panel's widgets, with a heading of their own, inside the panel. A panel inside a panel doubles the
+panel rim, so a group box wears the kit's thin border instead, the menu frame at THIN's 4 pixels of rim, over no ground of
+its own. Its title is set into its top or its bottom line, which stops short either side of the words rather than running
+through them, the way a fieldset's legend is. Size it with cfg.width and cfg.height, or anchor it, and put widgets in
+ret.content.
+
+cfg.title [string or table]
+  The words set into the line. Left out, the line is unbroken and runs along the edge of the frame.
+
+  A string is the words alone. A table is the title table described under KUI:CreateInset, of which a group box reads text,
+  location and font, and ignores the rest, a heading on a line having no plate to style or size. So the same table can be
+  handed to either without the caller remembering which widget wants which shape.
+
+  The six locations are the ones listed there. The words sit on the line rather than on a plaque, so nothing has to be turned
+  over here and the two edges are exact mirrors of each other. Words hung on a corner start clear of it, as far in as the rim
+  draws its corner plus KUI.GROUPBOX_NOTCH.
+
+cfg.font [string]
+  The font for the title, for a caller that gave the words as a string. A font in the title table wins. Defaults to
+  "GameFontNormal".
+
+ret.content [frame]
+  The area inside the border, where widgets go.
+
+ret.rings [table]
+  How far ret.content is in from each edge, as left, right, top and bottom. The rim and KUI.WIDGET_GAP inside it on every
+  side, and on the titled edge the deeper of the rim's foot and the words'. A group box fitted to its widgets is their size
+  plus these.
+
+ret:SetTitleText(string)
+  Change the words. The gap in the line is fitted to them again and stays where the location put it.
+
+ret:SetEnabled(onoff)
+  Dim the title, or bring it back. Nothing inside the box is touched, as with a panel.
+
+ret.titletext [FontString]
+ret.rim [table]
+  The title's words and the border.
+
+KUI.GROUPBOX_NOTCH
+  The space between the words and each end of the line they are set into, 4.
+
+5.10 KUI:CreateHSplit
+---------------------
+
+Splits a frame into two panes, one above the other, usually to separate parts of a tab in a tabbed dialog. The split is not
+movable as splitters in Windows applications are. If the frame being split is resizable, one pane resizes with it and the
+other is always a fixed size.
+
+Both panes are KUI:CreateInset panels and the frames handed back are their content areas, so widgets placed in them are
+already clear of the border. If the frame being split is itself a panel, it is told to stop drawing its own border, so that
+only the innermost panels draw.
+
+The two panes meet edge to edge. Each already stands its own padding clear of its outside, so the space between them is those
+two paddings and there is no gutter setting anywhere: change cfg.padding and the space between the panes changes with it.
+
+cfg.height [number]
+  The usable height of the static pane, in pixels. This splits the parent frame into two regions, one which is this number of
+  pixels and the other which is the remainder. The panel drawn around it is taller than this by everything its own edges give
+  up, so a caller asking for 48 still gets 48 to put things in.
+
+cfg.topanchor [boolean]
+  By default the height reserves the bottom pane, so the split is anchored to the bottom of the parent frame. Set this to
+  reserve the top one instead.
+
+cfg.padding [number or table]
+cfg.inner_padding [number or table]
+  Passed to both panes. See KUI:CreateInset above.
+
+cfg.inset_art [boolean or table]
+  Which edges of the *pair* draw, in the same form CreateInset takes. Each pane is given only the sides it actually owns, so
+  on a horizontal split top belongs to the top pane and bottom to the bottom one, while left and right go to both. The two
+  edges facing each other are interior and always draw.
+
+cfg.toppadding [number or table]
+cfg.bottompadding [number or table]
+  cfg.padding for one pane only, in the same form and falling back to it. Use this to nudge a panel within the space it was
+  given: dropping a pane's top padding moves the panel it draws up by that much, and because the pane's FRAME does not move,
+  the pane beside it stays exactly where it is. Re-anchoring a pane afterwards would drag its neighbour along with it.
+
+  Remember that a table names the sides it wants and everything left out is zero, so give all four when you only mean to change one.
+
+cfg.topborder [boolean]
+cfg.bottomborder [boolean]
+  Set either to false and that pane draws nothing. It gives up the artwork and the inner padding that measured the distance
+  to it, there being nothing left to stand clear of, but keeps its outer padding, which is position and not border. Widgets
+  in it therefore sit where they would have with a line around them. Use this where only one half of a split wants framing -
+  a page of plain options above a panel of buttons, say.
+
+  Add toppadding = 0 (or bottompadding) and the pane is a container instead: all three rings gone and the content is the
+  whole of it, which is what a pane holding panels of its own wants, so that they line up with the panels outside it. This is
+  the same state ret.topinset:SetBorderShown(false) reaches, said when the pane is built instead of undone afterwards.
+
+cfg.toptitle [string or table]
+cfg.bottomtitle [string or table]
+  Title one or both panes. A pane is a panel, so this is exactly cfg.title as described under KUI:CreateInset and is handed
+  to the pane untouched.
+
+  A title on the static pane makes that pane taller, since cfg.height is the usable height and the plate is not part of it.
+
+cfg.inset [number]
+  Number of pixels to inset the whole splitter by, if any. Rarely used.
+
+ret.topframe [table]
+  The top pane's content frame.
+
+ret.bottomframe [table]
+  The bottom pane's content frame.
+
+ret.topinset [table]
+ret.bottominset [table]
+  The panels themselves, should you need to call SetBorderShown on one.
+
+ret:SetSplitSize(height)
+  cfg.height after the fact, for a static pane that is as tall as whatever is in it and whose contents change. The pane it
+  resizes is the one cfg.topanchor chose, and height means the same usable height it meant at creation, so the panel drawn
+  around it still ends up taller than the number you give by whatever its own edges take.
+
+  Use it wherever the same slot holds different things at different times and each knows its own size. Doing it by hand
+  means reaching for ret.topinset and adding its rings back on, which is the widget's arithmetic in somebody else's file and
+  goes wrong the moment a ring changes.
+
+ret:SetStaticShown(onoff)
+  Show or hide the static pane, the one cfg.topanchor chose. While it is hidden the other pane takes the whole split, and
+  it goes back to its place when it is shown again. Never hide one by making it no height instead: the other pane is
+  anchored to it, and the game does not lay out what is anchored to a frame of no height.
+
+5.11 KUI:CreateVSplit
+---------------------
+
+Identical in purpose and function to KUI:CreateHSplit above, except this creates a vertical split, splitting the parent frame
+into a left and right component. Both panes are KUI:CreateInset panels and the frames handed back are their content areas.
+
+cfg.width [number]
+  The usable width of the static pane, in pixels. This splits the parent frame into two regions, one which is this number of
+  pixels and the other which is the remainder. The panel drawn around it is wider than this by everything its own edges give
+  up, so a caller asking for 180 still gets 180 to put things in.
+
+cfg.rightanchor [boolean]
+  By default the width reserves the left pane, so the split is anchored to the left of the parent frame. Set this to reserve
+  the right one instead.
+
+cfg.padding [number or table]
+cfg.inner_padding [number or table]
+  Passed to both panes. See KUI:CreateInset above.
+
+cfg.inset_art [boolean or table]
+  As for the horizontal split above: left belongs to the left pane, right to the right one, and top and bottom go to both.
+  The two edges facing each other are interior and always draw.
+
+cfg.leftpadding [number or table]
+cfg.rightpadding [number or table]
+  As cfg.toppadding above: cfg.padding for one pane only.
+
+cfg.leftborder [boolean]
+cfg.rightborder [boolean]
+  As cfg.topborder above: false stops that pane drawing, and with leftpadding = 0 (or rightpadding) makes it a container.
+
+cfg.lefttitle [string or table]
+cfg.righttitle [string or table]
+  Title one or both panes, in the form cfg.toptitle takes above.
+
+cfg.inset [number]
+  Number of pixels to inset the whole splitter by, if any. Rarely used.
+
+ret.leftinset [table]
+ret.rightinset [table]
+  The panels themselves, should you need to call SetBorderShown on one.
+
+ret.leftframe [table]
+  The left hand pane's content frame.
+
+ret.rightframe [table]
+  The right hand pane's content frame.
+
+ret:SetSplitSize(width)
+  cfg.width after the fact, for the pane cfg.rightanchor chose. The horizontal split's SetSplitSize above says when to use it.
+
+
+6.  Containers
+==============
+
+The above describe the widget types KoreUI offers. As useful as these widgets are, they are meaningless unless you actually
+put them somewhere a user can interact with them. That is what the container types are for. These container types provide a
+"canvas" onto which you can place your widgets to form a useful dialog that the user can interact with. Strictly speaking a
+popup menu is a container too, but it is lumped in with the actual widgets above, as it is almost identical to a dropdown
+menu.
+
+6.1 KUI:CreateDialogFrame
+-------------------------
+
+This creates a basic single page dialog frame. The frame can be moved and resized if desired.
+
+cfg.x, cfg.y, cfg.name, cfg.canresize, cfg.minwidth, cfg.maxwidth, cfg.minheight, cfg.maxheight
+  As described in section 1 above.
+
+cfg.canmove [boolean]
+  As described in section 1 above, except that a dialog is movable unless this is false.
+
+cfg.strata [string]
+  Sets the strata for this dialog box. Defaults to "DIALOG", the game's own dialogs' strata, one above a window's. A dialog
+  that is a mod's window rather than something put up over one is given "HIGH", as a tabbed dialog is.
+
+cfg.title [string or table]
+  Sets the title for the dialog box. The plate is the drag handle of a movable dialog, and a movable dialog with no title is
+  dragged by a strip along its top edge instead. A dialog with no border has no title.
+
+  This is the title plate described under KUI:CreateInset, in exactly the same form, and everything said there applies here.
+  The only difference is that a dialog takes THICK when the spec names no style, a panel taking THIN. Either can ask for
+  either. The plate straddles the border with the tips of its ends on the border's line.
+
+  It takes the same six locations a panel's does. A dialog's border cannot move to meet the plate the way a panel's edge
+  does, so here the plate is anchored to the border's own artwork and hung with its tips on the middle of the band that side
+  draws. A frame's four sides are not one thickness, the rim you ask for being the weight of its widest side, so where that
+  line falls is the drawing's to say rather than half the rim in from the frame. A plate at either end starts clear of the
+  corner, and a top right one clears the close button as well when there is one.
+
+  What a title at the foot of a dialog does not clear is the dialog's own buttons and status bar, which stand inside the
+  bottom of the frame rather than on its line. The content is kept clear of the deeper of the two, but the plate and the
+  buttons share that band, so give a foot title an end the buttons are not at. The buttons are at the right.
+
+  Note that a width is the width of the whole plate, ends included. Left out, the plate measures itself against the words.
+
+cfg.border [string or boolean]
+  Specifies whether or not the dialog has a border, and if so, what type. The choices are "THICK" or boolean true (the
+  default), which is the kit's window border with 10 pixels of rim, or "THIN", which is its menu border with 4. If you do not
+  want a border you must explicitly set this to boolean false or the string "NONE".
+
+cfg.blackbg [boolean]
+  Normally a dialog's ground is the kit's window surface. Sometimes for busy dialogs this can make the background obscure the
+  dialog elements. Setting this to true will use a solid black background so that the dialog widgets stand out better.
+
+cfg.xbutton [boolean]
+  Set to true if you want the kit's close button, a red gem with a gold cross, at the right hand end of the top border. It
+  is centred on the border's line, level with the title plate's words, so it sits above the content and never covers it. A
+  dialog with no border has it in the top right hand corner instead. It hides the dialog and throws OnClose.
+
+cfg.cancelbutton [boolean or table]
+cfg.okbutton [boolean or table]
+  Set to true for a standard cancel or OK button at the bottom of the dialog, or to a table to change it. Options you can set
+  in the table are:
+  .width (defaults to 100)
+    Width of the button.
+  .height (defaults to 24)
+    Height of the button.
+  .text (defaults to "Cancel" or "OK" in the user's language)
+    Text to display on the button.
+  If this is set and the button is pressed, this throws an OnCancel or OnAccept event.
+
+  The buttons are handed back as ret.okbutton and ret.cancelbutton. They sit in the bottom right corner, and OK is anchored
+  to the cancel button, so re-anchoring the cancel button moves the pair.
+
+cfg.buttons [string]
+  Where that pair stands along the bottom. "RIGHT", the default, is the corner. "CENTER" is the middle of the dialog, in
+  the same word cfg.x takes for it in section 1, and is what a dialog whose content is centred wants, so that the buttons
+  under it are not off to one side of everything above them.
+
+  Not for a dialog that also has a status bar. The bar stretches from the left wall to whichever button is leftmost, so
+  centring the pair drags the bar into the middle along with it.
+
+cfg.padding [number or table]
+  Space left inside the dialog's border before ret.content starts, in the same form KUI:CreateInset takes it - a number for
+  all four sides, or a table naming any of left, right, top and bottom with anything unnamed taken as zero. There is none
+  unless you ask for one, because a dialog is laid out in its content's own coordinates and adding padding moves everything
+  in it.
+
+  The border offset is not this. That clears the artwork and nothing more, which is why a widget placed at 0,0 without
+  padding sits hard against the frame.
+
+cfg.statusbar [boolean]
+  Set to true if you want a status bar at the bottom of the dialog that you can use to set messages in. This appears to the
+  left of the OK and cancel buttons, if configured, and is the kit's status strip, 20 pixels tall.
+
+cfg.statusfont [string]
+  Sets the font to use for the status bar, if it is configured. Defaults to "GameFontNormal".
+
+cfg.escclose [boolean]
+  Set to true if you want the dialog to be closed when the user presses the Escape key.
+
+cfg.enteraccept [boolean]
+  Set to true, on a dialog with an OK button, for Enter pressed on the dialog to press it while it is enabled. A field that
+  has the keyboard takes Enter first and gives the keyboard back in taking it, so the first Enter finishes the field and
+  the second accepts. Every other key goes on to the game, Escape and movement included. Left out, Enter is not the
+  dialog's at all.
+
+ret:SetTitleText (string)
+  Sets the title to the specified string. Only present if you specify a title above.
+
+ret:SetTitleWidth (width)
+ret:RedrawTitle ()
+  As a panel's (KUI:CreateInset): hold the plate at a width, or nil to measure it again, and ask its customtitle again.
+  The title table takes customtitle as a panel's does. Only present if you specify a title above.
+
+ret:SetStatusText (string)
+  Sets the status bar text to the given string. This function only appears if a status bar was configured for the dialog.
+
+ret.content [frame]
+  This is set to a frame that covers the usable portion of the dialog, inside the borders and above the buttons and status
+  bar. Note that if you use the return value from KUI:CreateDialogFrame() as the parent argument to any of the KoreUI
+  widgets, then the widgets will automatically become children of ret.content, not the outer containing frame.
+
+ret.rings [table]
+  How far ret.content is in from each edge of the dialog, as left, right, top and bottom: the border, the room a title plate
+  hangs below it, the OK and cancel buttons or status bar with a gap above them, and cfg.padding. A dialog sized to fit what
+  is in it is its content's size plus these.
+
+ret.title [frame]
+ret.titletext [FontString]
+  The title plate and its font string.
+
+ret.xbutton [frame]
+ret.okbutton [frame]
+ret.cancelbutton [frame]
+  The close, OK and cancel buttons, where there are any.
+
+throw:OnClose()
+  Thrown when the close button is pressed, after the dialog has been hidden.
+
+throw:OnCancel()
+  Thrown if you configured a cancel button and it is pressed. By the time this handler is called the dialog has already been hidden.
+
+throw:OnAccept()
+  Thrown if you configured an OK buton and it was pressed. By the time this handler is called the dialog has already been hidden.
+  With cfg.enteraccept, Enter pressed on the dialog presses it too.
+
+Example:
+
+  -- Create a simple dialog with one edit box in it
+  local cfg = {
+    name = "MyDialog", x = "CENTER", y = "MIDDLE", width = 200, height = 200,
+    canmove = true, xbutton = true, title = "My Dialog", escclose = true,
+    okbutton = {}, cancelbutton = {},
+  }
+  local mydlg = KUI:CreateDialogFrame(cfg)
+  cfg = {
+    x = 20, y = -20, width = 200, label = { text = "Input" }
+  }
+  local myedit = KUI:CreateEditBox (cfg, mydlg)
+
+6.2 KUI:CreateTabbedDialog
+--------------------------
+
+A tabbed dialog is a dialog frame with a strip of buttons along the bottom which change the content above them, and
+optionally a second strip along the top of each of those. A good example is the social panel (press 'O' in game). It also
+provides a header area that can be specific to either strip, as you choose.
+
+The two strips are called PAGES and TABS respectively, and the section immediately below defines those terms. They are used
+strictly throughout the rest of this section.
+
+The dialog is the kit's tabbed window. Its rim has rounded corners, and its bottom edge steps down into a tray under the page
+buttons, fitted to however many of them are showing. The portrait's frame sits over the top left corner and the kit's close
+button over the top right. The band between the title plaque and the content is the top bar, where the tabs stand. The band
+above the top bar is the drag handle of a movable window, and a resizable one has the kit's grip in its bottom right corner.
+
+The selected page button is filled in the gem colour, darkened so that its stones stand out, and a stone in the gem colour
+is laid over the stone set in each of its ends. The selected tab is filled the same way and carries a stone in the setting on
+its top edge. The words on either are lit.
+
+cfg.x, cfg.y, cfg.name, cfg.canmove, cfg.canresize, cfg.minwidth, cfg.maxwidth, cfg.minheight, cfg.maxheight
+  As described in section 1 above. The size a resizable tabbed dialog can be given defaults to between 192 and 1024 each way.
+
+cfg.strata [string]
+  Sets the strata for this dialog box. Defaults to "HIGH", over the game's panels and under its dialogs and the kit's.
+
+cfg.title [string or table]
+  Sets the title for the main tabbed dialog. This can be changed for each tab as you select it.
+
+  The title sits in the WINDOW plate described under KUI:CreateInset, set into the window's top edge with the tips of its
+  ends on the rim's line. The plaque plays the title part and its stone the titlegem part, so both wear the accent unless
+  cfg.parts says otherwise (see section 2.2). It measures itself against its words every time they change. It takes the same
+  table as any other title, so a caller never has to remember which widget wants which shape, but only text, location and
+  font mean anything here, the plate's style being fixed.
+
+  A window takes the three top locations and no more, its bottom edge being the tray its page buttons stand in. A location
+  naming the bottom keeps the end it named and comes up to the top edge. A plaque at the left hand end starts clear of the
+  portrait as well as of the corner, the portrait standing out over that corner.
+
+cfg.tltexture [string]
+cfg.tltexcoord [table]
+  The picture in the portrait in the top left corner, and { left, right, top, bottom } of the part of it to show. It fills
+  the opening of the portrait's frame, whose rim covers its edge. Without one the portrait is black.
+
+cfg.portraitaccent [table]
+  { r, g, b } the portrait's frame wears. Left out, the frame plays the portrait part and wears the accent.
+
+cfg.innerart [string]
+  Left out, the rim is plain. "FANCY" draws the rim as it was drawn instead, with a flourish standing out past each corner,
+  and a thin rule round the content that the tabs stand on. The content is inset by the rule's width as well, so the same
+  pages fit either way.
+
+cfg.blackbg [boolean]
+  Black out everything below the band across the top, which reads better behind a screen that is mostly panels than the
+  window surface does. The black runs from the top of the content down to the rim and into the tray, so the page buttons
+  stand on it too. The band across the top, which holds the title and the top bar, keeps its surface, drawn lighter.
+
+cfg.escclose [boolean]
+  Set to true if you want the dialog to be closed when the user presses the Escape key.
+
+cfg.savebarlocation [string]
+  Where the save bar stands while it is up, "BOTTOM" across the foot of the content or "TOP" across its head. BOTTOM when
+  left out. Kept as ret.savebarlocation. See ret:SetSaveBar.
+
+cfg.savebarreserved [boolean]
+  Keep the save bar's room from the start rather than growing the window for it. The bar is built with the dialog and the
+  content always stops short of it, so the pages are laid out in what is left. Putting the bar up or taking it down then only
+  shows or hides it and nothing moves. Where it stands is settled when the dialog is made. cfg.savebar, a table of .text
+  and .message, gives the button's words and its tooltip, as SPEC does to ret:SetSaveBar.
+
+cfg.onclick [function]
+  Called as onclick(dialog, pagename, tabname) every time a page or a tab is selected, with a nil tabname for a page that
+  shows no tab. A page or a tab may have an onclick of its own, which is called after it as onclick(entry, pagename, tabname)
+  with ENTRY the page or tab table.
+
+6.2.1  Pages and Tabs
+----------------------
+
+A tabbed dialog has two independent strips of buttons, and they are two different things. The words below are used strictly
+and mean only one thing each:
+
+  A PAGE is one of the buttons along the BOTTOM edge of the dialog. A page is a whole dialog. It has its own frame, content
+  area, top bar and title.
+
+  A TAB is one of the buttons along the TOP of a page, drawn in that page's own top bar. A page may have any number of tabs.
+  A tab may not have tabs of its own. only one level of nesting is supported, and a tab cannot have a title of its own.
+
+Both are addressed by NAME everywhere in this API and never by position. A name is the identity of a page or a tab and never
+changes. The "order" field decides only where in its strip the button is drawn, and positions shift the moment anything is
+hidden, added or removed - which is exactly why you never address by them.
+
+Hiding a page or tab closes its strip up, leaving no gap where the button was. If you hide the page or tab that is currently
+selected, the dialog moves to the nearest visible neighbour to its LEFT, or failing that to the nearest one to its right. If
+a dialog ends up with no visible pages at all that is a legitimate state: no page is shown and the title falls back to the
+dialog's own.
+
+cfg.defpage [string]
+  Name of the page to select when the dialog is first built. If not given, the first visible page is used.
+
+cfg.pages [table]
+  Defines the pages. Each entry must be a named table, and the key names the page unless the entry sets its own .name. Each
+  page may have:
+
+  page.name [string]
+    The page's name. Defaults to its key in cfg.pages.
+
+  page.title [string]
+    Title for this page. If set, selecting the page changes the top level title to this string.
+
+  page.text [string]
+    The text on the page's button. Keep it very short.
+
+  page.order [number]
+    Where this page is drawn in the bottom strip, lowest first. Pages are sorted on this, because cfg.pages is keyed by name
+    and Lua does not promise an order when iterating it. It is not an identity and it need not be dense or unique.
+
+  page.hidden [boolean]
+    If true, the page starts out hidden. Defaults to false.
+
+  page.hsplit [table]
+  page.vsplit [table]
+    Give this page a horizontal or vertical split, taking the same values you would pass to KUI:CreateHSplit or
+    KUI:CreateVSplit. This creates a .hsplit or .vsplit element on the page's content frame, from which the two halves can be
+    reached. Set one or the other, never both.
+
+  page.tabframe [string]
+    Controls which portion of the page changes when a tab is selected. Only meaningful if the page has both tabs and a split.
+    The intended use is a page whose tabs share content on one side of the split and vary on the other. With a vertical split
+    use "LEFT" or "RIGHT". With a horizontal split use "TOP" or "BOTTOM".
+
+  page.deftab [string]
+    Name of the tab to select when this page is first shown.
+
+  page.padding [number or table]
+    Insets the page's content frame, in the same form KUI:CreateInset takes it. A page that puts widgets straight onto its
+    content wants it, since nothing else stands them off the dialog's edge. One that declares a split does not, the split's
+    panels bringing their own padding, which this would be added to.
+
+  page.onclick [function]
+    Called when the page is selected. See cfg.onclick above.
+
+  page.savebar [boolean]
+  page.savebaroffset [number]
+    In a dialog that keeps the save bar's room (cfg.savebarreserved), what this page does with it. False savebar is a page
+    that never has anything unsaved: its content reaches down into the bar's room and has it for itself. A savebaroffset
+    also gives the page the room, and puts the bar up that far above the foot of the content, for a page that keeps
+    something of its own at the very bottom and leaves the bar's height free above it. Kept on the page as .nosavebar and
+    .savebaroffset, and the offset may be set again once the page has measured what it keeps down there. Ignored in a dialog
+    that does not keep the room.
+
+  page.tabs [table]
+    The page's tabs, in the same form: keyed by name, each with text, order, hidden, padding, onclick, hsplit, vsplit,
+    savebar, savebaroffset and wholepage. A tab's say about the save bar is its own and does not come from its page, except
+    that a tab on a page with savebar false already reaches the foot of the content with its page and takes no more room.
+
+  tab.wholepage [boolean]
+    On a page whose tabs change one side of its split (page.tabframe), a tab that covers the whole of the page's content
+    instead. The split, the side the other tabs share included, is hidden while it is the tab shown and comes back with
+    any other. For a tab that needs the room more than it needs what the shared side holds.
+
+Anything else you put in a page or tab config is left alone and handed back to you as .cfg on the page or tab, so you can
+hang your own meaning on a page without keeping a parallel table.
+
+ret:SetTitleText(string)
+  Sets the top title text to the specified string.
+
+ret:SetSaveBar(onoff, spec)
+  Put up or take down the save bar, a panel across the foot of the content for a page that has changes not yet saved. It
+  wears the panel rim with a jewel, the Separator's diamond and a stone, on the middle of its top line, and holds one wide
+  button and nothing else. The whole bar is tinted KUI.DEFAULT_CHANGED_COLOR, like the changed values themselves. The button's tooltip says that the page's changes are lost unless it is pressed.
+
+  The window makes room for it. While it is up the content stops short of it and the window is that much taller, its top
+  edge staying where it was, and a resizable window's height bounds are raised by the same. Taking it down gives all of it
+  back. It is as tall as the button and the rings round it.
+
+  Where it stands is ret.savebarlocation, "BOTTOM", across the foot of the content, or "TOP", across its head under the top
+  bar. It is read each time the bar is put up, so it can be changed between one and the next.
+
+  SPEC is read the first time the bar is put up, and may give .text for the button and .message for its tooltip. They
+  default to Kore's K.SAVEBAR_STR and K.SAVEBAR_MSG.
+
+  A dialog whose pages keep held edits (ret:NewPending) puts the bar up and down itself, and a caller need never call this.
+  One that keeps none is left to: it puts the bar up when a page has changes, catches OnSave to save them, and takes the bar
+  down.
+
+ret:IsSaveBarShown()
+  Whether the save bar is up.
+
+throw:OnSave()
+  Thrown on the dialog when the save bar's button is pressed, after the page on show has saved its held edits if it keeps any.
+
+ps = ret:NewPending(opts)
+  Make the held edits of one page, or one tab of a page, which is what drives the save bar. Nothing the page edits is
+  written while it is being edited: each change is held against the value that was saved when it was made, and pressing the
+  save bar's button hands the lot to the page's save at once. The dialog keeps them under the page's and tab's names, and
+  its save bar is up exactly while the page and tab on show have held changes, looked at again whenever either changes.
+  Hiding the dialog throws every page's held changes away and has each put its widgets back, which is what the button's
+  tooltip says closing the window does.
+
+  OPTS gives:
+    page, tab      the names of the page and, if the edits are a tab's, the tab
+    saved(key)     the value KEY has as saved
+    save(changes)  write CHANGES, a table of key to value, however the page stores and announces them
+    reload()       put the page's widgets back from what is saved
+
+  What is held is a value that differs from what is saved: setting a key back to its saved value is no change. Tables are
+  compared one level deep, entry by entry.
+
+  ps:Set(key, value)     an edit, held unless it agrees with what is saved
+  ps:Value(key)          what KEY is on screen, held if it is held and saved otherwise
+  ps:Has(key)            whether KEY is held
+  ps:Dirty()             whether anything is
+  ps:Watch(widget, ...)  WIDGET is shown changed (ret:SetChanged) while any of the keys after it is held
+  ps:Discard()           throw every held change away; the page puts its widgets back itself
+  ps:Save()              hand the held changes to save and forget them
+  ps:Reconcile()         what is saved may have moved under the page: a key changed there since it was edited here takes
+                         that value, and one that now agrees with the edit is no longer held. True when any was dropped.
+  ps:Pick(id)            on a page with a selector, the one thing the edits are to. Picking another throws them away, and
+                         picking the same one again reconciles them. ps.picked is the one picked.
+  ps:Hold(), ps:Release()  a refresh deselects and reselects its list; picks between the two are only noted, and Release
+                         acts on the last, so a refresh that ends where it began keeps the edits.
+
+ps = ret:ShownPending()
+  The held edits of the page and tab on show, or nil.
+
+ret:SyncPending()
+  Put the save bar up or down for the page on show. Every change to held edits does this itself.
+
+ret:DiscardPending()
+  Throw away every page's held changes and have each page reload its widgets, as hiding the dialog does.
+
+ret:SetPage(pagename, tabname)
+  Selects the page and, within it, the tab. Both are optional. A nil page means whichever page is current, else the default,
+  else the first visible one, and a nil tab means the same within the chosen page. Naming a page that does not exist, or one
+  that is hidden, falls back the same way, so a caller never has to check first. Returns the page name and tab name actually
+  selected, or nil if every page is hidden.
+
+ret:SetTab(tabname)
+  Selects a tab within the page that is already current.
+
+ret:GetPage (pagename)
+ret:GetTab(pagename, tabname)
+  Return the page or tab table, or nil. Both arguments default to whatever is current.
+
+ret:SetPageTitle(pagename, title)
+  Retitle a page. Every page shares the one plaque and it shows whichever page is current, so the words on screen change now
+  only if this is that page. Any other page's new title is waiting for it when it is next selected. A nil title falls back
+  the way it does at creation, to cfg.title and then to the dialog's own title.
+
+  This is for a dialog whose pages are named after something that changes under them. Rebuilding the window to relabel it
+  would throw away every frame in it, and WoW cannot destroy those.
+
+ret:SetPageShown(pagename, onoff)
+ret:SetTabShown(pagename, tabname, onoff)
+  Show or hide a page or a tab. The strip closes up, and if what you hid was current the dialog moves as described above.
+  ONOFF is tested for truth, so nil hides, as with SetShown.
+
+ret:IsPageShown(pagename)
+  Whether the dialog has the page and it is not hidden, which is to say whether SetPage would select it rather than fall back.
+
+ret:AddPage(cfg)
+ret:AddTab(pagename, cfg)
+  Add a page, or a tab to an existing page, after the dialog has been built. CFG takes the same fields as an entry in
+  cfg.pages, including its own tabs, except when a retired page or tab of that name comes back (see RemovePage). Returns the
+  new page or tab.
+
+ret:RemovePage(pagename)
+ret:RemoveTab(pagename, tabname)
+  Remove a page, or one tab of a page. WoW provides no way to destroy a frame, so the frames are retired rather than freed,
+  and adding a page or tab of the same name again reuses them as they were first built. Of the CFG given to AddPage or AddTab
+  then, only cfg.order is taken; its text, title, split and tabs are ignored, the page or tab coming back exactly as it was.
+  This is why you should keep names stable: churning through fresh names creates frames that live until the UI is reloaded.
+
+ret.title [FontString]
+  Pointer to the top level title font string. Setting its text re-measures the plaque it sits in.
+
+ret.titleplate [frame]
+  The plaque the title sits in.
+
+ret.portrait [texture]
+  The picture in the portrait.
+
+ret:SetPortrait(texture, coords)
+  cfg.tltexture and cfg.tltexcoord after the fact, for a window whose badge names something that changes under it. COORDS is
+  optional and a texture without it is the whole of its file. Pass no texture at all and the badge goes back to the dark
+  corner a window with no logo wears, which is also how you clear one.
+
+ret.portraitbutton [frame]
+  An invisible button covering the portrait in the top left corner, for a caller that wants the badge to mean something.
+  Catch "OnDoubleClick" on it, or "OnClick", which is handed the mouse button, for a click with a modifier held. The game
+  gives the second click of a pair to OnDoubleClick instead of OnClick, so a plain click is best left meaning nothing.
+
+ret.xbutton [frame]
+  The close button, which hides the dialog and throws OnClose.
+
+ret.content [frame]
+  A frame covering the usable portion of the dialog, inside the rim and the rule and below the top bar. Note that if
+  you use the return value from KUI:CreateTabbedDialog() as the parent argument to a KoreUI widget then the widget becomes a
+  child of ret.content, not of the outer frame. That is almost certainly not what you want, as this frame sits behind every
+  page and anything on it shows on all of them. Usually you pass a page or a tab as the parent instead.
+
+ret.pagecontent [frame]
+  The content frame of whatever is currently selected: the current tab's content if the current page has tabs, otherwise the
+  page's own.
+
+ret.topbar [frame]
+  The dialog's global top bar, visible on every page and tab. Each page has its own top bar as well, which changes with the
+  page; use this one for content that should not change at all.
+
+ret.currentpage [string]
+  Name of the currently selected page, or nil if none is shown.
+
+ret.pages [table]
+  Array of every page, in the order they are drawn.
+
+ret.pagesbyname [table]
+  The same pages keyed by name. GetPage is the supported way to reach one of these.
+
+  page.frame
+    Full frame for the page, covering its content and its top bar.
+  page.content
+    The page's content area. If the page has tabs, this covers them all.
+  page.content.hsplit
+  page.content.vsplit
+    The horizontal or vertical split, if one was configured.
+  page.topbar
+    The page's own top bar, where its tab buttons are drawn.
+  page.tbutton
+    The page's button on the bottom strip.
+  page.currenttab
+    Name of the page's currently selected tab, or nil.
+  page.tabs
+    Array of the page's tabs, in drawn order.
+  page.tabsbyname
+    The same tabs keyed by name. Each has .content and .tbutton.
+
+6.3 KUI:CreateScrollList
+------------------------
+
+The standard Blizzard API provides a type of frame called a Scroll Frame. This is a frame whose total content size can be a
+lot larger than the visual portion of the frame that is displayed. Essentially, a scroll frame is a view or window onto a
+much larger child frame canvas. These frames are generally used for larger dialogs. However, they are unsuited to displaying
+very long lists (for example, all members in a guild with 500). While it is true that a scroll frame could be used for such a
+purpose, it is very inefficient. The KoreUI scroll list solves this problem in much the same way as the internal Blizzard
+FrameXML code does with its FauxScrollFrame API - by creating a frame that can have a number of child elements whose content
+is scrolled, rather than scrolling an entire frame. For example, you can create a scroll list that can only fit 10 elements
+vertically, but which represents a list of 1000 users. The scroll bars scroll through the list and re-populate each of the 10
+visual elements from a list, rather than creating a single scroll frame whose child is big enough to hold all 1000 elements.
+This is vastly more efficient, but it does require a bit of extra coding. KoreUI tries to reduce the amount of code you have
+to write to the barest minimum.
+
+Scroll lists work on the basic principle that there are a finite number of visual elements used to display an infinite number
+of items. If the scroll list itself is resizable, the number of visual elements may change but the principle of a finite
+number of visual elements remains. The scroll bars may give the visual impression that a large canvas is being scrolled, but
+in fact it is not, only the content of the visual elements are changed as the user scrolls through the list. In this
+implementation, each visual element must be of the same height. KUI:CreateScrollFrame is for what is not rows of one height.
+
+When you create or resize a scroll list, KoreUI determines how many visual elements of the specified height will fit in the
+scroll list frame. If there are too many visual elements (the frame was made smaller) it hides the extra ones, and if there
+are too few, it calls a user function to create new ones. This same function is used to create the initial visual elements
+too. This is the newitem configuration element described below.
+
+When the content is scrolled or a visual item needs to have its content set, another function (setitem in the configuration)
+is called with an index indicating which member of the larger display list needs to be displayed. When an entry in the list
+is selected, a third function, called selectitem, is called. These functions are discussed in more detail below.
+
+Armed with these three functions, KoreUI can efficiently manage the display of the large list of items using the available
+number of visual items. It manages the positioning of the scroll bars, filling each visual element with the required info etc.
+
+Each visual element, as stated above, must be a uniform height, but KoreUI places no other restrictions on the visual
+elements. They can be as simple or as complex as you need. The KahLua Konfer Suicide Kings addon makes extensive use of some
+rather complex scroll lists if you want to see these in action.
+
+IMPORTANT: this container is different from other KoreUI containers in that it does not actually create a container frame,
+rather it fully occupies the parent frame given as an argument to the function, less one pixel on the left and
+KUI.SCROLLBAR_COMPENSATE on the right, where its scroll bar stands (none for a list made without a bar, cfg.scrollbar below).
+The width and height config elements are ignored. The
+most typical use for a scroll list is to fill the content frame of a vertical split, or any other container frame you create
+and specify as the parent. If there are any other widgets on the frame you specify as a parent, they will be obscured by the
+scroll list. Therefore, it is the programmers responsibility to ensure that this function is called with a suitably empty
+parent as its second argument.
+
+In the discussion below, there are two terms used that you need to be aware of. The slot number refers to the visual element
+position. For example, if you have a scroll list with 10 visual elements or slots that is covering an item list of 1000
+users, the slot number will range from 1 to 10. When you are at the top of the list, slot 1 will display item 1, slot 2 will
+display item 2 etc. If you scroll down the list, slot 1 will now display item 11, slot 2 will display item 12 etc. The second
+term is the item index, or simply the index. This is the index into the larger list that the scroll list slots cover. In the
+example above, the index would range from 1 to 1000.
+
+cfg.name [string]
+  Must be provided and must be unique.
+
+cfg.itemheight [number]
+  The height of each item. The newitem function below must create and return a single frame that is exactly this high.
+
+cfg.scrollstyle [string]
+  "rows", the default, or "smooth".
+
+  A list of rows scrolls a whole item at a time: the item at the top of the list is always a whole one, and the scrollbar
+  steps by the item height. It is also only ever as tall as a whole number of items, as many as its parent's height holds,
+  so that it never ends in a gap too short for another one, and it is cut again whenever the parent changes height. What is
+  left over stays in the parent below the list and its scrollbar. That is right for a list of text rows, where an item is a
+  line or two high and stopping between two of them would only look untidy.
+
+  "smooth" is for a list whose items are big enough that jumping a whole one is a lurch, or one that must run to the foot of
+  its parent. The list then fills its parent and scrolls by the pixel: an item is cut off at the top and at the bottom, the
+  list keeps one more visual element than fits to draw them, and a wheel notch moves half an item rather than half a page.
+
+  Nothing else changes. The item and slot numbers mean what they always did, and setitem is called for the part items exactly
+  as for the whole ones.
+
+cfg.scrollbar [boolean]
+  Defaults to true. Set it to false for a list with no scroll bar, scrolled by the mouse wheel alone. It keeps no strip for
+  one and runs to its parent's right edge, and ret.scrollbar is still there, hidden, holding where the list is scrolled to.
+
+cfg.well [boolean]
+  Sink the list into what it stands on: a thin rim of the panel's art, as dim as a scroll bar, round a ground darker than the
+  parent's, drawn on the parent under the list, with the rows, a check list's boxes and the bar standing a little in from
+  the parent's edges inside it. A list of whole rows ends a little above the well's foot, the well hugging it, and what it
+  leaves over stays below. ret.wellrim is the rim and ret.wellground the ground.
+
+cfg.itemcheck [string]
+  "TINY", "SMALL" or "NORMAL" makes the list a check list, every item with a checkbox of its own that big (10, 12 and
+  KUI.CHECKBOX_SIZE), and "NONE", the default, gives it none. The boxes stand in a strip down one side of the list, inside
+  it, each KUI.WIDGET_GAP clear of its item and outside the item's highlight, and the items stand in from that side to make
+  room. The strip is there whether the boxes are shown or hidden, so the items stay where they are as the boxes come and go.
+  A box belongs to its item's slot and comes and goes with it.
+
+cfg.checkpos [string]
+  "LEFT", the default, or "RIGHT": which side of the list the boxes stand down.
+
+cfg.ischecked [function]
+  ischecked(ret, index) answers whether item INDEX is ticked, asked for every item as the list is filled and whenever a box
+  is drawn again. With it the ticks are the caller's, kept wherever it likes (by its own key rather than by place in the
+  list, say), and it changes what it keeps when told of a change by OnItemChecked: a box clicked shows what ischecked says
+  next, so a change the caller does not take is undone. Without it the list keeps the ticks itself, by item index.
+
+cfg.highlight [string]
+cfg.highlightcolour [table]
+  How a row marks the pointer being on it and being selected. Left out, a row the pointer is on shows a faint charcoal fill,
+  and the selected row the whole fill with a thin ring round it in the window's tint, part rowrim (see section 2.2). The fill
+  is charcoal rather than a colour, so a row's words keep their own colours, which in a list of players are usually a class's.
+  Its corners are rounded to the ring's inner edge and drawn at their own size however tall the row, its sides and middle
+  stretched between them, so it follows the ring on a card of several lines as it does on a single line. cfg.highlight =
+  "LIGHT" asks for this explicitly.
+
+  Set cfg.highlight to "DARK" for a darker charcoal, the shade of a panel's ground and so all but invisible against one, or
+  to "GRAIN" for the grey grain the kit wore before the charcoals, drawn for a single line and stretched past that.
+
+  Set cfg.highlight to "GLOW" and the rows glow instead, the way a menu item does, softly under the pointer and more strongly
+  when selected. The glow wears the glow part's colour, or exactly cfg.highlightcolour where that is given.
+
+  All of them are read by the rows as they are made, through KUI:RowHighlight, KUI.NewItemHelper and KUI.HighlightItemHelper,
+  so a row made any other way is not marked at all.
+
+cfg.newitem [function]
+  This is the user-supplied function that is used to create new visual elements when they are needed (either during initial
+  list creation or on the fly if the list is resized). This function takes 2 arguments: the first is the return value from
+  KUI:CreateScrollList (ret), and the second is the visual element number or slot number. The return value from this function
+  is refered to as a "slot" or "slot button" (becuase the most common frame type returned is a button frame).
+
+  The list places each slot, one under another, and stretches it to the list's own width, which stops short of the strip
+  kept for the scrollbar. So the width newitem gives a slot does not matter, and anything in it laid against its right edge
+  lands against the list's.
+
+cfg.setitem [function]
+  This function is used to set the contents of a given slot to display the contents of a given index into the larger list.
+  This function takes 4 arguments: the first is the return value from CreateScrollList (ret), the second is the index into
+  the larger list, the third is the slot number, and the 4th is the actual slot button, which is the return value from a call
+  to newitem above. This function needs to set any content in the slot button that is appropraite for the index being
+  displayed in this slot.
+
+cfg.selectitem [function]
+  This function is called when an item is selected or deselected. It is only called when the selected item in a list actually
+  changes or when the list is being updated. It takes the same arguments as setitem above with an extra boolean. This boolean
+  can actually have 3 states. When the state is boolean true, it means the item specified by the index is being selected. If
+  the item is currently able to be displayed, then the slot and button arguments are non-nil. If the selected item is
+  scrolled off the visible portion of the list, they are nil. When the state is boolean false, it means the given item is
+  being de-selected. The code will always deselect any currently selected item before selecting a new one. If the state is
+  explicitly nil, it means the list has no item selected. When the state is true (the item is being selected), that is the
+  usual time to update any other user interface elements that need to be changed when a list item is selected. It is also
+  where you would enable any of those user interface elements. When state is false, that is the customary time to disable any
+  user interface elements that should be disabled when there is no item selected. It is entirely possible that those elements
+  will be re-enabled almost immediately when a new item is selected, but still the code should do the disabling of such
+  elements here.
+
+cfg.highlightitem [function]
+  This function is called for each slot in the visible list. It takes the same arguments as setitem above with an extra
+  boolean. This boolean is set to true when the given slot is the currently selected item, or false if not. This is used to
+  visually highlight the selected item in the list. Note that if the currently selected item is not being displayed because
+  it is scrolled away from the visible slots, then all of the visible slots will be called with this argument set to false.
+
+ret:UpdateList()
+  Call this if you have updated the number of items in the larger list, or the contents of that list. Before calling this,
+  however, you *MUST* have set ret.itemcount to be the total number of items in the larger list that is being scrolled
+  through.
+
+ret:SetSelected(index, display, force)
+  Sets the item specified by index as the currently selected item in the list. This is the index into the larger list, not
+  the index into the number of visual elements. If display is boolean true and the selected item is currently not visible,
+  make it visible. If possible, this will cause the selected item to occupy slot 1. This should always be set to false when
+  called from a button OnClick handler, as the button is already displayed (otherwise you couldn't click it). If the force
+  option is specified it forces the selection of the item, even if it is the currently selected item. Usually, if the
+  currently selected item is re-selected the selectitem function is not run. With force set, it is.
+
+ret:GetSelected()
+  Returns the index of the currently selected item. This is an index into the larger list, not the list of visible items. If
+  no item is currently selected this will return nil.
+
+ret.itemcount [number]
+  The number of items in the full list. This must be set accurately and must be set before calling ret:UpdateList().
+
+ret.itemheight [number]
+  The same as cfg.itemheight
+
+ret.newitem [function]
+ret.setitem [function]
+ret.selectitem [function]
+ret.highlightitem [function]
+  The functions used to create, set, select and highlight items.
+
+ret.slots [table]
+  A table of the visible slots.
+
+ret.scrollbar [table]
+  The kit's scroll bar, a track with a thumb that carries a stone in the gem colour and an arrow button off each end. It is
+  shown only while there is more in the list than fits.
+
+ret:SetEnabled(onoff)
+  A disabled scroll list can be neither scrolled nor clicked. Its bar, the bar's arrow buttons and the mouse wheel stop, and
+  its slots stop taking the mouse, slots made later as the list grows included. What it shows is left as it is. A check
+  list's boxes go dark with it.
+
+A check list (cfg.itemcheck) has these too. An index is an item's place in the larger list, as for SetSelected, and nil for
+every item where it may be left out.
+
+ret:CheckAll()
+ret:UncheckAll()
+ret:SetCheckedAll(onoff)
+  Tick, or untick, every item whose box is shown and lit. An item whose box is hidden or dark is left as it is.
+
+ret:SetItemChecked(index, onoff)
+ret:GetItemChecked(index)
+  Tick or untick one item, and whether it is ticked.
+
+ret:ShowItemCheck(index)
+ret:HideItemCheck(index)
+ret:EnableItemCheck(index)
+ret:DisableItemCheck(index)
+  Show, hide, light or darken item INDEX's box, or with INDEX nil every box. What is said of one item stands over what was
+  said of them all until the next word for them all, which wipes every word for one. They are kept by index, so a caller
+  that changes what is at an index says them again.
+
+ret:RefreshChecks()
+  Draw every box in sight again, for a caller whose ischecked now answers differently without the list having been updated.
+
+ret:CheckStrip()
+  How wide the strip kept for the boxes is, the box and its gap, and 0 for a list that is not a check list. For a caller
+  sizing what the list stands in, or placing something beside the boxes.
+
+throw:OnItemChecked(index, checked, user)
+  Thrown when item INDEX's tick changes, and only then: by a click, USER true, or by the functions above, USER false.
+  Nothing is thrown for a tick set to what it already was, and CheckAll and its fellows throw once for each item they
+  change.
+
+In order to try and reduce the code that users have to write to support scroll lists, KoreUI provides three "helper"
+functions you may want to use in your newitem, setitem and selectitem functions. These helper functions are discussed here.
+
+KUI.NewItemHelper (objp, num, name, w, h, stf, och, ocs, pch)
+  This function is meant to assist with the newitem scroll list function. objp is the base object for the scroll list (the
+  return value from CreateScrollList), num is the slot number, name is the base name for the scroll list item frames, w and h
+  are the width and height of the frame, stf is a function you can provide to set the "text" of the slot, och is a function
+  you can set to be called as the handler for the button's OnClick event, and ocs is code that is called from within the
+  default OnClick handler. stf receives 2 arguments, which are objp and a text string. och receives to arguments, which are
+  objp and the event name (always OnClick), and ocs receives 2 arguments, objp and the item index. If ocs returns true,
+  KoreUI will not call SetSelected() on the item, otherwise it does. This function creates a button based frame and gives it
+  the kit's row glow while the mouse is over it. Supports a single SetText function that will set the button text. pch is a
+  post-create hook function that is passed the just-created frame, objp and num, in that order. Use it to customize the frame
+  in any way you see fit. The frame also has SetTree(kind), which draws it as part of a tree exactly as a column list's
+  row:SetTree does. A row is one line: its text does not wrap, and what does not fit ends in an ellipsis.
+
+KUI.SetItemHelper (objp, btn, idx, tfn)
+  Displays a simple text string. btn is the actual button being displayed, idx is the index, and tfn is a function that takes
+  the object and the inde as its parameter and should return the string to display. Very simple and most here just for the
+  sake of completeness.
+
+KUI.SelectItemHelper (objp, idx, slot, btn, onoff, cfn, onfn, offfn, nilfn)
+  Helper for selectitem. The helper will set the selected item to be highlighted, remove the highlighting from unselected
+  items etc. objp is the returned object, idx is the index into the list, slot is the slot number, btn is the actual slot
+  button pointer. onoff is the tri-state boolean mentioned above. onfn, offfn and nilfn are the functions called when onoff
+  is true, false and nil respectively. Those functions are all passed objp, idx, slot, btn and onoff as arguments. cfn is a
+  function that can be used to do internal consistency checking. If it returns nil, then the selection function returns
+  immediately, before calling onfn(). If it returns false, then an error is thrown as the consistency check failed. If it
+  returns any other value, processing continues and onfn() will be called immediately after the call to cfn, if onfn was
+  defined.
+
+KUI.HighlightItemHelper (objp, idx, slot, btn, onoff, onfn, offfn)
+  Helper for highlightitem. This lights the slot with the kit's selected row glow, as KUI:RowSelected does, or puts it out.
+  If onfn or offfn are specified, they are called after the glow is lit or put out.
+
+6.3.1 KUI:CreateColumnList
+--------------------------
+
+A scroll list whose rows are cut into columns, under a header that names each column and sorts by it. The header is a
+straight button per column, and the column the list is sorted on carries the kit's sort arrow, pointing up while it runs
+upward and down while it runs downward. Clicking a sortable column sorts on it running upward, and clicking the column
+already sorted on turns it round.
+
+Like a scroll list, the list does not hold the caller's rows. The caller keeps them, says how many there are with
+ret:UpdateList, and fills a row's cells in setitem. When a header is clicked the list throws OnSort, and the caller sorts
+its rows, usually with ret:Sort, and calls ret:UpdateList again.
+
+Like a scroll list it fills its parent completely, and cfg.x, cfg.y, cfg.width and cfg.height are ignored. The rows mark
+the pointer and the selection as a scroll list's do, and cfg.highlight and cfg.highlightcolour are handed straight to it.
+The header and the rows both stop short of the strip kept for the scroll bar, and the bar runs up that strip to the top of
+the header, its up arrow beside the last column.
+
+cfg.name [string]
+  Must be provided and must be unique. The scroll list inside is named after it.
+
+cfg.columns [table]
+  The columns, left to right, each a table of:
+    key     What the caller's setitem names the column's cell by, and what ret:Sort reads from each row unless the column
+            sorts by a function of its own. A number or a string.
+    text    The column's name in the header. A string stands at the left of the column, over the words of the cells below
+            it. A table says more about it:
+
+              text      the words.
+              justifyh  "LEFT" (the default), "CENTER" or "RIGHT", as everywhere else here.
+              justifyv  "TOP", "MIDDLE" (the default) or "BOTTOM".
+              font      the font the words are drawn in, a smaller one for a narrow column. It wears the colours every
+                        heading does, the sort arrow is drawn smaller by as much as the font is, and the column is never
+                        narrower than the words and the arrow need. A button's own font if left out.
+
+            This is not the column's align, which is about the cells: a column of numbers is commonly right while its
+            heading is not, so the two are said separately.
+
+            A heading never runs under the sort arrow. The arrow is drawn over the right hand end of a sortable column's
+            header, and the room it takes is kept clear whichever way the words are justified.
+    width   Its width in pixels, or "fill" for a column that takes whatever the list's width leaves after the fixed ones.
+            Several columns may fill, and they share what is left equally. The columns are laid out again whenever the list
+            changes size. A width in pixels is never less than the column's heading needs, its words, the ends of its
+            button and, for a column that sorts, the arrow, so a heading is never cut short: a column given too little
+            is as wide as that instead. Which is how a narrow column of numbers is asked for, at the width the numbers need.
+    align   "LEFT" (the default), "CENTER" or "RIGHT", for the words in its cells.
+    header  A control of yours in the header instead of a heading, for a column whose cells are controls too: the tick that
+            answers for every row belongs at the top of the column of ticks it answers for, not beside it. A table of:
+
+              checked  whether it starts ticked.
+              tooltip  as any widget's.
+              changed  function (list, onoff), called when the player clicks it and not when you set it.
+
+            Today the control is always a checkbox. A column with one cannot be sorted on, the heading being a button so
+            that clicking it sorts and a control in its place taking those clicks for itself. text is ignored.
+    sort    Leave it out and the column cannot be sorted on. True sorts on the value of key in each row, numbers as numbers
+            and anything else as words without regard to case. A function (a, b) sorts by that instead, answering whether
+            row A comes before row B running upward, and is how a column whose cells show something other than the stored
+            value sorts by what it shows.
+    tree    True for the column that carries a row's tree connector (row:SetTree), its words standing in past it, for a
+            list whose tree belongs under a column other than its first: a list of members under a column of standings,
+            the alts under their main's name. Left out everywhere, the first column shown carries it.
+
+cfg.sortkey [number or string]
+cfg.descending [boolean]
+  The column the list starts sorted on, and whether it starts running downward. Setting these shows the arrow. It does not
+  sort anything, which is the caller's to do.
+
+cfg.itemheight [number]
+  The height of a row. Defaults to 16.
+
+cfg.font [string]
+  The font the cells are drawn in. Defaults to "GameFontNormalSmallLeft".
+
+cfg.setitem [function (ret, idx, slot, row)]
+  Fill ROW for item IDX of the caller's rows, with row:SetCell(key, text) for each column. Must be provided. ROW's ID is IDX.
+
+cfg.selectitem [function (ret, idx, slot, row, onoff)]
+  As a scroll list's selectitem. Optional.
+
+cfg.newrow [function (ret, row, num)]
+  Called for each row as it is made, after its cells are, for anything more a row wants: a tooltip, or an OnClick of its own
+  in place of selecting the row. Hook OnEnter and OnLeave rather than setting them, since the row's hover mark uses them.
+  Optional.
+
+cfg.scrollbar, cfg.itemcheck, cfg.checkpos, cfg.ischecked
+  Handed straight to the scroll list inside, as a scroll list's (section 6.3). A check list's strip is taken off the width
+  the columns are laid out across, so a "fill" column stops short of the boxes, and the headings stand in from the side
+  the strip is on, each over its cells. ischecked is called with the scroll list inside, not the column list.
+
+cfg.checkall [boolean]
+  In a check list, a box in the header over the rows' boxes, as big as they are, which ticks or unticks every row whose box
+  is shown and lit, and is ticked while they all are. It is shown, hidden, lit and darkened with the boxes it stands over.
+
+ret:CheckAll ()
+ret:UncheckAll ()
+ret:SetCheckedAll (onoff)
+ret:SetItemChecked (index, onoff)
+ret:GetItemChecked (index)
+ret:ShowItemCheck (index)
+ret:HideItemCheck (index)
+ret:EnableItemCheck (index)
+ret:DisableItemCheck (index)
+ret:RefreshChecks ()
+ret:CheckStrip ()
+  A check list's, handed on to the scroll list inside exactly as described there, the header box kept right as they act.
+
+throw:OnItemChecked(index, checked, user)
+  The scroll list's, thrown on again by the column list, which keeps the scroll list's own catch for its header box. Catch it
+  on the column list.
+
+row:SetCell (key, text)
+row.cells [table]
+  Set the words in the cell for column KEY, and the font strings themselves by key.
+
+row:SetTree (kind, lead)
+  Draw the row as part of a tree one level deep, a parent followed by its children. KIND is nil for a parent or a row that
+  is in no tree, "branch" for every child but the last of its parent, and "end" for the last. A child has a connector in
+  the column that carries the tree (a column's tree, below), a rod down from the parent's words above it and an arm across
+  to its own, which stand in past it.
+  LEAD is how far the whole connector, and the words with it, stand in from where a parent's words start, 0 if left out.
+  A branch's rod runs on to the next row and an end's stops at its arm. Rows are reused as the list scrolls, so setitem sets
+  this for every row, nil included. The connectors are strips of polished metal in the window's tint, whole pixels at any
+  row height.
+
+ret:UpdateList (count)
+  Show the rows again, COUNT of them if it is given. ret.itemcount is the count in use.
+
+ret:Sort (rows)
+  Sort the table ROWS in place by the column the list is sorted on, running the way it runs. Does nothing when that column
+  cannot be sorted on.
+
+ret:SetSort (key, ascending, throw)
+ret:GetSort ()
+  Set the column the list is sorted on and which way, moving the arrow, and throw OnSort if THROW is true. GetSort answers
+  the key and whether it runs upward.
+
+KUI.COLUMN_GAP
+  The space between two columns, 4. A set of columns is as wide as their widths and one gap fewer than there are columns.
+
+ret:SetColumnShown (key, onoff)
+  Show or hide the column KEY. A hidden column takes no room: its header button and its cells go, and the columns after it
+  close up, a "fill" column taking the width it gave up. Hiding the column the list is sorted on leaves the sort as it was,
+  so a caller that minds sets another.
+
+ret:ColumnWidget (key)
+  The control in column KEY's header, where that column was given one, and nil otherwise. This is for a caller that has to
+  put the control back where the rows have moved under it: a tick at the head of a column of ticks says nothing once every
+  row has been ticked by hand, and only the caller knows when that is so. Set it without throwing, it being what the rows
+  already say rather than anything the player clicked.
+
+ret:AddColumn (column)
+  Add a column, described exactly as one of cfg.columns is, to a list that has already been built, and answer it. It goes on
+  the end, so the column carrying the tree connector does not change. Rows that already exist are given a cell for it, so a
+  list part way through being filled takes one as happily as an empty one. This is for a list whose shape is only settled by
+  what arrives, a reply naming things the caller could not know in advance. A list whose columns are known at the outset
+  should still declare them in cfg.columns and hide the ones it does not want.
+
+  There is no RemoveColumn. SetColumnShown(key, false) is how a column goes away, the frames behind it being a cost WoW
+  never lets go of anyway.
+
+ret:SetSelected (index, display, force)
+ret:GetSelected ()
+  As a scroll list's.
+
+ret.list [table]
+ret.header [frame]
+  The scroll list inside, and the frame the header buttons are in.
+
+throw:OnSort(key, ascending)
+  Thrown when a header is clicked, after the arrow has moved.
+
+6.3.2 KUI:CreateScrollFrame
+---------------------------
+
+A canvas taller than the view onto it, for whatever is not rows of one height: boxes each as tall as what is in them, a form
+longer than its panel, a mix of the two. A scroll list draws only the rows in view and refills them as it scrolls, which is
+what makes a thousand rows cheap. A scroll frame draws everything on the canvas once and moves the view over it, so it suits
+a few dozen frames of any shapes and sizes, never a list of hundreds.
+
+The caller builds on ret.canvas, says how tall that came to with ret:SetCanvasHeight, and the frame scrolls it by the pixel
+under the kit's own scroll bar, the one a scroll list wears. The bar is shown only while the canvas is taller than the view.
+A notch of the mouse wheel, over the canvas or over the bar, moves half the bar's height, which is what each of its arrow
+buttons moves.
+
+Like a scroll list it creates no container of its own. It fills the parent it is given, less one pixel on the left and
+KUI.SCROLLBAR_COMPENSATE on the right, where the bar stands, and the width and height config elements are ignored. Give it a
+parent of the size wanted, with nothing else on it.
+
+cfg.name [string]
+  The frame's name. Made up if not given.
+
+cfg.highlight [string]
+cfg.highlightcolour [table]
+  How a row put on the canvas marks the pointer and the selection, when it is marked through KUI:RowHighlight and
+  KUI:RowSelected: "LIGHT" (the default), "DARK", "GRAIN" or "GLOW", exactly as a scroll list's rows. A row of any height
+  keeps its fill's rounded ends.
+
+ret.canvas [frame]
+  What to build on. It is always as wide as the view, so a widget anchored to its right hand edge stands against the bar's
+  strip, and as tall as ret:SetCanvasHeight last said. Anchor everything to its top: the top of the canvas is the top of
+  the view when the frame is scrolled all the way up.
+
+ret:SetCanvasHeight(height)
+  How tall what is on the canvas is, in pixels. Call it whenever that changes. The bar's range follows, and a canvas that
+  has shrunk below where the view was brings the view up with it.
+
+ret:ScrollTo(offset)
+  Move the view to OFFSET pixels below the top of the canvas, 0 being the top. An offset past the end stops at the end.
+
+ret:SetEnabled(onoff)
+  A disabled scroll frame cannot be scrolled: its bar, the bar's arrow buttons and the mouse wheel stop. What is on the canvas
+  keeps its own enable rules and is left as it is.
+
+ret.scrollbar [table]
+  The bar, as a scroll list's. Its value is how far down the canvas the view is.
+
+6.4 KUI:CreatePopupList
+-----------------------
+
+This is a hybrid between KUI:CreatePopupMenu() and KUI:CreateScrollList(). It is used to create a popup menu which can
+contain an arbitrarily long list of elements. This makes using a popup menu somewhat undesirable, as each and every element
+in a popup menu list creates its own frame. For very long lists, like all guild members, this can be excessive. Thus this
+container combines the functionality of both a popup menu and a scroll list. It does differ from KUI:CreatePopupMenu() in one
+major way though: you can not have submenus. This is really intended for cases where you really just need a long list of
+names in a popup window.
+
+cfg.x, cfg.y, cfg.width, cfg.height, cfg.canmove, cfg.canresize, cfg.minwidth, cfg.maxwidth, cfg.minheight, cfg.maxheight
+  As described in section 1 above. The height is the tallest the popup grows to as its list gets longer.
+
+cfg.border, cfg.blackbg, cfg.xbutton, cfg.escclose
+  Handed straight to the dialog this is built on. See KUI:CreateDialogFrame.
+
+cfg.name [string]
+  Must be provided and must be unique
+
+cfg.itemheight [number]
+cfg.itemwidth [number]
+  The height and width of each item. Default to 16 and 160.
+
+cfg.header [number]
+  Number of pixels to leave at the top of the popup menu for a header frame.
+
+cfg.footer [number]
+  Number of pixels to leave below the popup menu for a footer frame.
+
+cfg.title [string or table]
+  The title displayed at the very top of the popup, handed straight to the dialog this is built on. See KUI:CreateDialogFrame.
+
+cfg.timeout [number]
+  How many seconds the popup stays open after the mouse leaves it before it hides itself. The countdown starts only when the
+  mouse leaves, never when the popup opens, so a popup opened from a button stays open until it has been used or left.
+  Defaults to 0, which never hides it this way. It closes when an item is picked, unless cfg.keep is set, or by its close
+  button or Escape if it has them.
+
+cfg.keep [boolean]
+  Stay open when an item is picked, for a list the user picks several things from in a row. The selection function is still
+  called for each, and can take what was just picked out of the list with ret:RemoveValue. Such a popup always has the
+  close button, whatever cfg.xbutton says, picking an item no longer being a way to close it. A popup's close button sits
+  over the top right corner of its rim, and the header, cfg.header, is the room beside it.
+
+cfg.arg [anything]
+  Any value you like. Passed to the selection function below.
+
+cfg.func [function]
+  Function to call when an item is selected by the user. Receives three arguments: the list given to ret:UpdateList, the
+  index of the item selected, and cfg.arg, which can have any value. The popup hides itself afterwards unless cfg.keep says
+  otherwise.
+
+cfg.textfunc [function (table, idx, arg)]
+  Optional special function that you can use to get the value of a specific item. Use this function if the list you will be
+  providing does not have tables with text members, or is not a simple list of strings. This is passed the table as provided
+  to ret.UpdateList(), the index into that table whose text needs to be extracted, and the value of cfg.arg.
+
+ret.UpdateList [function (table)]
+  Function to call to set the new item list. The table must either be a list of tables, each with an element called "text",
+  or it must be a simple list of strings. When the popup is initially created it will have no items and you should call this
+  with the item list before calling :Show() to show the popup. When you are done with the list you can pass the nil value to
+  this function to remove reference to the list table.
+
+ret:RemoveValue (value)
+  Take every item whose value is VALUE out of the list given to ret.UpdateList, and show what is left. The table is changed
+  in place. With cfg.keep, this is how a picked item leaves the list without the caller building it again.
+
+ret:AddItem (item, pos)
+  Put ITEM, a table with text and value or a plain string, into the list at POS, or at the end if POS is left out, and show
+  the list. The table is changed in place, and a popup with no list yet starts one. Where a list is kept in an order, the
+  caller works out POS, since only the caller knows the order.
+
+ret.header [frame]
+  Pointer to the header frame, if any.
+
+ret.footer [frame]
+  Pointer to the footer frame, if any.
